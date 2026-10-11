@@ -26,3 +26,4 @@ mysql_data/
 node_modules/
 **/dist/
 dist/
+/jumpln-app-frontend-react-vite/.idea
