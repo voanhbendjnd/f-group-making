@@ -50,6 +50,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           label: t('majors.navLabel'),
           icon: <GraduationCap size={18} />,
         },
+        {
+          to: '/admin/lecturers',
+          label: 'Giảng viên',
+          icon: <UserCheck size={18} />,
+        },
       ]
     : [
         {

@@ -162,14 +162,16 @@ public class UserService {
                         "invalidactivationkey"
                 ));
 
-        Authority studentAuthority = authorityRepository.findById(AuthoritiesConstants.STUDENT)
-                .orElseThrow(() -> new IllegalStateException("Student authority is not configured"));
-
         user.setPassword(passwordEncoder.encode(password));
         user.setActivated(true);
         user.setActivationKey(null);
         user.setActivationKeyExpiresAt(null);
-        user.getAuthorities().add(studentAuthority);
+
+        if (user.getAuthorities() == null || user.getAuthorities().isEmpty()) {
+            Authority studentAuthority = authorityRepository.findById(AuthoritiesConstants.STUDENT)
+                    .orElseThrow(() -> new IllegalStateException("Student authority is not configured"));
+            user.getAuthorities().add(studentAuthority);
+        }
         userRepository.save(user);
         clearUserCaches(user);
     }

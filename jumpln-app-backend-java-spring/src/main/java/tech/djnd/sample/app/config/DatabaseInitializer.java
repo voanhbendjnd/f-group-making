@@ -38,17 +38,20 @@ public class DatabaseInitializer implements CommandLineRunner {
         Long totalAuthority = authorityRepository.count();
         Set<Authority> authorities = new HashSet<>();
 
-        if (totalAuthority.equals(0L)) {
-            log.info("Start create authority...");
-
-            Authority adminAuthority = new Authority();
-            adminAuthority.setName(AuthoritiesConstants.ADMIN);
-            Authority userAuthority = new Authority();
-            userAuthority.setName(AuthoritiesConstants.STUDENT);
-            Authority anonymousAuthority = new Authority();
-            anonymousAuthority.setName(AuthoritiesConstants.ANONYMOUS);
-            authorities.addAll(List.of(adminAuthority, userAuthority, anonymousAuthority));
-            authorityRepository.saveAll(authorities);
+        List<String> requiredRoles = List.of(
+                AuthoritiesConstants.ADMIN,
+                AuthoritiesConstants.STUDENT,
+                AuthoritiesConstants.LECTURE,
+                AuthoritiesConstants.LECTURE_MASTER,
+                AuthoritiesConstants.ANONYMOUS
+        );
+        for (String roleName : requiredRoles) {
+            if (!authorityRepository.existsById(roleName)) {
+                Authority auth = new Authority();
+                auth.setName(roleName);
+                authorityRepository.save(auth);
+                authorities.add(auth);
+            }
         }
 
         if (totalUsers.equals(0L)) {

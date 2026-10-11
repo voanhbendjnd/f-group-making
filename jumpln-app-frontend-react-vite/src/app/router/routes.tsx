@@ -17,6 +17,8 @@ import { AdminDashboardPage } from '@/pages/admin/AdminDashboardPage';
 import { StudentListPage } from '@/pages/admin/StudentListPage';
 import { StudentImportPage } from '@/pages/admin/StudentImportPage';
 import { MajorListPage } from '@/pages/admin/MajorListPage';
+import { LecturerListPage } from '@/pages/admin/LecturerListPage';
+import { LecturerImportPage } from '@/pages/admin/LecturerImportPage';
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
 import { UnauthorizedPage } from '@/pages/errors/UnauthorizedPage';
 import { NotFoundPage } from '@/pages/errors/NotFoundPage';
@@ -116,6 +118,14 @@ export const router = createBrowserRouter([
       {
         path: 'majors',
         element: <MajorListPage />,
+      },
+      {
+        path: 'lecturers',
+        element: <LecturerListPage />,
+      },
+      {
+        path: 'lecturers/import',
+        element: <LecturerImportPage />,
       },
     ],
   },
