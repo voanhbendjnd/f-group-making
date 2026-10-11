@@ -6,6 +6,7 @@ import jakarta.persistence.criteria.Subquery;
 import org.springframework.data.jpa.domain.Specification;
 import tech.djnd.sample.app.domain.Student;
 import tech.djnd.sample.app.domain.User;
+import tech.djnd.sample.app.domain.Major;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -18,6 +19,11 @@ public final class StudentSpecifications {
 
     public static Specification<Student> withFilter(
             String search, String majorCode, Boolean activated, Boolean hasActivationKey) {
+        return withFilter(search, majorCode, null, activated, hasActivationKey);
+    }
+
+    public static Specification<Student> withFilter(
+            String search, String majorSearch, Integer majorId, Boolean activated, Boolean hasActivationKey) {
 
         return (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
@@ -43,9 +49,14 @@ public final class StudentSpecifications {
                 predicates.add(cb.or(searchPredicates.toArray(new Predicate[0])));
             }
 
-            if (majorCode != null && !majorCode.isBlank()) {
-                predicates.add(cb.like(cb.lower(root.get("majorCode")),
-                        "%" + majorCode.trim().toLowerCase() + "%"));
+            if (majorId != null) {
+                predicates.add(cb.equal(root.get("majorId"), majorId));
+            } else if (majorSearch != null && !majorSearch.isBlank() && query != null) {
+                Subquery<Integer> majorSubquery = query.subquery(Integer.class);
+                Root<Major> major = majorSubquery.from(Major.class);
+                majorSubquery.select(major.get("id"));
+                majorSubquery.where(MajorSpecifications.matchingPredicate(major, cb, majorSearch));
+                predicates.add(root.get("majorId").in(majorSubquery));
             }
 
             if ((activated != null || hasActivationKey != null) && query != null) {

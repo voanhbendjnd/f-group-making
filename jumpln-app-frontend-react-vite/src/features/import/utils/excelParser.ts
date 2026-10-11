@@ -26,7 +26,7 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
   const rawRows: any[][] = XLSX.utils.sheet_to_json(worksheet, {
     header: 1,
     defval: '',
-    blankrows: false,
+    blankrows: true,
   });
 
   const parsedRows: ParsedStudentRow[] = [];
@@ -69,11 +69,10 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
     if (!originalMajor) {
       errors.push(i18n.t('import.clientErrors.missingMajor'));
     } else {
-      const parts = originalMajor.split('_');
-      if (parts.length >= 2) {
-        extractedMajorCode = parts[1];
-      } else {
-        extractedMajorCode = originalMajor;
+      const parts = originalMajor.split('_', 3);
+      extractedMajorCode = (parts[1] || '').trim().toUpperCase();
+      if (parts.length < 2 || !/^[A-Z0-9][A-Z0-9-]{0,19}$/.test(extractedMajorCode)) {
+        errors.push(i18n.t('import.clientErrors.invalidMajorFormat'));
       }
     }
 

@@ -10,6 +10,7 @@ public record StudentRow(
         String memberCode,
         Integer majorId,
         String majorCode,
+        String majorName,
         Boolean activated,
         String activationKey,
         Instant activationKeyExpiresAt,

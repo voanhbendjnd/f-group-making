@@ -2,17 +2,24 @@ package tech.djnd.sample.app.repository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.criteria.*;
+import org.hibernate.query.criteria.JpaEntityJoin;
+import org.hibernate.query.criteria.JpaRoot;
+import org.hibernate.query.sqm.tree.SqmJoinType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.query.QueryUtils;
 import org.springframework.stereotype.Repository;
 import tech.djnd.sample.app.domain.Student;
 import tech.djnd.sample.app.domain.User;
+import tech.djnd.sample.app.domain.Major;
 import tech.djnd.sample.app.service.projection.StudentRow;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
 
 @Repository
 public class StudentQueryRepository {
@@ -29,6 +36,9 @@ public class StudentQueryRepository {
         // ---- data query ----
         CriteriaQuery<StudentRow> cq = cb.createQuery(StudentRow.class);
         Root<Student> root = cq.from(Student.class);
+        // Join the entity explicitly by ID; Student has no association mapping.
+        JpaEntityJoin<Major> major = ((JpaRoot<Student>) root).join(Major.class, SqmJoinType.LEFT);
+        major.on(cb.equal(root.get("majorId"), major.get("id")));
         Root<User> user = cq.from(User.class);
         Predicate studentUserCondition = cb.equal(root.get("userId"), user.get("id"));
 //        Join<Student, User> user = root.join("user", JoinType.LEFT);
@@ -51,7 +61,8 @@ public class StudentQueryRepository {
                 user.get("email"),
                 root.get("memberCode"),
                 root.get("majorId"),
-                root.get("majorCode"),
+                major.get("code"),
+                major.get("name"),
                 user.get("activated"),
                 user.get("activationKey"),
                 user.get("activationKeyExpiresAt"),
@@ -62,13 +73,14 @@ public class StudentQueryRepository {
 //        if (predicate != null) cq.where(predicate);
 
         if (pageable.getSort().isSorted()) {
-            cq.orderBy(
-                    QueryUtils.toOrders(
-                            pageable.getSort(),
-                            root,
-                            cb
-                    )
-            );        }
+            List<Order> orders = new ArrayList<>();
+            Set<String> userProperties = Set.of("createdDate", "lastModifiedDate", "email", "activated");
+            for (Sort.Order order : pageable.getSort()) {
+                orders.addAll(QueryUtils.toOrders(Sort.by(order),
+                        userProperties.contains(order.getProperty()) ? user : root, cb));
+            }
+            cq.orderBy(orders);
+        }
 
         List<StudentRow> content = entityManager.createQuery(cq)
                 .setFirstResult((int) pageable.getOffset())

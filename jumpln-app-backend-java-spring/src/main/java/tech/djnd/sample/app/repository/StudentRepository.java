@@ -15,16 +15,19 @@ import java.util.Optional;
 public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpecificationExecutor<Student> {
     List<Student> findByRollNumberIn(List<String> rollNumbers);
 
+    List<Student> findByRollNumberIgnoreCaseIn(List<String> rollNumbers);
+
     List<Student> findByMemberCodeIgnoreCaseIn(List<String> memberCodes);
 
 
     @Query(value = """
         select new tech.djnd.sample.app.service.projection.StudentRow(
-            s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, s.majorCode,
+            s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, m.code, m.name,
             u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate
         )
         from Student s
         join User u on s.userId = u.id
+        left join Major m on s.majorId = m.id
         where s.userId = :userId
     """)
     Optional<StudentRow> findStudentProjectionById(@Param("userId") Long userId);

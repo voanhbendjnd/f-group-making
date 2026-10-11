@@ -6,11 +6,13 @@ import { Button } from '@/components/common/Button';
 
 export interface ImportSuccessSummaryProps {
   totalImported: number;
+  createdMajorCodes?: string[];
   onReset: () => void;
 }
 
 export const ImportSuccessSummary: React.FC<ImportSuccessSummaryProps> = ({
   totalImported,
+  createdMajorCodes = [],
   onReset,
 }) => {
   const { t } = useTranslation();
@@ -54,6 +56,9 @@ export const ImportSuccessSummary: React.FC<ImportSuccessSummaryProps> = ({
         {t('import.successDesc')}
       </p>
 
+      {createdMajorCodes.length > 0 && <p role="status" style={{ marginBottom: '1rem' }}>
+        {t('import.createdMajors', { codes: createdMajorCodes.join(', ') })}
+      </p>}
       {/* Workflow next step guide */}
       <div
         style={{

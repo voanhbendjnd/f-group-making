@@ -9,6 +9,7 @@ import {
   Sparkles,
   ShieldCheck,
   UserCheck,
+  GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
 
@@ -43,6 +44,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           to: '/admin/students/import',
           label: t('nav.importExcel'),
           icon: <Upload size={18} />,
+        },
+        {
+          to: '/admin/majors',
+          label: t('majors.navLabel'),
+          icon: <GraduationCap size={18} />,
         },
       ]
     : [

@@ -8,8 +8,10 @@ export const studentApi = {
     if (params.search && params.search.trim()) {
       queryParams.search = params.search.trim();
     }
-    if (params.majorCode && params.majorCode !== 'ALL') {
-      queryParams.majorCode = params.majorCode;
+    if (params.majorId !== undefined) {
+      queryParams.majorId = params.majorId;
+    } else if (params.majorSearch?.trim()) {
+      queryParams.majorSearch = params.majorSearch.trim();
     }
     if (params.activated !== undefined) {
       queryParams.activated = params.activated;
@@ -50,13 +52,15 @@ export const studentApi = {
     return data;
   },
 
-  async sendActivateAllMatching(search?: string, majorCode?: string): Promise<BatchActivationResult> {
+  async sendActivateAllMatching(search?: string, majorSearch?: string, majorId?: number): Promise<BatchActivationResult> {
     const params: Record<string, any> = {};
     if (search && search.trim()) {
       params.search = search.trim();
     }
-    if (majorCode && majorCode !== 'ALL') {
-      params.majorCode = majorCode;
+    if (majorId !== undefined) {
+      params.majorId = majorId;
+    } else if (majorSearch?.trim()) {
+      params.majorSearch = majorSearch.trim();
     }
 
     const data = await apiClient.post<any, BatchActivationResult>('/api/students/activate/all', null, {

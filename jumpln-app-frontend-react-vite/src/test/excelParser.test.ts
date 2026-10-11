@@ -3,6 +3,25 @@ import * as XLSX from 'xlsx';
 import { parseExcelClientSide } from '../features/import/utils/excelParser';
 
 describe('excelParser client validation', () => {
+  it('normalizes the code after the first underscore, rejects missing codes and preserves row numbers', async () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([
+      ['Title'], ['Headers'], [],
+      [1, 'SV001', 'Student One', 'BEN_ se _ET', 'MEM001', 'one@example.com'],
+      [2, 'SV002', 'Student Two', 'SE', 'MEM002', 'two@example.com'],
+      [3, 'SV003', 'Student Three', 'BEN__ET', 'MEM003', 'three@example.com'],
+    ]);
+    XLSX.utils.book_append_sheet(workbook, sheet, 'Students');
+    const file = new File([XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })], 'students.xlsx');
+    const result = await parseExcelClientSide(file);
+    expect(result.rows[0].rowNumber).toBe(4);
+    expect(result.rows[0].extractedMajorCode).toBe('SE');
+    expect(result.rows[0].isValid).toBe(true);
+    expect(result.rows[1].isValid).toBe(false);
+    expect(result.rows[2].isValid).toBe(false);
+    expect(result.invalidCount).toBe(2);
+  });
+
   it('correctly skips first 2 header rows and validates valid student records', async () => {
     // Construct a workbook matching the backend template (row 1 & 2 headers, row 3+ data)
     const data = [

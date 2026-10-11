@@ -13,6 +13,7 @@ public interface StudentProjection {
     String getMemberCode();
     Integer getMajorId();
     String getMajorCode();
+    String getMajorName();
 
     @JsonIgnore
     UserInfo getUser();

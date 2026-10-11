@@ -2,6 +2,8 @@ package tech.djnd.sample.app.web.rest;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -14,6 +16,7 @@ import tech.djnd.sample.app.service.dto.ImportResultDTO;
 import tech.djnd.sample.app.service.dto.ResultPaginationDTO;
 import tech.djnd.sample.app.service.dto.StudentDTO;
 import tech.djnd.sample.app.util.anotation.ApiMessage;
+import java.util.Set;
 
 /**
  * REST controller for managing {@link tech.djnd.sample.app.domain.Student}.
@@ -42,13 +45,15 @@ public class StudentResource {
     public ResponseEntity<ResultPaginationDTO> getAllStudents(
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "majorCode", required = false) String majorCode,
+            @RequestParam(name = "majorSearch", required = false) String majorSearch,
+            @RequestParam(name = "majorId", required = false) Integer majorId,
             @RequestParam(name = "activated", required = false) Boolean activated,
             @RequestParam(name = "hasActivationKey", required = false) Boolean hasActivationKey,
-            Pageable pageable) {
+            @PageableDefault(size = 20, sort = {"createdDate", "userId"}, direction = Sort.Direction.DESC) Pageable pageable) {
 
         log.debug("REST request to get students with filter: search={}, majorCode={}, activated={}, hasKey={}",
                 search, majorCode, activated, hasActivationKey);
-        ResultPaginationDTO result = studentService.getStudents(search, majorCode, activated, hasActivationKey, pageable);
+        ResultPaginationDTO result = studentService.getStudents(search, majorSearch != null ? majorSearch : majorCode, majorId, activated, hasActivationKey, pageable);
         return ResponseEntity.ok(result);
     }
 
@@ -76,10 +81,12 @@ public class StudentResource {
     @ApiMessage("Batch activation request accepted successfully")
     public ResponseEntity<BatchActivationResultDTO> activateAllStudents(
             @RequestParam(name = "search", required = false) String search,
-            @RequestParam(name = "majorCode", required = false) String majorCode) {
+            @RequestParam(name = "majorCode", required = false) String majorCode,
+            @RequestParam(name = "majorSearch", required = false) String majorSearch,
+            @RequestParam(name = "majorId", required = false) Integer majorId) {
 
         log.debug("REST request to activate all matching unactivated students: search={}, majorCode={}", search, majorCode);
-        BatchActivationResultDTO result = studentService.activateAllMatching(search, majorCode);
+        BatchActivationResultDTO result = studentService.activateAllMatching(search, majorSearch != null ? majorSearch : majorCode, majorId);
         return ResponseEntity.ok(result);
     }
 
@@ -90,12 +97,13 @@ public class StudentResource {
      */
     @PostMapping(value = "/import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
-    @ApiMessage("Import students successfully")
+    @ApiMessage("Student import processed")
     public ResponseEntity<ImportResultDTO> importStudentsFromExcel(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(name = "confirmedMajorCodes", required = false) Set<String> confirmedMajorCodes) {
 
         log.debug("REST request to import students from Excel: filename={}", file.getOriginalFilename());
-        ImportResultDTO result = studentService.importFromExcel(file);
+        ImportResultDTO result = studentService.importFromExcel(file, confirmedMajorCodes);
         return ResponseEntity.ok(result);
     }
 }

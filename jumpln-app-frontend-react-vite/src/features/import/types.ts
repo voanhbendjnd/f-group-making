@@ -9,6 +9,9 @@ export interface ImportResult {
   success: boolean;
   totalImported: number;
   errors: ImportRowError[];
+  confirmationRequired?: boolean;
+  newMajorCodes?: string[];
+  createdMajorCodes?: string[];
 }
 
 export interface ParsedStudentRow {

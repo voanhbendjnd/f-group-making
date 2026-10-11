@@ -27,7 +27,7 @@ export const StudentListPage: React.FC = () => {
     page: 1,
     size: 10,
     search: '',
-    majorCode: '',
+    majorSearch: '',
   });
 
   // Selection state
@@ -99,7 +99,7 @@ export const StudentListPage: React.FC = () => {
       page: 1,
       size: 10,
       search: '',
-      majorCode: '',
+      majorSearch: '',
       activated: undefined,
       hasActivationKey: undefined,
     });
@@ -159,18 +159,18 @@ export const StudentListPage: React.FC = () => {
         <EmptyState
           title={t('students.emptyTitle')}
           description={
-            filters.search || filters.majorCode || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
               ? t('students.emptyFiltered')
               : t('students.emptyNoData')
           }
           icon={<Users size={32} />}
           actionText={
-            filters.search || filters.majorCode || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
               ? t('students.clearFilters')
               : t('students.importBtn')
           }
           onAction={
-            filters.search || filters.majorCode || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
               ? handleResetFilters
               : () => navigate('/admin/students/import')
           }

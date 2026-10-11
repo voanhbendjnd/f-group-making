@@ -6,6 +6,7 @@ export interface Student {
   memberCode: string;
   majorId: number | null;
   majorCode: string | null;
+  majorName?: string | null;
   activated: boolean;
   hasActivationKey: boolean;
   activationKeyExpiresAt: string | null;
@@ -16,7 +17,9 @@ export interface Student {
 
 export interface StudentFilterParams {
   search?: string;
-  majorCode?: string;
+  majorSearch?: string;
+  majorId?: number;
+  majorLabel?: string;
   activated?: boolean;
   hasActivationKey?: boolean;
   page?: number; // 1-indexed for Spring

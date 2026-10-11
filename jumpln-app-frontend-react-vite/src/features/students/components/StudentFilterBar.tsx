@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, Filter, Loader2 } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { MajorSearchFilter } from './MajorSearchFilter';
+import { Button } from '@/components/common/Button';
 import type { StudentFilterParams } from '../types';
 
 export interface StudentFilterBarProps {
@@ -19,16 +21,14 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
   const { t } = useTranslation();
   // Local state for smooth typing without lag or focus loss
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
-  const [majorCodeTerm, setMajorCodeTerm] = useState(filters.majorCode || '');
+  const [lastExternalSearch, setLastExternalSearch] = useState(filters.search || '');
+  const [majorResetVersion, setMajorResetVersion] = useState(0);
 
   // Synchronize when filters are modified from the outside (e.g. reset or clear)
-  useEffect(() => {
+  if (lastExternalSearch !== (filters.search || '')) {
+    setLastExternalSearch(filters.search || '');
     setSearchTerm(filters.search || '');
-  }, [filters.search]);
-
-  useEffect(() => {
-    setMajorCodeTerm(filters.majorCode || '');
-  }, [filters.majorCode]);
+  }
 
   // Debounced search trigger (350ms)
   useEffect(() => {
@@ -40,19 +40,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
     }, 350);
 
     return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  // Debounced majorCode trigger (350ms)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const trimmed = majorCodeTerm.trim();
-      if (trimmed !== (filters.majorCode || '')) {
-        onFilterChange({ ...filters, majorCode: trimmed, page: 1 });
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [majorCodeTerm]);
+  }, [searchTerm, filters, onFilterChange]);
 
   // Immediately apply on Enter without triggering page reload or form submit
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -61,7 +49,6 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
       onFilterChange({
         ...filters,
         search: searchTerm.trim(),
-        majorCode: majorCodeTerm.trim(),
         page: 1,
       });
     }
@@ -92,17 +79,9 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
 
   const handleReset = () => {
     setSearchTerm('');
-    setMajorCodeTerm('');
+    setMajorResetVersion((version) => version + 1);
     onReset();
   };
-
-  const hasActiveFilters =
-    Boolean(searchTerm) ||
-    Boolean(majorCodeTerm) ||
-    Boolean(filters.search) ||
-    Boolean(filters.majorCode) ||
-    filters.activated !== undefined ||
-    filters.hasActivationKey !== undefined;
 
   let currentStatusValue = 'all';
   if (filters.activated === true) currentStatusValue = 'activated';
@@ -199,20 +178,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
           </div>
         </div>
 
-        {/* Major Code filter */}
-        <div>
-          <label className="form-label" style={{ marginBottom: '0.375rem' }}>
-            {t('students.majorLabel')}
-          </label>
-          <input
-            type="text"
-            className="form-control"
-            placeholder={t('students.majorPlaceholder')}
-            value={majorCodeTerm}
-            onChange={(e) => setMajorCodeTerm(e.target.value)}
-            onKeyDown={handleKeyDown}
-          />
-        </div>
+        <MajorSearchFilter key={majorResetVersion} filters={filters} onFilterChange={onFilterChange} />
 
         {/* Account status filter */}
         <div>
@@ -247,19 +213,11 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
         </div>
 
         {/* Reset button */}
-        {hasActiveFilters && (
-          <div style={{ display: 'flex', alignItems: 'center' }}>
-            <button
-              type="button"
-              onClick={handleReset}
-              className="btn btn-ghost btn-sm"
-              style={{ width: '100%', color: 'var(--color-text-muted)' }}
-            >
-              <Filter size={14} />
-              <span>{t('students.clearFilters')}</span>
-            </button>
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <Button type="button" variant="secondary" icon={<X size={16} />} onClick={handleReset}>
+            {t('students.clearFilters')}
+          </Button>
+        </div>
       </div>
     </div>
   );

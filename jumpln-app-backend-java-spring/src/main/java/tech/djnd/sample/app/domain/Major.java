@@ -27,7 +27,7 @@ public class Major extends AbstractAuditingEntity <Integer> implements Serializa
     String code;
 
     @NotNull
-    @Length(max = 50, min = 2)
+    @Length(max = 50, min = 1)
     @Column(name = "name", unique = true,length = 50)
     String name;
 

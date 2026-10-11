@@ -91,7 +91,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    {student.majorCode || 'N/A'}
+                    {student.majorCode || 'N/A'}{student.majorName && student.majorName !== student.majorCode && ` — ${student.majorName}`}
                   </span>
                 </td>
 

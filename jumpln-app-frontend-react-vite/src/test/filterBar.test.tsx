@@ -1,27 +1,65 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StudentFilterBar } from '../features/students/components/StudentFilterBar';
+import type { StudentFilterParams } from '../features/students/types';
+import i18n from '@/locales/i18n';
 
 describe('StudentFilterBar Component', () => {
   const initialFilters = {
     page: 1,
     size: 10,
     search: '',
-    majorCode: '',
+    majorSearch: '',
   };
+
+  it('always shows clear filters and resets all filters plus pending input', async () => {
+    await i18n.changeLanguage('vi');
+    vi.useFakeTimers();
+    const onChange = vi.fn();
+    const onReset = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    function Harness() {
+      const [filters, setFilters] = useState<StudentFilterParams>({
+        ...initialFilters, search: 'old', majorId: 1, majorLabel: 'SE', activated: true, hasActivationKey: true,
+      });
+      return <StudentFilterBar filters={filters}
+        onFilterChange={(next) => { onChange(next); setFilters(next); }}
+        onReset={() => { onReset(); setFilters(initialFilters); }} />;
+    }
+    try {
+      render(<QueryClientProvider client={client}><Harness /></QueryClientProvider>);
+      fireEvent.change(screen.getByPlaceholderText('Nhập mã SV, họ tên hoặc email...'), { target: { value: 'pending' } });
+      act(() => vi.advanceTimersByTime(200));
+      fireEvent.click(screen.getByRole('button', { name: 'Xóa bộ lọc' }));
+      expect(onReset).toHaveBeenCalledTimes(1);
+      expect(screen.getByPlaceholderText('Nhập mã SV, họ tên hoặc email...')).toHaveValue('');
+      const controls = screen.getAllByRole('combobox');
+      expect(controls[0]).toHaveValue('');
+      expect(controls[1]).toHaveValue('all');
+      expect(controls[2]).toHaveValue('all');
+      expect(screen.getByRole('button', { name: 'Xóa bộ lọc' })).toBeVisible();
+      act(() => vi.advanceTimersByTime(500));
+      expect(onChange).not.toHaveBeenCalled();
+    } finally {
+      cleanup();
+      client.clear();
+      vi.useRealTimers();
+    }
+  });
 
   it('allows user to type smoothly without inputs being disabled', () => {
     const handleFilterChange = vi.fn();
     const handleReset = vi.fn();
 
     render(
-      <StudentFilterBar
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StudentFilterBar
         filters={initialFilters}
         onFilterChange={handleFilterChange}
         onReset={handleReset}
         isLoading={true}
-      />
+      /></QueryClientProvider>
     );
 
     const searchInput = screen.getByPlaceholderText('Nhập mã SV, họ tên hoặc email...');
@@ -37,12 +75,12 @@ describe('StudentFilterBar Component', () => {
     const handleReset = vi.fn();
 
     render(
-      <StudentFilterBar
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StudentFilterBar
         filters={initialFilters}
         onFilterChange={handleFilterChange}
         onReset={handleReset}
         isLoading={false}
-      />
+      /></QueryClientProvider>
     );
 
     const searchInput = screen.getByPlaceholderText('Nhập mã SV, họ tên hoặc email...');
@@ -62,12 +100,12 @@ describe('StudentFilterBar Component', () => {
     const handleReset = vi.fn();
 
     render(
-      <StudentFilterBar
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><StudentFilterBar
         filters={initialFilters}
         onFilterChange={handleFilterChange}
         onReset={handleReset}
         isLoading={false}
-      />
+      /></QueryClientProvider>
     );
 
     const searchInput = screen.getByPlaceholderText('Nhập mã SV, họ tên hoặc email...');

@@ -46,7 +46,7 @@ export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
     try {
       let res: BatchActivationResult;
       if (isAllMatching) {
-        res = await studentApi.sendActivateAllMatching(filters.search, filters.majorCode);
+        res = await studentApi.sendActivateAllMatching(filters.search, filters.majorSearch, filters.majorId);
       } else {
         res = await studentApi.sendBatchActivation(userIds);
       }

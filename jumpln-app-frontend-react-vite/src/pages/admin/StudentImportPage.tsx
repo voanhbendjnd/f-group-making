@@ -12,10 +12,14 @@ import { ImportErrorList } from '@/features/import/components/ImportErrorList';
 import { ImportSuccessSummary } from '@/features/import/components/ImportSuccessSummary';
 import { parseExcelClientSide, type ParseExcelResult } from '@/features/import/utils/excelParser';
 import { importApi } from '@/features/import/api/importApi';
+import { useQueryClient } from '@tanstack/react-query';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import type { ImportResult } from '@/features/import/types';
 
 export const StudentImportPage: React.FC = () => {
   const { t } = useTranslation();
+  const queryClient = useQueryClient();
+  const [pendingMajorCodes, setPendingMajorCodes] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsingClient, setIsParsingClient] = useState<boolean>(false);
   const [clientParseResult, setClientParseResult] = useState<ParseExcelResult | null>(null);
@@ -26,7 +30,9 @@ export const StudentImportPage: React.FC = () => {
 
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
+    setClientParseResult(null);
     setServerResult(null);
+    setPendingMajorCodes([]);
     setGenericError(null);
     setIsParsingClient(true);
 
@@ -45,20 +51,24 @@ export const StudentImportPage: React.FC = () => {
     setSelectedFile(null);
     setClientParseResult(null);
     setServerResult(null);
+    setPendingMajorCodes([]);
     setGenericError(null);
   };
 
-  const handleConfirmImport = async () => {
-    if (!selectedFile) return;
+  const handleConfirmImport = async (confirmedMajorCodes: string[] = []) => {
+    if (!selectedFile || isSubmitting) return;
 
     setIsSubmitting(true);
     setGenericError(null);
 
     try {
-      const result = await importApi.importExcel(selectedFile);
+      const result = await importApi.importExcel(selectedFile, confirmedMajorCodes);
       setServerResult(result);
+      setPendingMajorCodes(result.confirmationRequired ? result.newMajorCodes || [] : []);
 
       if (result.success) {
+        void queryClient.invalidateQueries({ queryKey: ['students'] });
+        void queryClient.invalidateQueries({ queryKey: ['majors'] });
         try {
           confetti({ particleCount: 90, spread: 70 });
         } catch {
@@ -86,6 +96,7 @@ export const StudentImportPage: React.FC = () => {
         />
         <ImportSuccessSummary
           totalImported={serverResult.totalImported}
+          createdMajorCodes={serverResult.createdMajorCodes}
           onReset={handleFileRemove}
         />
       </div>
@@ -110,6 +121,18 @@ export const StudentImportPage: React.FC = () => {
         }
       />
 
+      <ConfirmDialog open={pendingMajorCodes.length > 0} title={t('import.newMajorsTitle')}
+        confirmText={t('import.createMajorsAndImport')} isLoading={isSubmitting}
+        onCancel={() => { if (!isSubmitting) setPendingMajorCodes([]); }}
+        onConfirm={() => handleConfirmImport(pendingMajorCodes)}
+        message={<div>
+          <p>{t('import.newMajorsDescription')}</p>
+          <ul style={{ margin: '0.75rem 0', paddingLeft: '1.25rem' }}>
+            {pendingMajorCodes.map((code) => <li key={code}><strong>{code}</strong></li>)}
+          </ul>
+          <p>{t('import.newMajorsNotice')}</p>
+          {genericError && <p role="alert" style={{ color: 'var(--color-error)' }}>{genericError}</p>}
+        </div>} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
         {/* Step 1: File Dropzone */}
         <div className="card">
@@ -146,7 +169,7 @@ export const StudentImportPage: React.FC = () => {
         )}
 
         {/* Server Validation Errors (success = false) */}
-        {serverResult && !serverResult.success && serverResult.errors && (
+        {serverResult && !serverResult.success && serverResult.errors?.length > 0 && (
           <div className="card">
             <div className="card-header">
               <h3 className="card-title" style={{ color: 'var(--color-error)' }}>
@@ -167,10 +190,10 @@ export const StudentImportPage: React.FC = () => {
 
               <Button
                 variant="primary"
-                onClick={handleConfirmImport}
+                onClick={() => handleConfirmImport()}
                 loading={isSubmitting}
                 icon={<Send size={16} />}
-                disabled={clientParseResult.rows.length === 0}
+                disabled={clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
               >
                 {t('import.confirmImportBtn', { count: clientParseResult.validCount })}
               </Button>
@@ -214,10 +237,10 @@ export const StudentImportPage: React.FC = () => {
 
                 <Button
                   variant="primary"
-                  onClick={handleConfirmImport}
+                  onClick={() => handleConfirmImport()}
                   loading={isSubmitting}
                   icon={<Send size={16} />}
-                  disabled={clientParseResult.rows.length === 0}
+                  disabled={clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
                 >
                   {t('import.confirmImportBtn', { count: clientParseResult.validCount })}
                 </Button>
