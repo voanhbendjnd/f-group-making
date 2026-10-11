@@ -37,15 +37,17 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
     const rawRow = rawRows[i];
     const excelRowNumber = i + 1; // 1-indexed Excel row
 
-    // Extract columns B to F (indices 1 to 5)
+    // Extract columns B to F (indices 1 to 5) and I, J (indices 8, 9)
     const rollNumber = String(rawRow[1] ?? '').trim();
     const fullName = String(rawRow[2] ?? '').trim();
     const originalMajor = String(rawRow[3] ?? '').trim();
     const memberCode = String(rawRow[4] ?? '').trim();
     const email = String(rawRow[5] ?? '').trim().toLowerCase();
+    const groupName = String(rawRow[8] ?? '').trim();
+    const lecturerCode = String(rawRow[9] ?? '').trim();
 
     // Check if entire row is empty
-    if (!rollNumber && !fullName && !originalMajor && !memberCode && !email) {
+    if (!rollNumber && !fullName && !originalMajor && !memberCode && !email && !groupName && !lecturerCode) {
       continue;
     }
 
@@ -86,6 +88,16 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
       errors.push(i18n.t('import.clientErrors.invalidEmail', { email }));
     }
 
+    if (!groupName) {
+      errors.push('Thiếu tên lớp (Group Name)');
+    } else if (groupName.length > 50) {
+      errors.push('Tên lớp không được vượt quá 50 ký tự');
+    }
+
+    if (!lecturerCode) {
+      errors.push('Thiếu mã giảng viên (GV)');
+    }
+
     parsedRows.push({
       rowNumber: excelRowNumber,
       rollNumber,
@@ -94,6 +106,8 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
       extractedMajorCode,
       memberCode,
       email,
+      groupName,
+      lecturerCode,
       isValid: errors.length === 0,
       validationErrors: errors,
     });

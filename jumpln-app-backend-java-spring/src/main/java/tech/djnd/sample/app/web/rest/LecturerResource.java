@@ -61,9 +61,10 @@ public class LecturerResource {
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     @ApiMessage("Import lecturers from Excel completed")
     public ResponseEntity<ImportResultDTO> importLecturersFromExcel(
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "termId", required = false) Integer termId) {
 
-        log.debug("REST request to import lecturers from Excel: filename={}", file.getOriginalFilename());
+        log.debug("REST request to import lecturers from Excel: filename={}, termId={}", file.getOriginalFilename(), termId);
         ImportResultDTO result = lecturerService.importFromExcel(file);
         return ResponseEntity.ok(result);
     }

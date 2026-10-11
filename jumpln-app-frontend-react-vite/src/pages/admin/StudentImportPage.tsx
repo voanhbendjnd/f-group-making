@@ -14,11 +14,13 @@ import { parseExcelClientSide, type ParseExcelResult } from '@/features/import/u
 import { importApi } from '@/features/import/api/importApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { TermSelect } from '@/features/terms/components/TermSelect';
 import type { ImportResult } from '@/features/import/types';
 
 export const StudentImportPage: React.FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
+  const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
   const [pendingMajorCodes, setPendingMajorCodes] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsingClient, setIsParsingClient] = useState<boolean>(false);
@@ -62,7 +64,7 @@ export const StudentImportPage: React.FC = () => {
     setGenericError(null);
 
     try {
-      const result = await importApi.importExcel(selectedFile, confirmedMajorCodes);
+      const result = await importApi.importExcel(selectedFile, selectedTermId, confirmedMajorCodes);
       setServerResult(result);
       setPendingMajorCodes(result.confirmationRequired ? result.newMajorCodes || [] : []);
 
@@ -134,15 +136,20 @@ export const StudentImportPage: React.FC = () => {
           {genericError && <p role="alert" style={{ color: 'var(--color-error)' }}>{genericError}</p>}
         </div>} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-        {/* Step 1: File Dropzone */}
+        {/* Step 1: File Dropzone & Term Selection */}
         <div className="card">
-          <div className="card-header">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
               <h3 className="card-title">{t('import.step1Title')}</h3>
               <p className="card-subtitle">
                 {t('import.step1Sub')}
               </p>
             </div>
+            <TermSelect
+              selectedTermId={selectedTermId}
+              onSelectTerm={setSelectedTermId}
+              disabled={isParsingClient || isSubmitting}
+            />
           </div>
 
           <FileDropzone

@@ -29,9 +29,12 @@ export const lecturerApi = {
     return data;
   },
 
-  async importExcel(file: File): Promise<ImportResult> {
+  async importExcel(file: File, termId?: number | null): Promise<ImportResult> {
     const formData = new FormData();
     formData.append('file', file);
+    if (termId !== undefined && termId !== null) {
+      formData.append('termId', String(termId));
+    }
 
     const data = await apiClient.post<any, ImportResult>('/api/lecturers/import', formData, {
       headers: {

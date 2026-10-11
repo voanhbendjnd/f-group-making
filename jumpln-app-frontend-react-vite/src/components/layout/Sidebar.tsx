@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   UserCheck,
   GraduationCap,
+  Layers,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
 
@@ -34,6 +35,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           to: '/admin/dashboard',
           label: t('nav.dashboard'),
           icon: <LayoutDashboard size={18} />,
+        },
+        {
+          to: '/admin/classes',
+          label: 'Lớp học',
+          icon: <Layers size={18} />,
         },
         {
           to: '/admin/students',

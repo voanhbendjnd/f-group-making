@@ -22,6 +22,8 @@ export interface ParsedStudentRow {
   extractedMajorCode?: string;
   memberCode: string;
   email: string;
+  groupName: string;
+  lecturerCode: string;
   isValid: boolean;
   validationErrors: string[];
 }

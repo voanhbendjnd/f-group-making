@@ -139,6 +139,8 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
               <th>{t('students.colMajor')}</th>
               <th>{t('students.colMemberCode')}</th>
               <th>{t('students.colEmail')}</th>
+              <th>Lớp</th>
+              <th>GV</th>
               <th>{t('common.status')}</th>
             </tr>
           </thead>
@@ -169,6 +171,34 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
                   {row.memberCode || '—'}
                 </td>
                 <td>{row.email || '—'}</td>
+                <td>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: '#f1f5f9',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      color: '#334155',
+                    }}
+                  >
+                    {row.groupName || '—'}
+                  </span>
+                </td>
+                <td>
+                  <span
+                    style={{
+                      padding: '2px 8px',
+                      borderRadius: 'var(--radius-sm)',
+                      backgroundColor: '#eff6ff',
+                      fontSize: '0.8125rem',
+                      fontWeight: 600,
+                      color: '#1d4ed8',
+                    }}
+                  >
+                    {row.lecturerCode || '—'}
+                  </span>
+                </td>
                 <td>
                   {row.isValid ? (
                     <span className="badge badge-success">

@@ -15,19 +15,40 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
-import tech.djnd.sample.app.util.MajorCode;
+import tech.djnd.sample.app.domain.Lecturer;
 import tech.djnd.sample.app.domain.Major;
+import tech.djnd.sample.app.domain.SchoolClass;
 import tech.djnd.sample.app.domain.Student;
 import tech.djnd.sample.app.domain.User;
-import tech.djnd.sample.app.repository.*;
-import tech.djnd.sample.app.service.dto.*;
+import tech.djnd.sample.app.repository.LecturerRepository;
+import tech.djnd.sample.app.repository.MajorRepository;
+import tech.djnd.sample.app.repository.SchoolClassRepository;
+import tech.djnd.sample.app.repository.StudentQueryRepository;
+import tech.djnd.sample.app.repository.StudentRepository;
+import tech.djnd.sample.app.repository.StudentSpecifications;
+import tech.djnd.sample.app.repository.TermRepository;
+import tech.djnd.sample.app.repository.UserRepository;
+import tech.djnd.sample.app.service.dto.BatchActivationResultDTO;
+import tech.djnd.sample.app.service.dto.ImportResultDTO;
+import tech.djnd.sample.app.service.dto.ImportRowErrorDTO;
+import tech.djnd.sample.app.service.dto.ResultPaginationDTO;
+import tech.djnd.sample.app.service.dto.StudentDTO;
+import tech.djnd.sample.app.service.dto.StudentImportRowDTO;
+import tech.djnd.sample.app.service.dto.UserDTO;
 import tech.djnd.sample.app.service.errors.BadRequestResourceException;
 import tech.djnd.sample.app.service.errors.ExcelImportException;
 import tech.djnd.sample.app.service.projection.StudentRow;
+import tech.djnd.sample.app.util.MajorCode;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -46,7 +67,9 @@ public class StudentService {
     private static final int COL_MAJOR       = 3;   // Column D: Major (BEN_CHN_ET_19C,...)
     private static final int COL_MEMBER_CODE = 4;   // Column E: Member code
     private static final int COL_EMAIL       = 5;   // Column F: Email
-    private static final int COL_LECTURER_CODE = 9;
+    private static final int COL_GROUP_NAME  = 8;   // Column I: GroupName (SchoolClass)
+    private static final int COL_LECTURER_CODE = 9; // Column J: GV (Lecturer code)
+
     private final StudentQueryRepository studentQueryRepository;
     private final StudentRepository studentRepository;
     private final MajorRepository majorRepository;
@@ -54,6 +77,9 @@ public class StudentService {
     private final UserService userService;
     private final LecturerRepository lecturerRepository;
     private final NotificationAsyncService notificationAsyncService;
+    private final SchoolClassRepository schoolClassRepository;
+    private final TermRepository termRepository;
+    private final TermService termService;
 
     public StudentService(
             StudentRepository studentRepository,
@@ -62,7 +88,10 @@ public class StudentService {
             UserService userService,
             NotificationAsyncService notificationAsyncService,
             StudentQueryRepository studentQueryRepository,
-            LecturerRepository lecturerRepository
+            LecturerRepository lecturerRepository,
+            SchoolClassRepository schoolClassRepository,
+            TermRepository termRepository,
+            TermService termService
     ) {
         this.studentRepository = studentRepository;
         this.majorRepository = majorRepository;
@@ -71,21 +100,38 @@ public class StudentService {
         this.studentQueryRepository = studentQueryRepository;
         this.notificationAsyncService = notificationAsyncService;
         this.lecturerRepository = lecturerRepository;
+        this.schoolClassRepository = schoolClassRepository;
+        this.termRepository = termRepository;
+        this.termService = termService;
     }
 
-
     /**
-     * Import student list from Excel file (.xlsx).
+     * Import student list from Excel file (.xlsx) with default parameters.
      */
     public ImportResultDTO importFromExcel(MultipartFile file) {
-        return importFromExcel(file, Set.of());
+        return importFromExcel(file, null, Set.of());
     }
 
     public ImportResultDTO importFromExcel(MultipartFile file, Set<String> confirmedMajorCodes) {
+        return importFromExcel(file, null, confirmedMajorCodes);
+    }
+
+    public ImportResultDTO importFromExcel(MultipartFile file, Integer termId, Set<String> confirmedMajorCodes) {
         // Step 1: Validate file (format, size, empty)
         validateFile(file);
-        log.info("Starting Excel import: filename={}, size={} bytes",
-                file.getOriginalFilename(), file.getSize());
+        log.info("Starting Excel import: filename={}, size={} bytes, termId={}",
+                file.getOriginalFilename(), file.getSize(), termId);
+
+        // Determine effective term
+        final Integer effectiveTermId;
+        if (termId == null) {
+            effectiveTermId = termService.ensureCurrentTerm().getId();
+        } else {
+            if (!termRepository.existsById(termId)) {
+                throw new BadRequestResourceException("Học kỳ (Term) không tồn tại với ID: " + termId, "studentManagement", "termNotFound");
+            }
+            effectiveTermId = termId;
+        }
 
         // Step 2: Parse Excel file to DTO list
         List<StudentImportRowDTO> rows = parseExcelRows(file);
@@ -99,7 +145,24 @@ public class StudentService {
         List<Major> catalog = majorRepository.findAll();
         Map<String, Major> majorsByCode = catalog.stream().collect(Collectors.toMap(
                 major -> MajorCode.normalize(major.getCode()), major -> major));
-        List<ImportRowErrorDTO> errors = validateRows(rows);
+        
+        // Fetch lecturers corresponding to lecturerCodes present in the file
+        Set<String> lecturerCodesInFile = rows.stream()
+                .map(StudentImportRowDTO::getLecturerCode)
+                .filter(code -> code != null && !code.isBlank())
+                .map(code -> code.trim().toUpperCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+
+        Map<String, Lecturer> lecturersByCode = lecturerRepository
+                .findByCodeIgnoreCaseIn(lecturerCodesInFile)
+                .stream()
+                .collect(Collectors.toMap(
+                        l -> l.getCode().trim().toUpperCase(Locale.ROOT),
+                        l -> l,
+                        (existing, replacement) -> existing
+                ));
+
+        List<ImportRowErrorDTO> errors = validateRows(rows, lecturersByCode);
         Set<String> existingNames = catalog.stream().map(major -> major.getName().trim().toUpperCase(Locale.ROOT))
                 .collect(Collectors.toSet());
         for (StudentImportRowDTO row : rows) {
@@ -137,7 +200,37 @@ public class StudentService {
             major.setName(code);
             majorsByCode.put(code, majorRepository.save(major));
         }
-        List<StudentDTO> studentDTOs = mapToEntities(rows, majorsByCode);
+
+        // Find or create SchoolClass for each unique groupName in the file
+        Map<String, SchoolClass> schoolClassMap = new HashMap<>();
+        for (StudentImportRowDTO row : rows) {
+            String groupName = row.getGroupName().trim();
+            String classKey = groupName.toUpperCase(Locale.ROOT);
+            if (!schoolClassMap.containsKey(classKey)) {
+                String normalizedLec = row.getLecturerCode().trim().toUpperCase(Locale.ROOT);
+                Lecturer lecturer = lecturersByCode.get(normalizedLec);
+                Long lecturerId = lecturer != null ? lecturer.getUserId() : null;
+
+                SchoolClass schoolClass = schoolClassRepository
+                        .findByNameIgnoreCaseAndTermId(groupName, effectiveTermId)
+                        .orElseGet(() -> {
+                            SchoolClass sc = new SchoolClass();
+                            sc.setName(groupName);
+                            sc.setTermId(effectiveTermId);
+                            sc.setLecturerId(lecturerId);
+                            return schoolClassRepository.save(sc);
+                        });
+
+                if (schoolClass.getLecturerId() == null && lecturerId != null) {
+                    schoolClass.setLecturerId(lecturerId);
+                    schoolClass = schoolClassRepository.save(schoolClass);
+                }
+                schoolClassMap.put(classKey, schoolClass);
+            }
+        }
+
+        List<StudentDTO> studentDTOs = mapToEntities(rows, majorsByCode, schoolClassMap);
+
         // Create user accounts before creating student records
         List<User> userStudents = new ArrayList<>();
         studentDTOs.forEach(student -> {
@@ -153,14 +246,14 @@ public class StudentService {
             student.setUserId(userId);
         });
 
-
         studentRepository.saveAll(studentDTOs.stream().map(this::toEntity).toList());
         studentRepository.flush();
 
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                log.info("Import completed successfully: {} student(s) saved", studentDTOs.size());
+                log.info("Import completed successfully: {} student(s) saved into termId={}",
+                        studentDTOs.size(), effectiveTermId);
             }
         });
         return ImportResultDTO.builder()
@@ -171,14 +264,14 @@ public class StudentService {
                 .build();
     }
 
-    private Student toEntity(StudentDTO dto){
+    private Student toEntity(StudentDTO dto) {
         Student student = new Student();
         student.setUserId(dto.getUserId());
         student.setRollNumber(dto.getRollNumber());
         student.setFullName(dto.getFullName());
-//        student.setEmail(dto.getEmail());
         student.setMemberCode(dto.getMemberCode());
         student.setMajorId(dto.getMajorId());
+        student.setSchoolClassId(dto.getSchoolClassId());
         return student;
     }
 
@@ -278,25 +371,19 @@ public class StudentService {
                 .build();
     }
 
-
-    // =========================================================================
-    // PRIVATE METHODS
-    // =========================================================================
-
-    /**
-     * Validate file before processing.
-     */
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ExcelImportException("File must not be empty.");
         }
         if (file.getSize() > MAX_FILE_SIZE_BYTES) {
-            throw new ExcelImportException(
-                    String.format("File size exceeds maximum allowed limit (%.1f MB).", MAX_FILE_SIZE_BYTES / (1024.0 * 1024)));
+            throw new ExcelImportException("File size exceeds 5MB limit.");
         }
         String contentType = file.getContentType();
-        String originalFilename = Objects.requireNonNullElse(file.getOriginalFilename(), "");
-        boolean isXlsxByType = XLSX_CONTENT_TYPE.equals(contentType);
+        boolean isXlsxByType = contentType != null && contentType.equalsIgnoreCase(XLSX_CONTENT_TYPE);
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename == null) {
+            throw new ExcelImportException("Invalid file name.");
+        }
         boolean isXlsxByName = originalFilename.toLowerCase().endsWith(".xlsx");
         if (!isXlsxByType && !isXlsxByName) {
             throw new ExcelImportException("Only .xlsx files are supported.");
@@ -323,8 +410,8 @@ public class StudentService {
                 String memberCode    = getCellValueAsString(row, COL_MEMBER_CODE).trim();
                 String email         = getCellValueAsString(row, COL_EMAIL).trim().toLowerCase(Locale.ENGLISH);
                 String majorCode     = parseMajorCode(originalMajor);
-                String lecturerCode = getCellValueAsString(row, COL_LECTURER_CODE).trim();
-
+                String groupName     = getCellValueAsString(row, COL_GROUP_NAME).trim();
+                String lecturerCode  = getCellValueAsString(row, COL_LECTURER_CODE).trim();
 
                 rows.add(StudentImportRowDTO.builder()
                         .rowIndex(row.getRowNum() + 1)
@@ -334,6 +421,7 @@ public class StudentService {
                         .memberCode(memberCode)
                         .originalMajor(originalMajor)
                         .majorCode(majorCode)
+                        .groupName(groupName)
                         .lecturerCode(lecturerCode)
                         .build());
             }
@@ -347,7 +435,7 @@ public class StudentService {
     /**
      * Validate all rows and collect error details.
      */
-    private List<ImportRowErrorDTO> validateRows(List<StudentImportRowDTO> rows) {
+    private List<ImportRowErrorDTO> validateRows(List<StudentImportRowDTO> rows, Map<String, Lecturer> lecturersByCode) {
         List<ImportRowErrorDTO> errors = new ArrayList<>();
         List<String> rollNumbersInFile = rows.stream()
                 .map(StudentImportRowDTO::getRollNumber)
@@ -378,13 +466,24 @@ public class StudentService {
                 .map(User::getEmail)
                 .collect(Collectors.toSet());
 
-
         Map<String, Integer> seenRollNumbers = new HashMap<>();
         Map<String, Integer> seenMemberCodes = new HashMap<>();
         Map<String, Integer> seenEmails = new HashMap<>();
+        Map<String, String> classToLecturerInFile = new HashMap<>();
 
         for (StudentImportRowDTO row : rows) {
-            validateSingleRow(row, existingRollNumbers, existingMemberCodes, existingEmails, seenRollNumbers, seenMemberCodes, seenEmails, errors);
+            validateSingleRow(
+                    row,
+                    existingRollNumbers,
+                    existingMemberCodes,
+                    existingEmails,
+                    seenRollNumbers,
+                    seenMemberCodes,
+                    seenEmails,
+                    lecturersByCode,
+                    classToLecturerInFile,
+                    errors
+            );
         }
         return errors;
     }
@@ -400,8 +499,10 @@ public class StudentService {
             Map<String, Integer> seenRollNumbers,
             Map<String, Integer> seenMemberCodes,
             Map<String, Integer> seenEmails,
+            Map<String, Lecturer> lecturersByCode,
+            Map<String, String> classToLecturerInFile,
             List<ImportRowErrorDTO> errors) {
-        // lecturer code skip -> cause if exist not add to db
+
         // Rule 1: rollNumber must not be empty
         if (row.getRollNumber() == null || row.getRollNumber().isBlank()) {
             errors.add(ImportRowErrorDTO.builder()
@@ -474,8 +575,7 @@ public class StudentService {
                     .rollNumber(row.getRollNumber())
                     .field("memberCode")
                     .message(String.format("Member code '%s' already exists in the system.", row.getMemberCode()))
-                    .build()
-            );
+                    .build());
         }
         if (existingEmails.contains(row.getEmail())) {
             errors.add(ImportRowErrorDTO.builder()
@@ -483,8 +583,7 @@ public class StudentService {
                     .rollNumber(row.getRollNumber())
                     .field("email")
                     .message(String.format("Email '%s' already exists in the system.", row.getEmail()))
-                    .build()
-            );
+                    .build());
         }
 
         // Rule 4: fullName must not be empty
@@ -521,42 +620,106 @@ public class StudentService {
             return;
         }
 
-        // Rule 8: member code must not be null/blank
+        // Rule 7: member code must not be null/blank
         if (row.getMemberCode() == null || row.getMemberCode().isBlank()) {
             errors.add(ImportRowErrorDTO.builder()
                     .row(row.getRowIndex())
                     .field("memberCode")
                     .message("Member code must not be empty.")
-                    .build()
-            );
+                    .build());
             return;
         }
 
-        // Rule 9: email must not be null/blank
+        // Rule 8: email must not be null/blank
         if (row.getEmail() == null || row.getEmail().length() > 254
                 || !row.getEmail().matches("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
             errors.add(ImportRowErrorDTO.builder()
                     .row(row.getRowIndex())
                     .field("email")
                     .message("A valid email of at most 254 characters is required.")
-                    .build()
-            );
+                    .build());
+        }
+
+        // Rule 9: Group name (SchoolClass) validation
+        if (row.getGroupName() == null || row.getGroupName().isBlank()) {
+            errors.add(ImportRowErrorDTO.builder()
+                    .row(row.getRowIndex())
+                    .rollNumber(row.getRollNumber())
+                    .field("groupName")
+                    .message("Group name (tên lớp) không được để trống.")
+                    .build());
+        } else if (row.getGroupName().length() > 50) {
+            errors.add(ImportRowErrorDTO.builder()
+                    .row(row.getRowIndex())
+                    .rollNumber(row.getRollNumber())
+                    .field("groupName")
+                    .message("Group name (tên lớp) không được vượt quá 50 ký tự.")
+                    .build());
+        }
+
+        // Rule 10: Lecturer code validation (Must exist in database)
+        if (row.getLecturerCode() == null || row.getLecturerCode().isBlank()) {
+            errors.add(ImportRowErrorDTO.builder()
+                    .row(row.getRowIndex())
+                    .rollNumber(row.getRollNumber())
+                    .field("lecturerCode")
+                    .message("Mã giảng viên không được để trống.")
+                    .build());
+        } else {
+            String normalizedLecCode = row.getLecturerCode().trim().toUpperCase(Locale.ROOT);
+            if (!lecturersByCode.containsKey(normalizedLecCode)) {
+                errors.add(ImportRowErrorDTO.builder()
+                        .row(row.getRowIndex())
+                        .rollNumber(row.getRollNumber())
+                        .field("lecturerCode")
+                        .message(String.format("Giảng viên với mã '%s' không tìm thấy trong hệ thống.", row.getLecturerCode()))
+                        .build());
+            }
+        }
+
+        // Rule 11: Consistent lecturer per class within file
+        if (row.getGroupName() != null && !row.getGroupName().isBlank()
+                && row.getLecturerCode() != null && !row.getLecturerCode().isBlank()) {
+            String classKey = row.getGroupName().trim().toUpperCase(Locale.ROOT);
+            String currentLec = row.getLecturerCode().trim().toUpperCase(Locale.ROOT);
+            if (classToLecturerInFile.containsKey(classKey)
+                    && !classToLecturerInFile.get(classKey).equalsIgnoreCase(currentLec)) {
+                errors.add(ImportRowErrorDTO.builder()
+                        .row(row.getRowIndex())
+                        .rollNumber(row.getRollNumber())
+                        .field("groupName")
+                        .message(String.format("Lớp '%s' có nhiều mã giảng viên khác nhau trong cùng file ('%s' và '%s').",
+                                row.getGroupName(), classToLecturerInFile.get(classKey), row.getLecturerCode()))
+                        .build());
+            } else {
+                classToLecturerInFile.put(classKey, currentLec);
+            }
         }
     }
 
     /**
      * Map validated DTO list to Student entity list.
      */
-    private List<StudentDTO> mapToEntities(List<StudentImportRowDTO> rows, Map<String, Major> majorsByCode) {
+    private List<StudentDTO> mapToEntities(
+            List<StudentImportRowDTO> rows,
+            Map<String, Major> majorsByCode,
+            Map<String, SchoolClass> schoolClassMap) {
+
         return rows.stream().map(row -> {
             Major major = majorsByCode.get(row.getMajorCode());
+            SchoolClass schoolClass = schoolClassMap.get(row.getGroupName().trim().toUpperCase(Locale.ROOT));
+
             StudentDTO student = new StudentDTO();
             student.setRollNumber(row.getRollNumber());
             student.setFullName(row.getFullName());
             student.setEmail(row.getEmail());
             student.setMemberCode(row.getMemberCode());
             student.setMajorId(major.getId());
+            student.setGroupName(row.getGroupName());
             student.setLecturerCode(row.getLecturerCode());
+            if (schoolClass != null) {
+                student.setSchoolClassId(schoolClass.getId());
+            }
             return student;
         }).toList();
     }

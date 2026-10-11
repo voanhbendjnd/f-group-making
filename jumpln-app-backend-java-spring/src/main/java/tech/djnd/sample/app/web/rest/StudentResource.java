@@ -100,10 +100,11 @@ public class StudentResource {
     @ApiMessage("Student import processed")
     public ResponseEntity<ImportResultDTO> importStudentsFromExcel(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(name = "termId", required = false) Integer termId,
             @RequestParam(name = "confirmedMajorCodes", required = false) Set<String> confirmedMajorCodes) {
 
-        log.debug("REST request to import students from Excel: filename={}", file.getOriginalFilename());
-        ImportResultDTO result = studentService.importFromExcel(file, confirmedMajorCodes);
+        log.debug("REST request to import students from Excel: filename={}, termId={}", file.getOriginalFilename(), termId);
+        ImportResultDTO result = studentService.importFromExcel(file, termId, confirmedMajorCodes);
         return ResponseEntity.ok(result);
     }
 }

@@ -9,17 +9,17 @@ import org.hibernate.validator.constraints.Length;
 public class Group extends AbstractAuditingEntity<Long>{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private  Long id;
+    private  Long id;
     @Length(max = 100, min = 2)
     @Column(name = "name", length = 100)
-  private  String name;
-  private  Long leaderId;
-   private String reason;
+    private  String name;
+    private  Long leaderId;
+    private String reason;
     // enum
-   private String status;
+    private String status;
     @NotNull
     @Column(name = "school_class_id", nullable = false)
-    Integer schoolClassId;
+    private Integer schoolClassId;
 
     public Integer getSchoolClassId() {
         return schoolClassId;

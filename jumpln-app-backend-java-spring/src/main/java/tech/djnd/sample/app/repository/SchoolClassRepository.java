@@ -1,0 +1,80 @@
+package tech.djnd.sample.app.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import tech.djnd.sample.app.domain.SchoolClass;
+import tech.djnd.sample.app.service.dto.SchoolClassDTO;
+
+import java.util.List;
+import java.util.Optional;
+
+@Repository
+public interface SchoolClassRepository extends JpaRepository<SchoolClass, Integer> {
+
+    Optional<SchoolClass> findByNameIgnoreCaseAndTermId(String name, Integer termId);
+
+    List<SchoolClass> findByTermId(Integer termId);
+
+    @Query(
+        value = """
+            SELECT new tech.djnd.sample.app.service.dto.SchoolClassDTO(
+                sc.id, sc.name, sc.termId, t.name,
+                sc.lecturerId, l.code, u.name, u.email,
+                COUNT(s.userId), sc.createdDate
+            )
+            FROM SchoolClass sc
+            LEFT JOIN Term t ON sc.termId = t.id
+            LEFT JOIN Lecturer l ON sc.lecturerId = l.userId
+            LEFT JOIN User u ON l.userId = u.id
+            LEFT JOIN Student s ON s.schoolClassId = sc.id
+            WHERE (:termId IS NULL OR sc.termId = :termId)
+              AND (
+                  :search IS NULL OR :search = ''
+                  OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(l.code) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
+              )
+            GROUP BY sc.id, sc.name, sc.termId, t.name, sc.lecturerId, l.code, u.name, u.email, sc.createdDate
+        """,
+        countQuery = """
+            SELECT COUNT(DISTINCT sc.id)
+            FROM SchoolClass sc
+            LEFT JOIN Lecturer l ON sc.lecturerId = l.userId
+            LEFT JOIN User u ON l.userId = u.id
+            WHERE (:termId IS NULL OR sc.termId = :termId)
+              AND (
+                  :search IS NULL OR :search = ''
+                  OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(l.code) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(u.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                  OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
+              )
+        """
+    )
+    Page<SchoolClassDTO> searchClasses(
+        @Param("search") String search,
+        @Param("termId") Integer termId,
+        Pageable pageable
+    );
+
+    @Query("""
+        SELECT new tech.djnd.sample.app.service.dto.SchoolClassDTO(
+            sc.id, sc.name, sc.termId, t.name,
+            sc.lecturerId, l.code, u.name, u.email,
+            COUNT(s.userId), sc.createdDate
+        )
+        FROM SchoolClass sc
+        LEFT JOIN Term t ON sc.termId = t.id
+        LEFT JOIN Lecturer l ON sc.lecturerId = l.userId
+        LEFT JOIN User u ON l.userId = u.id
+        LEFT JOIN Student s ON s.schoolClassId = sc.id
+        WHERE sc.id = :classId
+        GROUP BY sc.id, sc.name, sc.termId, t.name, sc.lecturerId, l.code, u.name, u.email, sc.createdDate
+    """)
+    Optional<SchoolClassDTO> findClassDTOById(@Param("classId") Integer classId);
+}
