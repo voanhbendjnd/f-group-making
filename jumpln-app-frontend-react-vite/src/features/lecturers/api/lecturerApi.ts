@@ -6,6 +6,7 @@ import type { BatchActivationResult } from '@/features/students/types';
 export const lecturerApi = {
   async getLecturers(params: LecturerFilterParams = {}): Promise<PaginatedLecturers> {
     const queryParams: Record<string, any> = {};
+    if (params.termId !== undefined) queryParams.termId = params.termId;
 
     if (params.search && params.search.trim()) {
       queryParams.search = params.search.trim();
@@ -38,28 +39,29 @@ export const lecturerApi = {
 
     const data = await apiClient.post<any, ImportResult>('/api/lecturers/import', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
     });
     return data;
   },
 
-  async sendSingleActivation(userId: number, email?: string): Promise<void> {
+  async sendSingleActivation(userId: number, email?: string, termId?: number): Promise<void> {
     await apiClient.post('/api/activate', {
       userId,
       email,
-    });
+    }, { params: { termId } });
   },
 
-  async sendBatchActivation(userIds: number[]): Promise<BatchActivationResult> {
+  async sendBatchActivation(userIds: number[], termId?: number): Promise<BatchActivationResult> {
     const data = await apiClient.post<any, BatchActivationResult>('/api/activate/mul', {
       userIds,
-    });
+    }, { params: { termId } });
     return data;
   },
 
-  async sendActivateAllMatching(search?: string): Promise<BatchActivationResult> {
+  async sendActivateAllMatching(search?: string, termId?: number): Promise<BatchActivationResult> {
     const params: Record<string, any> = {};
+    if (termId !== undefined) params.termId = termId;
     if (search && search.trim()) {
       params.search = search.trim();
     }
@@ -74,7 +76,7 @@ export const lecturerApi = {
     await apiClient.delete(`/api/lecturers/${userId}`);
   },
 
-  async deleteBatchLecturers(userIds: number[]): Promise<void> {
-    await apiClient.post('/api/lecturers/batch-delete', userIds);
+  async deleteBatchLecturers(userIds: number[], termId?: number): Promise<void> {
+    await apiClient.post('/api/lecturers/batch-delete', userIds, { params: { termId } });
   },
 };

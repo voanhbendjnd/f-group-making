@@ -16,6 +16,7 @@ export interface Student {
 }
 
 export interface StudentFilterParams {
+  termId?: number;
   search?: string;
   majorSearch?: string;
   majorId?: number;

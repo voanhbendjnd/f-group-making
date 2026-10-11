@@ -15,8 +15,15 @@ import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { classApi } from '@/features/classes/api/classApi';
+import { useTranslation } from 'react-i18next';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 
-export const ClassDetailPage: React.FC = () => {
+export const ClassDetailPage: React.FC = () => <TermScope><ClassDetailContent /></TermScope>;
+
+const ClassDetailContent: React.FC = () => {
+  const { selectedTermId } = useTerm();
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const classId = Number(id);
@@ -31,7 +38,7 @@ export const ClassDetailPage: React.FC = () => {
     error: classError,
     refetch: refetchClass,
   } = useQuery({
-    queryKey: ['school-class', classId],
+    queryKey: ['school-class', selectedTermId, classId],
     queryFn: () => classApi.getClassById(classId),
     enabled: Boolean(classId && !isNaN(classId)),
   });
@@ -40,10 +47,13 @@ export const ClassDetailPage: React.FC = () => {
   const {
     data: students = [],
     isLoading: isStudentsLoading,
+    isError: isStudentsError,
+    error: studentsError,
+    refetch: refetchStudents,
   } = useQuery({
-    queryKey: ['school-class-students', classId],
+    queryKey: ['school-class-students', selectedTermId, classId],
     queryFn: () => classApi.getClassStudents(classId),
-    enabled: Boolean(classId && !isNaN(classId)),
+    enabled: Boolean(classDetail && classDetail.termId === selectedTermId),
   });
 
   // Filter students by local search
@@ -59,6 +69,13 @@ export const ClassDetailPage: React.FC = () => {
         s.majorCode?.toLowerCase().includes(q)
     );
   }, [students, searchStudent]);
+
+  if (classDetail && classDetail.termId !== selectedTermId) {
+    return <div className="card" style={{ padding: '2rem' }}>
+      <p role="alert" style={{ marginBottom: '1rem' }}>{t('terms.classOutsideTerm')}</p>
+      <Button variant="secondary" onClick={() => navigate('/admin/classes')}>{t('terms.backToClasses')}</Button>
+    </div>;
+  }
 
   if (isClassLoading || isStudentsLoading) {
     return (
@@ -78,6 +95,9 @@ export const ClassDetailPage: React.FC = () => {
       </div>
     );
   }
+
+  if (isStudentsError) return <ErrorState message={(studentsError as any)?.message || t('errors.generalFailure')}
+    onRetry={() => void refetchStudents()} />;
 
   return (
     <div className="space-y-6">

@@ -13,7 +13,8 @@ import { parseLecturerExcelClientSide } from '@/features/lecturers/utils/lecture
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
 import { useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/app/providers/ToastContext';
-import { TermSelect } from '@/features/terms/components/TermSelect';
+import { useTerm } from '@/app/providers/TermContext';
+import { useTranslation } from 'react-i18next';
 import type { ParseLecturerExcelResult } from '@/features/lecturers/types';
 import type { ImportResult } from '@/features/import/types';
 
@@ -22,7 +23,8 @@ export const LecturerImportPage: React.FC = () => {
   const queryClient = useQueryClient();
   const { success } = useToast();
 
-  const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
+  const { lockTermSelection } = useTerm();
+  const { t } = useTranslation();
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsingClient, setIsParsingClient] = useState<boolean>(false);
   const [clientParseResult, setClientParseResult] = useState<ParseLecturerExcelResult | null>(null);
@@ -36,6 +38,7 @@ export const LecturerImportPage: React.FC = () => {
   const [importedCount, setImportedCount] = useState<number>(0);
 
   const handleFileSelect = async (file: File) => {
+    const unlock = lockTermSelection();
     setSelectedFile(file);
     setClientParseResult(null);
     setServerResult(null);
@@ -50,6 +53,7 @@ export const LecturerImportPage: React.FC = () => {
       setClientParseResult(null);
     } finally {
       setIsParsingClient(false);
+      unlock();
     }
   };
 
@@ -62,12 +66,13 @@ export const LecturerImportPage: React.FC = () => {
 
   const handleConfirmImport = async () => {
     if (!selectedFile || isSubmitting) return;
+    const unlock = lockTermSelection();
 
     setIsSubmitting(true);
     setGenericError(null);
 
     try {
-      const result = await lecturerApi.importExcel(selectedFile, selectedTermId);
+      const result = await lecturerApi.importExcel(selectedFile);
       setServerResult(result);
 
       if (result.success) {
@@ -85,6 +90,7 @@ export const LecturerImportPage: React.FC = () => {
       setGenericError(err.message || 'Có lỗi xảy ra khi gửi dữ liệu lên máy chủ.');
     } finally {
       setIsSubmitting(false);
+      unlock();
     }
   };
 
@@ -104,7 +110,7 @@ export const LecturerImportPage: React.FC = () => {
           { label: 'Import' },
         ]}
         action={
-          <Link to="/admin/lecturers" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
+          <Link to="/admin/lecturers?scope=all" className="btn btn-secondary btn-sm" style={{ textDecoration: 'none' }}>
             <ArrowLeft size={16} />
             <span>Quay lại danh sách</span>
           </Link>
@@ -121,11 +127,7 @@ export const LecturerImportPage: React.FC = () => {
                 Hệ thống hỗ trợ file mẫu (như DS_Mentor_email.xlsx) có các cột Mentor và Email.
               </p>
             </div>
-            <TermSelect
-              selectedTermId={selectedTermId}
-              onSelectTerm={setSelectedTermId}
-              disabled={isParsingClient || isSubmitting}
-            />
+            <p className="card-subtitle">{t('terms.lecturerImportGlobal')}</p>
           </div>
 
           <FileDropzone
@@ -247,7 +249,7 @@ export const LecturerImportPage: React.FC = () => {
             <Button variant="secondary" onClick={handleCloseSuccessModal}>
               Tiếp tục ở lại
             </Button>
-            <Button variant="primary" onClick={() => navigate('/admin/lecturers')}>
+            <Button variant="primary" onClick={() => navigate('/admin/lecturers?scope=all')}>
               Xem danh sách Giảng viên
             </Button>
           </div>

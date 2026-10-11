@@ -16,7 +16,7 @@ export const importApi = {
 
     const data = await apiClient.post<any, ImportResult>('/api/students/import', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
     });
     return data;

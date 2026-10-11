@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 import { Upload, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { studentApi } from '@/features/students/api/studentApi';
@@ -17,7 +19,10 @@ import { StudentTable } from '@/features/students/components/StudentTable';
 import { BatchActivationModal } from '@/features/students/components/BatchActivationModal';
 import { SingleActivationModal } from '@/features/students/components/SingleActivationModal';
 
-export const StudentListPage: React.FC = () => {
+export const StudentListPage: React.FC = () => <TermScope><StudentListContent /></TermScope>;
+
+const StudentListContent: React.FC = () => {
+  const { selectedTermId } = useTerm();
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -38,11 +43,10 @@ export const StudentListPage: React.FC = () => {
   const [singleStudentModal, setSingleStudentModal] = useState<Student | null>(null);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
 
-  // Fetch students via TanStack Query with keepPreviousData for smooth pagination/search
+  // Each Term has its own cache; no placeholder rows are shown during a new request.
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['students', filters],
-    queryFn: () => studentApi.getStudents(filters),
-    placeholderData: keepPreviousData,
+    queryKey: ['students', selectedTermId, filters],
+    queryFn: () => studentApi.getStudents({ ...filters, termId: selectedTermId! }),
   });
 
   const students = data?.result || [];
@@ -108,6 +112,8 @@ export const StudentListPage: React.FC = () => {
 
   const handleActivationSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['students'] });
+    queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
+    queryClient.invalidateQueries({ queryKey: ['school-class-students'] });
     handleClearSelection();
   };
 
@@ -129,8 +135,8 @@ export const StudentListPage: React.FC = () => {
 
       {/* Filter Bar */}
       <StudentFilterBar
-        filters={filters}
-        onFilterChange={setFilters}
+        filters={{ ...filters, termId: selectedTermId! }}
+        onFilterChange={(nextFilters) => { setFilters(nextFilters); handleClearSelection(); }}
         onReset={handleResetFilters}
         isLoading={isFetching}
       />
@@ -197,6 +203,7 @@ export const StudentListPage: React.FC = () => {
 
       {/* Modals */}
       <BatchActivationModal
+        key={isBatchModalOpen ? 'batch-open' : 'batch-closed'}
         open={isBatchModalOpen}
         onClose={() => setIsBatchModalOpen(false)}
         onSuccess={handleActivationSuccess}
@@ -204,11 +211,13 @@ export const StudentListPage: React.FC = () => {
         totalSelected={selectedUserIds.length}
         alreadyActiveCount={activeInSelected}
         isAllMatching={isAllMatchingSelected}
-        filters={filters}
+        filters={{ ...filters, termId: selectedTermId! }}
         totalFilteredCount={meta.total}
       />
 
       <SingleActivationModal
+        key={`single-${singleStudentModal?.userId ?? 'closed'}`}
+        termId={selectedTermId!}
         open={Boolean(singleStudentModal)}
         student={singleStudentModal}
         onClose={() => setSingleStudentModal(null)}

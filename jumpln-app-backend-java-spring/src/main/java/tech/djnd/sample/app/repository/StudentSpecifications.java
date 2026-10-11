@@ -7,6 +7,7 @@ import org.springframework.data.jpa.domain.Specification;
 import tech.djnd.sample.app.domain.Student;
 import tech.djnd.sample.app.domain.User;
 import tech.djnd.sample.app.domain.Major;
+import tech.djnd.sample.app.domain.SchoolClass;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,6 +16,17 @@ import java.util.List;
 public final class StudentSpecifications {
 
     private StudentSpecifications() {
+    }
+
+    public static Specification<Student> withTerm(Integer termId) {
+        return (root, query, cb) -> {
+            if (termId == null) return cb.conjunction();
+            Subquery<Integer> classes = query.subquery(Integer.class);
+            Root<SchoolClass> schoolClass = classes.from(SchoolClass.class);
+            classes.select(schoolClass.get("id"));
+            classes.where(cb.equal(schoolClass.get("termId"), termId));
+            return root.get("schoolClassId").in(classes);
+        };
     }
 
     public static Specification<Student> withFilter(

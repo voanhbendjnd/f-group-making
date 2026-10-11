@@ -13,13 +13,15 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
+import { TermSelect } from '@/features/terms/components/TermSelect';
 
 export interface SidebarProps {
+  showTermFilter?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilter = false }) => {
   const { user, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -108,6 +110,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           </div>
         </div>
       </div>
+
+      {isAdmin && showTermFilter && (
+        <div style={{ padding: '1rem 0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+          <TermSelect compact />
+        </div>
+      )}
 
       {/* Navigation Links */}
       <div style={{ flex: 1, padding: '1rem 0.75rem', overflowY: 'auto' }}>

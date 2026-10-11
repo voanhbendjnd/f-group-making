@@ -23,13 +23,16 @@ public class SchoolClassService {
 
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
+    private final TermService termService;
 
     public SchoolClassService(
             SchoolClassRepository schoolClassRepository,
-            StudentRepository studentRepository
+            StudentRepository studentRepository,
+            TermService termService
     ) {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
+        this.termService = termService;
     }
 
     /**
@@ -37,6 +40,7 @@ public class SchoolClassService {
      */
     @Transactional(readOnly = true)
     public ResultPaginationDTO getSchoolClasses(String search, Integer termId, Pageable pageable) {
+        termService.validateTerm(termId);
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
         Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, pageable);

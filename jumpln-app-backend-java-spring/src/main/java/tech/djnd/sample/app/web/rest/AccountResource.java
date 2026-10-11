@@ -23,6 +23,7 @@ import tech.djnd.sample.app.service.AuthService;
 import tech.djnd.sample.app.service.MailService;
 import tech.djnd.sample.app.service.NotificationAsyncService;
 import tech.djnd.sample.app.service.UserService;
+import tech.djnd.sample.app.service.TermService;
 import tech.djnd.sample.app.service.dto.ActivationKeyVerifyDTO;
 import tech.djnd.sample.app.service.dto.BatchActivationResultDTO;
 import tech.djnd.sample.app.service.dto.ResLoginDTO;
@@ -42,6 +43,7 @@ import java.util.Optional;
 @RequestMapping("/api")
 public class AccountResource {
     private final UserService userService;
+    private final TermService termService;
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final AuthService authService;
     private final MailService mailService;
@@ -56,9 +58,11 @@ public class AccountResource {
             AuthService authService,
             MailService mailService,
             NotificationAsyncService notificationAsyncService,
-            PasswordEncoder passwordEncoder
+            PasswordEncoder passwordEncoder,
+            TermService termService
     ) {
         this.userService = userService;
+        this.termService = termService;
         this.authenticationManagerBuilder = authenticationManagerBuilder;
         this.notificationAsyncService = notificationAsyncService;
         this.mailService = mailService;
@@ -99,15 +103,18 @@ public class AccountResource {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     @ApiMessage("Activation email request accepted successfully")
-    public void sendRequestActivateAccount(@RequestBody(required = false) Map<String, Object> mp) {
+    public void sendRequestActivateAccount(@RequestBody(required = false) Map<String, Object> mp,
+            @RequestParam(name = "termId", required = false) Integer termId) {
         String email = mp == null ? null : (mp.get("email") != null ? mp.get("email").toString() : null);
         Object rawUserId = mp == null ? null : (mp.containsKey("userId") ? mp.get("userId") : mp.get("id"));
 
         UserDTO dto;
         if (rawUserId != null) {
             Long userId = rawUserId instanceof Number ? ((Number) rawUserId).longValue() : Long.parseLong(rawUserId.toString());
+            termService.validateUserIdsInTerm(List.of(userId), termId);
             dto = userService.initActivatedKeyAccountById(userId);
         } else if (email != null && !email.isBlank()) {
+            termService.validateEmailInTerm(email, termId);
             dto = userService.initActivatedKeyAccount(email);
         } else {
             throw new BadRequestResourceException("Email not found", "userManagement", "emailnotfound");
@@ -119,9 +126,11 @@ public class AccountResource {
     @ResponseStatus(HttpStatus.OK)
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     @ApiMessage("Batch activation request accepted successfully")
-    public ResponseEntity<BatchActivationResultDTO> sendMulRequestActivateAccount(@Valid @RequestBody MulUserId mulUserId) {
+    public ResponseEntity<BatchActivationResultDTO> sendMulRequestActivateAccount(@Valid @RequestBody MulUserId mulUserId,
+            @RequestParam(name = "termId", required = false) Integer termId) {
         List<Long> userIds = mulUserId.getUserIds();
         List<Long> distinctUserIds = userIds.stream().distinct().toList();
+        termService.validateUserIdsInTerm(distinctUserIds, termId);
         List<UserDTO> usersToActivate = userService.initActivateKeyMulAccount(distinctUserIds);
         notificationAsyncService.sendMailActivatedAccount(usersToActivate);
 
