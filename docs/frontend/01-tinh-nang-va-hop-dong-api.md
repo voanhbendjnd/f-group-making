@@ -1,5 +1,7 @@
 # 01 — Tính năng hiện có và hợp đồng API
 
+> Contract bổ sung 12/10/2026: [bốn API giảng viên và Rule theo lớp](11-giang-vien-va-quy-dinh-nhom.md#bốn-api), đã có kiểm thử HTTP qua MockMvc với H2. Các mô tả API thiếu ở bản rà soát cũ không áp dụng cho phần bổ sung này.
+
 [Về mục lục](README.md)
 
 ## 1. Căn cứ và giới hạn

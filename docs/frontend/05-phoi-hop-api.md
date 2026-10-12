@@ -1,5 +1,7 @@
 # 05 — Phối hợp API và quản lý trạng thái
 
+> Cập nhật 12/10/2026: query/mutation của Rule theo lớp đã triển khai, gồm version, chống gửi lặp, không retry ghi và đọc lại chủ động khi kết quả chưa xác nhận. Xem [11](11-giang-vien-va-quy-dinh-nhom.md); các nhận định về chỉ có bốn POST bên dưới thuộc bản rà soát cũ.
+
 [Về mục lục](README.md) · [Hợp đồng hiện có](01-tinh-nang-va-hop-dong-api.md)
 
 ## 1. Mục tiêu và giới hạn

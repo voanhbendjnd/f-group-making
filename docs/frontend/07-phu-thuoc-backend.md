@@ -1,5 +1,7 @@
 # 07 — Phụ thuộc và điểm cần bổ sung backend
 
+> Cập nhật 12/10/2026: các API giảng viên/lớp/Rule, quyền theo lớp và lưu toàn bộ quy định có version đã được triển khai. Xem [11](11-giang-vien-va-quy-dinh-nhom.md). Module nhóm/random/chốt nhóm vẫn chưa nằm trong phạm vi; migration cần chạy trước backend mới trên database cũ.
+
 [Về mục lục](README.md) · [Hợp đồng đã rà soát](01-tinh-nang-va-hop-dong-api.md)
 
 ## 1. Cách đọc

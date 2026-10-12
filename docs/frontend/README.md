@@ -1,5 +1,7 @@
 # Đặc tả frontend React — F Group Making
 
+> Cập nhật 12/10/2026: đã triển khai khu vực giảng viên, bốn API quản lý lớp/Rule và kiểm tra quyền theo lớp. Contract, cấu trúc hiện hữu và hướng dẫn migration ở [11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
+
 > Mục tiêu ưu tiên: người không rành công nghệ biết mình đang ở đâu, cần làm gì tiếp theo và thao tác vừa rồi đã có kết quả gì.
 
 Bộ tài liệu này là căn cứ triển khai frontend, thiết kế giao diện và phối hợp giữa người phát triển với agent. Đây là tài liệu thiết kế; chưa tạo ứng dụng React, chưa thay đổi backend, chưa gọi API để ghi dữ liệu hoặc gửi email.

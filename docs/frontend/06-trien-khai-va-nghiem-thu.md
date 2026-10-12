@@ -1,5 +1,7 @@
 # 06 — Lộ trình triển khai và tiêu chí nghiệm thu
 
+> Bổ sung 12/10/2026: frontend và backend cho giảng viên/Rule đã được triển khai. Các ca nghiệm thu cụ thể và giới hạn kiểm chứng được ghi tại [11](11-giang-vien-va-quy-dinh-nhom.md#kiểm-tra-nghiệm-thu), thay cho trạng thái chưa có frontend của kế hoạch ban đầu.
+
 [Về mục lục](README.md)
 
 ## 1. Phạm vi thực hiện
