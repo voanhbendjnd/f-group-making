@@ -15,40 +15,46 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorState } from '@/components/common/ErrorState';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 
-export const AdminDashboardPage: React.FC = () => {
+export const AdminDashboardPage: React.FC = () => <TermScope><AdminDashboardContent /></TermScope>;
+
+const AdminDashboardContent: React.FC = () => {
+  const { selectedTermId } = useTerm();
   const { t } = useTranslation();
   const navigate = useNavigate();
 
   // Query 1: Total students
   const totalQuery = useQuery({
-    queryKey: ['students-count-total'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1 }),
+    queryKey: ['admin-dashboard', selectedTermId, 'students-count-total'],
+    queryFn: () => studentApi.getStudents({ page: 1, size: 1, termId: selectedTermId! }),
   });
 
   // Query 2: Activated students
   const activatedQuery = useQuery({
-    queryKey: ['students-count-activated'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: true }),
+    queryKey: ['admin-dashboard', selectedTermId, 'students-count-activated'],
+    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: true, termId: selectedTermId! }),
   });
 
   // Query 3: Waiting for activation
   const waitingQuery = useQuery({
-    queryKey: ['students-count-waiting'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: false }),
+    queryKey: ['admin-dashboard', selectedTermId, 'students-count-waiting'],
+    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: false, termId: selectedTermId! }),
   });
 
   // Query 4: Email sent waiting for student to activate
   const emailSentQuery = useQuery({
-    queryKey: ['students-count-sent'],
+    queryKey: ['admin-dashboard', selectedTermId, 'students-count-sent'],
     queryFn: () =>
-      studentApi.getStudents({ page: 1, size: 1, activated: false, hasActivationKey: true }),
+      studentApi.getStudents({ page: 1, size: 1, activated: false, hasActivationKey: true, termId: selectedTermId! }),
   });
 
   // Query 5: Recent students preview
   const recentQuery = useQuery({
-    queryKey: ['students-recent'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 5, sort: 'userId,desc' }),
+    queryKey: ['admin-dashboard', selectedTermId, 'students-recent'],
+    queryFn: () => studentApi.getStudents({ page: 1, size: 5, sort: 'userId,desc', termId: selectedTermId! }),
   });
 
   const totalStudents = totalQuery.data?.meta?.total ?? 0;
@@ -58,7 +64,13 @@ export const AdminDashboardPage: React.FC = () => {
   const notSentStudents = Math.max(0, waitingStudents - emailSentStudents);
 
   const recentStudents = recentQuery.data?.result || [];
-  const isLoading = totalQuery.isLoading || recentQuery.isLoading;
+  const queries = [totalQuery, activatedQuery, waitingQuery, emailSentQuery, recentQuery];
+  const isLoading = queries.some((query) => query.isPending);
+  const failedQuery = queries.find((query) => query.isError);
+
+  if (failedQuery) return <ErrorState message={failedQuery.error?.message || t('errors.generalFailure')}
+    onRetry={() => queries.forEach((query) => void query.refetch())} />;
+  if (isLoading) return <LoadingSpinner message={t('students.loadingList')} />;
 
   return (
     <div>

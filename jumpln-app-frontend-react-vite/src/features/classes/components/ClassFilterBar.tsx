@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Search, X, RotateCcw, Calendar } from 'lucide-react';
+import { Search, X, RotateCcw } from 'lucide-react';
 import type { SchoolClassFilterParams } from '../types';
-import { termApi } from '@/features/terms/api/termApi';
-import type { Term } from '@/features/terms/types';
 
 export interface ClassFilterBarProps {
   filters: SchoolClassFilterParams;
@@ -40,14 +38,6 @@ const STYLES = `
 .cf-clear:hover{background:#d1d5db; color:#111827}
 .cf-clear:focus-visible{outline:none; box-shadow:0 0 0 3px rgba(79,107,237,.25)}
 
-/* Term dropdown */
-.cf-term{display:flex; align-items:center; gap:6px; background:#f3f4f6; border-radius:12px; padding:4px 8px}
-.cf-select{
-  padding:6px 12px; font:600 13px/1.2 inherit; color:var(--cf-text); background:transparent;
-  border:none; border-radius:8px; cursor:pointer; outline:none;
-}
-.cf-select:focus{box-shadow:0 0 0 2px var(--cf-accent)}
-
 /* Reset */
 .cf-reset{
   display:inline-flex; align-items:center; gap:6px; padding:9px 14px; font:600 13px/1.2 inherit;
@@ -65,16 +55,6 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
   onReset,
 }) => {
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
-  const [terms, setTerms] = useState<Term[]>([]);
-
-  useEffect(() => {
-    // Fetch all terms (false = both past and future terms)
-    termApi.getTerms(false).then((data) => {
-      setTerms(data);
-    }).catch(() => {
-      // ignore
-    });
-  }, []);
 
   // Debounce search update
   useEffect(() => {
@@ -84,14 +64,9 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
       }
     }, 350);
     return () => clearTimeout(timer);
-  }, [searchTerm]);
+  }, [searchTerm, filters.search, onChange]);
 
-  const handleTermChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const val = e.target.value;
-    onChange({ termId: val ? Number(val) : undefined, page: 1 });
-  };
-
-  const hasActiveFilters = Boolean(searchTerm || filters.termId !== undefined);
+  const hasActiveFilters = Boolean(searchTerm);
 
   return (
     <div className="cf-root">
@@ -121,23 +96,6 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
           )}
         </div>
 
-        {/* Term Filter Dropdown */}
-        <div className="cf-term">
-          <Calendar size={15} style={{ color: 'var(--cf-muted)' }} />
-          <select
-            className="cf-select"
-            value={filters.termId ?? ''}
-            onChange={handleTermChange}
-            aria-label="Lọc theo học kỳ"
-          >
-            <option value="">Tất cả học kỳ</option>
-            {terms.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} {t.isCurrent ? '★ (Hiện tại)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {hasActiveFilters && (

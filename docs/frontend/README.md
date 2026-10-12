@@ -1,6 +1,7 @@
 # Đặc tả frontend React — F Group Making
 
-> Cập nhật 12/10/2026: đã triển khai khu vực giảng viên, bốn API quản lý lớp/Rule và kiểm tra quyền theo lớp. Contract, cấu trúc hiện hữu và hướng dẫn migration ở [11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
+> **Cập nhật 12/10/2026:** Đã triển khai Academic Term Filter ([11 — Academic Term Filter](11-academic-term-filter.md)) và khu vực giảng viên, quản lý lớp/Rule cùng kiểm tra quyền theo lớp ([11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md)). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
+
 
 > Mục tiêu ưu tiên: người không rành công nghệ biết mình đang ở đâu, cần làm gì tiếp theo và thao tác vừa rồi đã có kết quả gì.
 

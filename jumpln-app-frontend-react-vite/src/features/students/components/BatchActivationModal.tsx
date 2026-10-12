@@ -6,6 +6,7 @@ import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { studentApi } from '../api/studentApi';
 import type { BatchActivationResult, StudentFilterParams } from '../types';
+import { useTerm } from '@/app/providers/TermContext';
 
 export interface BatchActivationModalProps {
   open: boolean;
@@ -31,6 +32,7 @@ export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
   totalFilteredCount,
 }) => {
   const { t } = useTranslation();
+  const { lockTermSelection } = useTerm();
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<BatchActivationResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -40,15 +42,17 @@ export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
     : Math.max(0, totalSelected - alreadyActiveCount);
 
   const handleSend = async () => {
+    if (isSending || !filters.termId) return;
+    const unlock = lockTermSelection();
     setIsSending(true);
     setErrorMsg(null);
 
     try {
       let res: BatchActivationResult;
       if (isAllMatching) {
-        res = await studentApi.sendActivateAllMatching(filters.search, filters.majorSearch, filters.majorId);
+        res = await studentApi.sendActivateAllMatching(filters.search, filters.majorSearch, filters.majorId, filters.termId);
       } else {
-        res = await studentApi.sendBatchActivation(userIds);
+        res = await studentApi.sendBatchActivation(userIds, filters.termId);
       }
 
       setResult(res);
@@ -62,6 +66,7 @@ export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
       setErrorMsg(err.message || t('errors.generalFailure'));
     } finally {
       setIsSending(false);
+      unlock();
     }
   };
 

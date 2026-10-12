@@ -7,9 +7,9 @@ describe('excelParser client validation', () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
       ['Title'], ['Headers'], [],
-      [1, 'SV001', 'Student One', 'BEN_ se _ET', 'MEM001', 'one@example.com', '', '', 'Class A', 'LECTURER'],
-      [2, 'SV002', 'Student Two', 'SE', 'MEM002', 'two@example.com', '', '', 'Class A', 'LECTURER'],
-      [3, 'SV003', 'Student Three', 'BEN__ET', 'MEM003', 'three@example.com', '', '', 'Class A', 'LECTURER'],
+      [1, 'SV001', 'Student One', 'BEN_ se _ET', 'MEM001', 'one@example.com', '', '', 'EXE101_G01', 'GV01'],
+      [2, 'SV002', 'Student Two', 'SE', 'MEM002', 'two@example.com', '', '', 'EXE101_G01', 'GV01'],
+      [3, 'SV003', 'Student Three', 'BEN__ET', 'MEM003', 'three@example.com', '', '', 'EXE101_G01', 'GV01'],
     ]);
     XLSX.utils.book_append_sheet(workbook, sheet, 'Students');
     const file = new File([XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })], 'students.xlsx');
@@ -27,8 +27,8 @@ describe('excelParser client validation', () => {
     const data = [
       ['BẢNG PHÂN CÔNG SINH VIÊN', '', '', '', '', ''],
       ['STT', 'Mã SV', 'Họ và tên', 'Mã ngành', 'Mã thành viên', 'Email'],
-      [1, 'SE180001', 'Nguyễn Văn An', 'BEN_SE_ET_19C', 'AN_SE180001', 'an@fpt.edu.vn', '', '', 'Class A', 'LECTURER'],
-      [2, 'SE180002', 'Trần Thị Bình', 'BEN_SE_ET_19C', 'BINH_SE180002', 'binh@fpt.edu.vn', '', '', 'Class A', 'LECTURER'],
+      [1, 'SE180001', 'Nguyễn Văn An', 'BEN_SE_ET_19C', 'AN_SE180001', 'an@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
+      [2, 'SE180002', 'Trần Thị Bình', 'BEN_SE_ET_19C', 'BINH_SE180002', 'binh@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);
@@ -80,8 +80,9 @@ describe('excelParser client validation', () => {
     const data = [
       ['HEADER 1', '', '', '', '', ''],
       ['HEADER 2', '', '', '', '', ''],
-      [1, 'SE180099', 'Sinh Viên 1', 'BEN_SE_ET_19C', 'SV1', 'sv1@fpt.edu.vn', '', '', 'Class A', 'LECTURER'],
-      [2, 'SE180099', 'Sinh Viên 2', 'BEN_SE_ET_19C', 'SV2', 'sv2@fpt.edu.vn', '', '', 'Class A', 'LECTURER'],
+      [1, 'SE180099', 'Sinh Viên 1', 'BEN_SE_ET_19C', 'SV1', 'sv1@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
+      [2, 'SE180099', 'Sinh Viên 2', 'BEN_SE_ET_19C', 'SV2', 'sv2@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
+
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);

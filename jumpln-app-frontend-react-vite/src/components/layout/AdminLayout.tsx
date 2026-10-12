@@ -1,3 +1,4 @@
 import { ManagementLayout } from './ManagementLayout';
 
-export const AdminLayout = () => <ManagementLayout area="admin" />;
+export const AdminLayout = () => <ManagementLayout area="admin" showTermFilter />;
+

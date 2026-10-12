@@ -25,15 +25,18 @@ public class SchoolClassService {
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
     private final SchoolClassAccessService accessService;
+    private final TermService termService;
 
     public SchoolClassService(
             SchoolClassRepository schoolClassRepository,
             StudentRepository studentRepository,
-            SchoolClassAccessService accessService
+            SchoolClassAccessService accessService,
+            TermService termService
     ) {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
         this.accessService = accessService;
+        this.termService = termService;
     }
 
     /**
@@ -50,6 +53,8 @@ public class SchoolClassService {
     }
 
     private ResultPaginationDTO searchClasses(String search, Integer termId, Long lecturerId, Pageable pageable) {
+        termService.validateTerm(termId);
+
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
         Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, lecturerId, pageable);

@@ -9,7 +9,7 @@ export const classApi = {
       params: { search: params.search?.trim() || undefined, termId: params.termId,
         page: params.page || 1, size: params.size || 10 }, signal,
     });
-    return parseClassPage(data);
+    return data ? parseClassPage(data) : (data as any);
   },
   async getClasses(params: SchoolClassFilterParams = {}, signal?: AbortSignal): Promise<PaginatedSchoolClasses> {
     const queryParams: Record<string, any> = {};
@@ -30,13 +30,14 @@ export const classApi = {
     const data = await apiClient.get<unknown, unknown>('/api/school-classes', {
       params: queryParams, signal,
     });
-    return parseClassPage(data);
+    return data ? parseClassPage(data) : (data as any);
   },
 
   async getClassById(id: number, signal?: AbortSignal): Promise<SchoolClass> {
     const data = await apiClient.get<unknown, unknown>(`/api/school-classes/${id}`, { signal });
-    return parseSchoolClass(data);
+    return data ? parseSchoolClass(data) : (data as any);
   },
+
 
   async getClassStudents(id: number, signal?: AbortSignal): Promise<Student[]> {
     const data = await apiClient.get<any, Student[]>(`/api/school-classes/${id}/students`, { signal });

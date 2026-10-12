@@ -4,6 +4,7 @@ import type { BatchActivationResult, PaginatedStudents, Student, StudentFilterPa
 export const studentApi = {
   async getStudents(params: StudentFilterParams = {}): Promise<PaginatedStudents> {
     const queryParams: Record<string, any> = {};
+    if (params.termId !== undefined) queryParams.termId = params.termId;
 
     if (params.search && params.search.trim()) {
       queryParams.search = params.search.trim();
@@ -38,22 +39,23 @@ export const studentApi = {
     return data;
   },
 
-  async sendSingleActivation(userId: number, email?: string): Promise<void> {
+  async sendSingleActivation(userId: number, email?: string, termId?: number): Promise<void> {
     await apiClient.post('/api/activate', {
       userId,
       email,
-    });
+    }, { params: { termId } });
   },
 
-  async sendBatchActivation(userIds: number[]): Promise<BatchActivationResult> {
+  async sendBatchActivation(userIds: number[], termId?: number): Promise<BatchActivationResult> {
     const data = await apiClient.post<any, BatchActivationResult>('/api/activate/mul', {
       userIds,
-    });
+    }, { params: { termId } });
     return data;
   },
 
-  async sendActivateAllMatching(search?: string, majorSearch?: string, majorId?: number): Promise<BatchActivationResult> {
+  async sendActivateAllMatching(search?: string, majorSearch?: string, majorId?: number, termId?: number): Promise<BatchActivationResult> {
     const params: Record<string, any> = {};
+    if (termId !== undefined) params.termId = termId;
     if (search && search.trim()) {
       params.search = search.trim();
     }

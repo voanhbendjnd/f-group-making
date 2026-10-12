@@ -5,8 +5,10 @@ import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { studentApi } from '../api/studentApi';
 import type { Student } from '../types';
+import { useTerm } from '@/app/providers/TermContext';
 
 export interface SingleActivationModalProps {
+  termId: number;
   open: boolean;
   student: Student | null;
   onClose: () => void;
@@ -18,8 +20,10 @@ export const SingleActivationModal: React.FC<SingleActivationModalProps> = ({
   student,
   onClose,
   onSuccess,
+  termId,
 }) => {
   const { t } = useTranslation();
+  const { lockTermSelection } = useTerm();
   const [isSending, setIsSending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -27,16 +31,19 @@ export const SingleActivationModal: React.FC<SingleActivationModalProps> = ({
   if (!open || !student) return null;
 
   const handleSend = async () => {
+    if (isSending) return;
+    const unlock = lockTermSelection();
     setIsSending(true);
     setErrorMsg(null);
     try {
-      await studentApi.sendSingleActivation(student.userId, student.email);
+      await studentApi.sendSingleActivation(student.userId, student.email, termId);
       setIsSuccess(true);
       onSuccess();
     } catch (err: any) {
       setErrorMsg(err.message || t('errors.generalFailure'));
     } finally {
       setIsSending(false);
+      unlock();
     }
   };
 

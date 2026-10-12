@@ -49,11 +49,14 @@ public class StudentResource {
             @RequestParam(name = "majorId", required = false) Integer majorId,
             @RequestParam(name = "activated", required = false) Boolean activated,
             @RequestParam(name = "hasActivationKey", required = false) Boolean hasActivationKey,
+            @RequestParam(name = "termId", required = false) Integer termId,
             @PageableDefault(size = 20, sort = {"createdDate", "userId"}, direction = Sort.Direction.DESC) Pageable pageable) {
 
         log.debug("REST request to get students with filter: search={}, majorCode={}, activated={}, hasKey={}",
                 search, majorCode, activated, hasActivationKey);
-        ResultPaginationDTO result = studentService.getStudents(search, majorSearch != null ? majorSearch : majorCode, majorId, activated, hasActivationKey, pageable);
+        ResultPaginationDTO result = termId == null
+                ? studentService.getStudents(search, majorSearch != null ? majorSearch : majorCode, majorId, activated, hasActivationKey, pageable)
+                : studentService.getStudents(search, majorSearch != null ? majorSearch : majorCode, majorId, activated, hasActivationKey, pageable, termId);
         return ResponseEntity.ok(result);
     }
 
@@ -83,10 +86,13 @@ public class StudentResource {
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "majorCode", required = false) String majorCode,
             @RequestParam(name = "majorSearch", required = false) String majorSearch,
-            @RequestParam(name = "majorId", required = false) Integer majorId) {
+            @RequestParam(name = "majorId", required = false) Integer majorId,
+            @RequestParam(name = "termId", required = false) Integer termId) {
 
         log.debug("REST request to activate all matching unactivated students: search={}, majorCode={}", search, majorCode);
-        BatchActivationResultDTO result = studentService.activateAllMatching(search, majorSearch != null ? majorSearch : majorCode, majorId);
+        BatchActivationResultDTO result = termId == null
+                ? studentService.activateAllMatching(search, majorSearch != null ? majorSearch : majorCode, majorId)
+                : studentService.activateAllMatching(search, majorSearch != null ? majorSearch : majorCode, majorId, termId);
         return ResponseEntity.ok(result);
     }
 

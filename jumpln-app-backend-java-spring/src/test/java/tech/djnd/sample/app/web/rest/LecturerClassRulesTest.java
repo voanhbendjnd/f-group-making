@@ -63,8 +63,11 @@ class LecturerClassRulesTest {
         mvc.perform(get("/api/me/school-classes").param("search", " Class A").param("termId", term.getId().toString()))
                 .andExpect(jsonPath("$.data.meta.total").value(1))
                 .andExpect(jsonPath("$.data.result[0].id").value(ownClass.getId()));
+        Term emptyTerm = new Term(); emptyTerm.setName("EMPTYTERM"); emptyTerm = terms.saveAndFlush(emptyTerm);
+        mvc.perform(get("/api/me/school-classes").param("termId", emptyTerm.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.meta.total").value(0));
         mvc.perform(get("/api/me/school-classes").param("termId", "2147483647"))
-                .andExpect(jsonPath("$.data.meta.total").value(0));
+                .andExpect(status().isBadRequest());
     }
 
     @Test

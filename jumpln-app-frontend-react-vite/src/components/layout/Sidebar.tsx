@@ -14,19 +14,27 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
 import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
+import { TermSelect } from '@/features/terms/components/TermSelect';
 
 export interface SidebarProps {
   area?: 'admin' | 'lecturer' | 'student';
+  showTermFilter?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ area, isOpen, onClose }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  area,
+  isOpen,
+  onClose,
+  showTermFilter = false,
+}) => {
   const { user, isAdmin: hasAdminRole, logout } = useAuth();
   const isAdmin = area ? area === 'admin' : hasAdminRole;
   const isLecturer = area === 'lecturer';
-  const isMaster = user?.authorities.includes('ROLE_LECTURE_MASTER');
+  const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
   const allClasses = canViewAllClasses(user?.authorities || []);
+
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -116,6 +124,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ area, isOpen, onClose }) => {
           </div>
         </div>
       </div>
+
+      {isAdmin && showTermFilter && (
+        <div style={{ padding: '1rem 0.75rem', borderBottom: '1px solid var(--color-border)' }}>
+          <TermSelect compact />
+        </div>
+      )}
 
       {/* Navigation Links */}
       <div style={{ flex: 1, padding: '1rem 0.75rem', overflowY: 'auto' }}>

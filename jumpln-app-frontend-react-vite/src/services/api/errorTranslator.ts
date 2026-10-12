@@ -19,6 +19,14 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'termNotFound':
+    case 'error.termNotFound':
+      return i18n.t('terms.invalid');
+    case 'userOutsideTerm':
+    case 'error.userOutsideTerm':
+    case 'lecturerOutsideTerm':
+    case 'error.lecturerOutsideTerm':
+      return i18n.t('terms.outsideScope');
     case 'error.classAccessDenied':
     case 'classAccessDenied':
       return i18n.t('rules.errors.classAccessDenied');
@@ -46,6 +54,7 @@ export function translateErrorMessage(error: any): string {
     case 'error.ruleValueOutOfRange':
     case 'ruleValueOutOfRange':
       return i18n.t('rules.errors.ruleValueOutOfRange');
+
     case 'error.emailnotfound':
     case 'emailnotfound':
       return i18n.t('errors.emailNotFound');
