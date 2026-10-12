@@ -6,10 +6,13 @@ import { StudentImportPage } from '@/pages/admin/StudentImportPage';
 import { importApi } from '@/features/import/api/importApi';
 import { parseExcelClientSide } from '@/features/import/utils/excelParser';
 import i18n from '@/locales/i18n';
+import { ToastProvider } from '@/app/providers/ToastContext';
+import { termApi } from '@/features/terms/api/termApi';
 
 vi.mock('@/features/import/api/importApi', () => ({ importApi: { importExcel: vi.fn() } }));
 vi.mock('@/features/import/utils/excelParser', () => ({ parseExcelClientSide: vi.fn() }));
 vi.mock('canvas-confetti', () => ({ default: vi.fn() }));
+vi.mock('@/features/terms/api/termApi', () => ({ termApi: { getTerms: vi.fn(), createTerm: vi.fn() } }));
 
 const pending = { success: false, totalImported: 0, errors: [], confirmationRequired: true, newMajorCodes: ['ABC', 'XYZ'] };
 const success = { success: true, totalImported: 1, errors: [], createdMajorCodes: ['ABC', 'XYZ'] };
@@ -22,7 +25,9 @@ function chooseFile(name = 'students.xlsx') {
 }
 
 async function startImport() {
-  render(<MemoryRouter><QueryClientProvider client={client}><StudentImportPage /></QueryClientProvider></MemoryRouter>);
+  render(<MemoryRouter><ToastProvider><QueryClientProvider client={client}><StudentImportPage /></QueryClientProvider></ToastProvider></MemoryRouter>);
+  await screen.findByRole('option', { name: /SP26/ });
+  await waitFor(() => expect(screen.getByRole('combobox')).toHaveValue('1'));
   const file = chooseFile();
   await waitFor(() => expect(parseExcelClientSide).toHaveBeenCalledWith(file));
   fireEvent.click((await screen.findAllByRole('button', { name: /Confirm Import 1/ }))[0]);
@@ -34,8 +39,10 @@ describe('Student import major confirmation', () => {
     vi.resetAllMocks();
     await i18n.changeLanguage('en');
     client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    vi.mocked(termApi.getTerms).mockResolvedValue([{ id: 1, name: 'SP26', isCurrent: true }]);
     vi.mocked(parseExcelClientSide).mockResolvedValue({ rows: [{ rowNumber: 3, rollNumber: 'SE001', fullName: 'Student',
       originalMajor: 'BEN_ABC_ET', extractedMajorCode: 'ABC', memberCode: 'MEM001', email: 'student@example.com',
+      groupName: 'Class A', lecturerCode: 'LECTURER',
       isValid: true, validationErrors: [] }], totalRows: 1, validCount: 1, invalidCount: 0, hasErrors: false });
     vi.mocked(importApi.importExcel).mockResolvedValueOnce(pending).mockResolvedValueOnce(success);
   });
@@ -46,10 +53,10 @@ describe('Student import major confirmation', () => {
     const file = await startImport();
     expect(await screen.findByRole('dialog')).toHaveTextContent('ABC');
     expect(screen.getByRole('dialog')).toHaveTextContent('XYZ');
-    expect(importApi.importExcel).toHaveBeenCalledWith(file, []);
+    expect(importApi.importExcel).toHaveBeenCalledWith(file, 1, []);
     expect(importApi.importExcel).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: 'Create majors and import' }));
-    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(file, ['ABC', 'XYZ']));
+    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(file, 1, ['ABC', 'XYZ']));
     expect(await screen.findByText(/Created majors: ABC, XYZ/)).toBeInTheDocument();
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['majors'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['students'] });
@@ -71,7 +78,7 @@ describe('Student import major confirmation', () => {
     const nextFile = chooseFile('different.xlsx');
     await waitFor(() => expect(parseExcelClientSide).toHaveBeenLastCalledWith(nextFile));
     fireEvent.click((await screen.findAllByRole('button', { name: /Confirm Import 1/ }))[0]);
-    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(nextFile, []));
+    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(nextFile, 1, []));
   });
 
   it('asks again when the server finds additional unapproved codes', async () => {
@@ -83,6 +90,6 @@ describe('Student import major confirmation', () => {
     await waitFor(() => expect(screen.getByRole('dialog')).toHaveTextContent('NEW'));
     expect(importApi.importExcel).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole('button', { name: 'Create majors and import' }));
-    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(file, ['ABC', 'XYZ', 'NEW']));
+    await waitFor(() => expect(importApi.importExcel).toHaveBeenLastCalledWith(file, 1, ['ABC', 'XYZ', 'NEW']));
   });
 });
