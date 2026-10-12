@@ -10,8 +10,9 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isStudent: boolean;
+  isLecturer: boolean;
   isLoading: boolean;
-  login: (request: LoginRequest) => Promise<void>;
+  login: (request: LoginRequest) => Promise<StoredUser>;
   logout: () => void;
 }
 
@@ -39,7 +40,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [handleUnauthorized]);
 
-  const login = async (request: LoginRequest): Promise<void> => {
+  const login = async (request: LoginRequest): Promise<StoredUser> => {
     setIsLoading(true);
     try {
       const response = await authApi.login(request);
@@ -52,6 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       storage.setUser(storedUser);
       setUser(storedUser);
+      return storedUser;
     } catch (err: any) {
       error(err.message || i18n.t('auth.loginFailed'));
       throw err;
@@ -69,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const authorities = user?.authorities || [];
   const isAdmin = authorities.includes('ROLE_ADMIN');
   const isStudent = authorities.includes('ROLE_STUDENT');
+  const isLecturer = authorities.includes('ROLE_LECTURE') || authorities.includes('ROLE_LECTURE_MASTER');
   const isAuthenticated = !!user && !!storage.getToken();
 
   return (
@@ -78,6 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthenticated,
         isAdmin,
         isStudent,
+        isLecturer,
         isLoading,
         login,
         logout,

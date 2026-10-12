@@ -7,6 +7,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import type { LoginRequest } from '../types';
+import { canAccessPath, getHomeRoute } from '../utils/roleRouting';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -29,20 +30,13 @@ export const LoginForm: React.FC = () => {
   const onSubmit = async (data: LoginRequest) => {
     setFormError(null);
     try {
-      await login(data);
+      const user = await login(data);
       // Determine redirection based on target or user role
-      const from = (location.state as any)?.from?.pathname;
-      if (from) {
+      const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+      if (from && canAccessPath(from, user.authorities)) {
         navigate(from, { replace: true });
       } else {
-        // AuthContext updates synchronously from localStorage
-        const stored = localStorage.getItem('f_group_auth_user');
-        const user = stored ? JSON.parse(stored) : null;
-        if (user?.authorities?.includes('ROLE_ADMIN')) {
-          navigate('/admin/dashboard', { replace: true });
-        } else {
-          navigate('/student/dashboard', { replace: true });
-        }
+        navigate(getHomeRoute(user.authorities), { replace: true });
       }
     } catch (err: any) {
       setFormError(err.message || t('auth.loginFailed'));

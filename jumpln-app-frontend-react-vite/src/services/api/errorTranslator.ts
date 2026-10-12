@@ -19,6 +19,33 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'error.classAccessDenied':
+    case 'classAccessDenied':
+      return i18n.t('rules.errors.classAccessDenied');
+    case 'error.classNotFound':
+    case 'classNotFound':
+      return i18n.t('lecturer.classNotFound');
+    case 'error.rulesVersionConflict':
+    case 'rulesVersionConflict':
+      return i18n.t('rules.errors.rulesVersionConflict');
+    case 'error.duplicateRuleCode':
+    case 'duplicateRuleCode':
+      return i18n.t('rules.errors.duplicateRuleCode');
+    case 'error.incompleteRules':
+    case 'incompleteRules':
+      return i18n.t('rules.errors.incompleteRules');
+    case 'error.ruleMinGreaterThanMax':
+    case 'ruleMinGreaterThanMax':
+      return i18n.t('rules.minGreaterThanMax');
+    case 'error.ruleMajorsExceedMembers':
+    case 'ruleMajorsExceedMembers':
+      return i18n.t('rules.majorsExceedMembers');
+    case 'error.ruleSeExceedMembers':
+    case 'ruleSeExceedMembers':
+      return i18n.t('rules.seExceedMembers');
+    case 'error.ruleValueOutOfRange':
+    case 'ruleValueOutOfRange':
+      return i18n.t('rules.errors.ruleValueOutOfRange');
     case 'error.emailnotfound':
     case 'emailnotfound':
       return i18n.t('errors.emailNotFound');

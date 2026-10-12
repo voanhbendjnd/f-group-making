@@ -54,6 +54,7 @@ apiClient.interceptors.response.use(
       detail: data?.detail,
       violations: data?.violations || data?.fieldErrors,
       raw: data,
+      outcomeUnknown: !error.response || status >= 500,
     };
 
     // If 401 Unauthorized, notify application if needed
