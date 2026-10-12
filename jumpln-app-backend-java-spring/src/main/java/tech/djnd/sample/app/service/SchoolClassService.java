@@ -12,6 +12,7 @@ import tech.djnd.sample.app.service.dto.SchoolClassDTO;
 import tech.djnd.sample.app.service.dto.StudentDTO;
 import tech.djnd.sample.app.service.errors.BadRequestResourceException;
 import tech.djnd.sample.app.service.projection.StudentRow;
+import tech.djnd.sample.app.web.rest.errors.NotFoundAlertException;
 
 import java.time.Instant;
 import java.util.List;
@@ -23,13 +24,16 @@ public class SchoolClassService {
 
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
+    private final SchoolClassAccessService accessService;
 
     public SchoolClassService(
             SchoolClassRepository schoolClassRepository,
-            StudentRepository studentRepository
+            StudentRepository studentRepository,
+            SchoolClassAccessService accessService
     ) {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
+        this.accessService = accessService;
     }
 
     /**
@@ -37,9 +41,18 @@ public class SchoolClassService {
      */
     @Transactional(readOnly = true)
     public ResultPaginationDTO getSchoolClasses(String search, Integer termId, Pageable pageable) {
+        return searchClasses(search, termId, null, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMySchoolClasses(String search, Integer termId, Pageable pageable) {
+        return searchClasses(search, termId, accessService.currentLecturerId(), pageable);
+    }
+
+    private ResultPaginationDTO searchClasses(String search, Integer termId, Long lecturerId, Pageable pageable) {
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, pageable);
+        Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, lecturerId, pageable);
 
         ResultPaginationDTO.Meta meta = ResultPaginationDTO.Meta.builder()
                 .page(pageable.getPageNumber() + 1)
@@ -59,6 +72,8 @@ public class SchoolClassService {
      */
     @Transactional(readOnly = true)
     public SchoolClassDTO getSchoolClassById(Integer classId) {
+        accessService.requireReadAccess(schoolClassRepository.findById(classId)
+                .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound")));
         return schoolClassRepository.findClassDTOById(classId)
                 .orElseThrow(() -> new BadRequestResourceException(
                         "Lớp học không tồn tại với ID: " + classId,
@@ -72,13 +87,8 @@ public class SchoolClassService {
      */
     @Transactional(readOnly = true)
     public List<StudentDTO> getStudentsByClassId(Integer classId) {
-        if (!schoolClassRepository.existsById(classId)) {
-            throw new BadRequestResourceException(
-                    "Lớp học không tồn tại với ID: " + classId,
-                    "schoolClassManagement",
-                    "classNotFound"
-            );
-        }
+        accessService.requireReadAccess(schoolClassRepository.findById(classId)
+                .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound")));
 
         List<StudentRow> rows = studentRepository.findStudentsBySchoolClassId(classId);
 

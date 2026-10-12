@@ -7,7 +7,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import tech.djnd.sample.app.security.AuthoritiesConstants;
 import tech.djnd.sample.app.service.SchoolClassService;
 import tech.djnd.sample.app.service.dto.ResultPaginationDTO;
 import tech.djnd.sample.app.service.dto.SchoolClassDTO;
@@ -36,7 +35,7 @@ public class SchoolClassResource {
      * GET /api/school-classes : Get paginated list of school classes with search and term filter.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER')")
     @ApiMessage("Get school classes list successfully")
     public ResponseEntity<ResultPaginationDTO> getAllSchoolClasses(
             @RequestParam(name = "search", required = false) String search,
@@ -52,7 +51,7 @@ public class SchoolClassResource {
      * GET /api/school-classes/{id} : Get class details by ID.
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
     @ApiMessage("Get school class details successfully")
     public ResponseEntity<SchoolClassDTO> getSchoolClassById(@PathVariable("id") Integer id) {
         log.debug("REST request to get school class: id={}", id);
@@ -64,7 +63,7 @@ public class SchoolClassResource {
      * GET /api/school-classes/{id}/students : Get all students belonging to the class.
      */
     @GetMapping("/{id}/students")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
     @ApiMessage("Get school class students successfully")
     public ResponseEntity<List<StudentDTO>> getStudentsByClassId(@PathVariable("id") Integer id) {
         log.debug("REST request to get students of class: id={}", id);

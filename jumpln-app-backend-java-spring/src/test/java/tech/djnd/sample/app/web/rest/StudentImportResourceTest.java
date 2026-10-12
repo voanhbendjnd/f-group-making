@@ -3,6 +3,8 @@ package tech.djnd.sample.app.web.rest;
 import jakarta.persistence.EntityManager;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +16,9 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.dao.DataIntegrityViolationException;
 import tech.djnd.sample.app.domain.Major;
+import tech.djnd.sample.app.domain.User;
+import tech.djnd.sample.app.domain.Lecturer;
+import tech.djnd.sample.app.repository.LecturerRepository;
 import tech.djnd.sample.app.repository.MajorRepository;
 import tech.djnd.sample.app.repository.StudentRepository;
 import tech.djnd.sample.app.repository.UserRepository;
@@ -39,6 +44,23 @@ class StudentImportResourceTest {
     @Autowired private UserRepository users;
     @Autowired private StudentService service;
     @Autowired private EntityManager em;
+    @Autowired private LecturerRepository lecturers;
+    private Long importLecturerId;
+
+    @BeforeEach
+    void provideLecturerRequiredByCurrentImportContract() {
+        User user = new User(); user.setEmail("import-lecturer@example.com"); user.setName("Import Lecturer");
+        user = users.saveAndFlush(user);
+        importLecturerId = user.getId();
+        Lecturer lecturer = new Lecturer(); lecturer.setUserId(user.getId()); lecturer.setCode("IMPORT-LECTURER");
+        lecturers.saveAndFlush(lecturer);
+    }
+
+    @AfterEach
+    void removeImportLecturerFixture() {
+        lecturers.deleteById(importLecturerId);
+        users.deleteById(importLecturerId);
+    }
 
     @Test
     void missingCodesRequireConfirmationWithoutWriting() throws Exception {
@@ -193,6 +215,8 @@ class StudentImportResourceTest {
                 row.createCell(3).setCellValue(codes[i]);
                 row.createCell(4).setCellValue("IMPMEMBER" + i);
                 row.createCell(5).setCellValue("import" + i + "@example.com");
+                row.createCell(8).setCellValue("Import Class");
+                row.createCell(9).setCellValue("IMPORT-LECTURER");
             }
             workbook.write(output);
             return new MockMultipartFile("file", "students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray());

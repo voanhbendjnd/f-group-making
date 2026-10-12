@@ -22,6 +22,16 @@ public class SchoolClass extends AbstractAuditingEntity<Integer>{
     private Integer termId;
     @Column(name = "lecturer_id")
     private Long lecturerId;
+    @Column(name = "rules_version", nullable = false)
+    private long rulesVersion = 0;
+
+    public long getRulesVersion() {
+        return rulesVersion;
+    }
+
+    public void setRulesVersion(long rulesVersion) {
+        this.rulesVersion = rulesVersion;
+    }
     @JsonIgnore
     @ManyToMany
     @JoinTable(

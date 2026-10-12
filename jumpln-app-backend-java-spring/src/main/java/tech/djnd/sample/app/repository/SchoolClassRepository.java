@@ -11,6 +11,8 @@ import tech.djnd.sample.app.service.dto.SchoolClassDTO;
 
 import java.util.List;
 import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 
 @Repository
 public interface SchoolClassRepository extends JpaRepository<SchoolClass, Integer> {
@@ -18,6 +20,10 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
     Optional<SchoolClass> findByNameIgnoreCaseAndTermId(String name, Integer termId);
 
     List<SchoolClass> findByTermId(Integer termId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sc FROM SchoolClass sc WHERE sc.id = :classId")
+    Optional<SchoolClass> findByIdForUpdate(@Param("classId") Integer classId);
 
     @Query(
         value = """
@@ -32,6 +38,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
             LEFT JOIN User u ON l.userId = u.id
             LEFT JOIN Student s ON s.schoolClassId = sc.id
             WHERE (:termId IS NULL OR sc.termId = :termId)
+              AND (:lecturerId IS NULL OR sc.lecturerId = :lecturerId)
               AND (
                   :search IS NULL OR :search = ''
                   OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -47,6 +54,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
             LEFT JOIN Lecturer l ON sc.lecturerId = l.userId
             LEFT JOIN User u ON l.userId = u.id
             WHERE (:termId IS NULL OR sc.termId = :termId)
+              AND (:lecturerId IS NULL OR sc.lecturerId = :lecturerId)
               AND (
                   :search IS NULL OR :search = ''
                   OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -59,6 +67,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
     Page<SchoolClassDTO> searchClasses(
         @Param("search") String search,
         @Param("termId") Integer termId,
+        @Param("lecturerId") Long lecturerId,
         Pageable pageable
     );
 
