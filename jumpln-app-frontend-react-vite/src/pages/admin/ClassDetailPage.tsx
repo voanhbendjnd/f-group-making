@@ -15,6 +15,7 @@ import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { classApi } from '@/features/classes/api/classApi';
+import { ClassRulesDisclosure } from '@/features/rules/components/ClassRulesDisclosure';
 
 export const ClassDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -193,6 +194,8 @@ export const ClassDetailPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      <ClassRulesDisclosure key={classId} classId={classId} />
 
       {/* Student List in Class */}
       <div className="card">
