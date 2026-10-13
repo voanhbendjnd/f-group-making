@@ -10,7 +10,7 @@ Bộ tài liệu này là căn cứ triển khai frontend, thiết kế giao di�
 ## 1. Phạm vi và mức độ xác minh
 
 - Rà soát ngày **29/09/2026**, tại mã nguồn có HEAD `0679187` và các tệp trong working tree.
-- Backend được đọc tại `jumpln-app-backend-java-spring/`. Chưa có ứng dụng frontend hoặc `package.json` trong phạm vi đã kiểm tra.
+- Backend được đọc tại `server/`. Chưa có ứng dụng frontend hoặc `package.json` trong phạm vi đã kiểm tra.
 - Có **4 endpoint nghiệp vụ do ứng dụng khai báo**, trong `AccountResource` và `StudentResource`. Các endpoint tự động của framework, nếu được bật, không phải tính năng người dùng trong đặc tả này.
 - Hợp đồng API được suy ra từ controller, service, DTO và security. **Chưa kiểm thử HTTP thực tế**; không xem ví dụ trong tài liệu là phản hồi đã thu được từ máy chủ.
 - Đường dẫn xuất hiện trong whitelist, entity, repository hoặc hàm service không đồng nghĩa với API đã tồn tại.

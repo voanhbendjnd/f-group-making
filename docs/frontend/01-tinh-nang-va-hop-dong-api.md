@@ -10,15 +10,15 @@ Các đường dẫn bên dưới là mapping trong ứng dụng, chưa cộng c
 
 | Nguồn trong repository | Nội dung đối chiếu |
 | --- | --- |
-| [AccountResource.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/AccountResource.java) | Ba POST đăng nhập và yêu cầu kích hoạt |
-| [StudentResource.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/StudentResource.java) | POST nhập sinh viên và `ROLE_ADMIN` |
-| [StudentService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/StudentService.java) | Đọc Excel, kiểm tra và lưu toàn bộ hoặc từ chối |
-| [UserService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/UserService.java) | Sinh khóa kích hoạt, kiểm tra tài khoản và xử lý hàng loạt |
-| [AuthService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/AuthService.java) | Thông tin đăng nhập, access token, refresh token, session |
-| [SecurityConfiguration.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/config/SecurityConfiguration.java) | API public và yêu cầu xác thực |
-| [ResFormatResponse.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/util/ResFormatResponse.java) | Bao gói phản hồi thành công |
-| [ExceptionTranslator.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/errors/ExceptionTranslator.java) | Phản hồi Problem và lỗi kiểm tra dữ liệu |
-| [SmartAuthenticationEntryPoint.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/config/SmartAuthenticationEntryPoint.java) | Một dạng phản hồi lỗi xác thực khác |
+| [AccountResource.java](../../server/src/main/java/com/fmaking/web/rest/AccountResource.java) | Ba POST đăng nhập và yêu cầu kích hoạt |
+| [StudentResource.java](../../server/src/main/java/com/fmaking/web/rest/StudentResource.java) | POST nhập sinh viên và `ROLE_ADMIN` |
+| [StudentService.java](../../server/src/main/java/com/fmaking/service/StudentService.java) | Đọc Excel, kiểm tra và lưu toàn bộ hoặc từ chối |
+| [UserService.java](../../server/src/main/java/com/fmaking/service/UserService.java) | Sinh khóa kích hoạt, kiểm tra tài khoản và xử lý hàng loạt |
+| [AuthService.java](../../server/src/main/java/com/fmaking/service/AuthService.java) | Thông tin đăng nhập, access token, refresh token, session |
+| [SecurityConfiguration.java](../../server/src/main/java/com/fmaking/config/SecurityConfiguration.java) | API public và yêu cầu xác thực |
+| [ResFormatResponse.java](../../server/src/main/java/com/fmaking/util/ResFormatResponse.java) | Bao gói phản hồi thành công |
+| [ExceptionTranslator.java](../../server/src/main/java/com/fmaking/web/rest/errors/ExceptionTranslator.java) | Phản hồi Problem và lỗi kiểm tra dữ liệu |
+| [SmartAuthenticationEntryPoint.java](../../server/src/main/java/com/fmaking/config/SmartAuthenticationEntryPoint.java) | Một dạng phản hồi lỗi xác thực khác |
 
 Ưu tiên hành vi trong thân hàm hơn comment. Ví dụ comment cũ chỉ nói ba cột Excel và một dòng tiêu đề; thân hàm thực tế đọc năm cột B–F và bỏ hai dòng đầu.
 

@@ -25,7 +25,7 @@
 ## 2. Kiến trúc giải pháp (Architecture)
 
 ```
-jumpln-app-frontend-react-vite/
+Client/
 ├── src/
 │   ├── locales/
 │   │   ├── i18n.ts            # Cấu hình i18next & hook đồng bộ localStorage
