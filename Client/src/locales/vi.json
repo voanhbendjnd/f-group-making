@@ -652,7 +652,8 @@
     "noGroup": "Hiện tại bạn chưa có nhóm",
     "account": "Tài khoản",
     "accountDetails": "Thông tin tài khoản",
-    "open": "Xem hồ sơ của tôi",
+    "open": "Xem hồ sơ của tôi"
+  },
   "deadline": {
     "title": "Quản lý Hạn chót Chọn nhóm",
     "description": "Tạo và quản lý các đợt hạn chọn nhóm dành cho sinh viên các lớp trong học kỳ.",
@@ -775,5 +776,4 @@
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
     }
   }
-}
 }

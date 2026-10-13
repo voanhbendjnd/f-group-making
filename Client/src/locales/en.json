@@ -652,7 +652,8 @@
     "noGroup": "You are not in a group yet",
     "account": "Account",
     "accountDetails": "Account information",
-    "open": "View my profile",
+    "open": "View my profile"
+  },
   "deadline": {
     "title": "Group Deadline Management",
     "description": "Create and manage group matching deadlines for students in the semester.",
@@ -775,5 +776,4 @@
       "verifying": "Verifying deadline and class information..."
     }
   }
-}
 }
