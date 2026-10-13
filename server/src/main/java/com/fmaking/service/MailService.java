@@ -111,6 +111,28 @@ public class MailService {
         sendEmailFromTemplateSync(user, "mail/passwordResetEmail", "email.reset.title");
     }
 
+    public String getClientBaseUrl() {
+        return clientBaseUrl;
+    }
+
+    public void sendDeadlineEmailSync(String toEmail, String studentName, String deadlineName, String description, String startTimeStr, String endTimeStr, String targetUrl) {
+        if (toEmail == null || toEmail.isBlank()) {
+            return;
+        }
+        Locale locale = Locale.forLanguageTag(Constants.DEFAULT_LANGUAGE);
+        Context context = new Context(locale);
+        context.setVariable("studentName", studentName != null ? studentName : toEmail);
+        context.setVariable("deadlineName", deadlineName);
+        context.setVariable("description", description != null ? description : "");
+        context.setVariable("startTime", startTimeStr);
+        context.setVariable("endTime", endTimeStr);
+        context.setVariable("targetUrl", targetUrl);
+        context.setVariable(BASE_URL, clientBaseUrl);
+        String content = springTemplateEngine.process("mail/deadlineNotificationEmail", context);
+        String subject = messageSource.getMessage("email.deadline.title", null, locale);
+        sendEmailSync(toEmail, subject, content, false, true);
+    }
+
     private static String validateAndNormalizeClientBaseUrl(String rawUrl, boolean allowLocalhost) {
         if (rawUrl == null || rawUrl.isBlank()) {
             throw new IllegalStateException("djnd.client.base-url must be configured");

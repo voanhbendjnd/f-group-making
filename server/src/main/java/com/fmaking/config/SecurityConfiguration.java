@@ -88,6 +88,7 @@ public class SecurityConfiguration {
                 "/api/login",
                 "/api/account/activate",
                 "/api/account/activate/verify",
+                "/api/account/activate/request",
                 "/refresh",
                 "/account/activate/**",
                 "/api/account/reset-password/init",
@@ -102,6 +103,7 @@ public class SecurityConfiguration {
                                 .requestMatchers(HttpMethod.POST, "/api/register").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/login").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/account/activate").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/account/activate/request").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/account/activate/verify").permitAll()
                                 .requestMatchers(HttpMethod.GET, "/api/account/reset-password/verify").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/account/reset-password/init").permitAll()

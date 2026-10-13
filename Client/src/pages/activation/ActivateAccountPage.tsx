@@ -179,7 +179,14 @@ export const ActivateAccountPage: React.FC = () => {
           variant="primary"
           size="lg"
           icon={<ArrowRight size={18} />}
-          onClick={() => navigate('/login')}
+          onClick={() => {
+            const pendingRedirect = sessionStorage.getItem('fmaking_pending_redirect');
+            if (pendingRedirect) {
+              navigate(`/login?redirect=${encodeURIComponent(pendingRedirect)}`);
+            } else {
+              navigate('/login');
+            }
+          }}
           style={{ width: '100%' }}
         >
           {t('activation.loginNow')}
