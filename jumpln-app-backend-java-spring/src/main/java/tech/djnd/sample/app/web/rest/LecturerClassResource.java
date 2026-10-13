@@ -26,8 +26,8 @@ public class LecturerClassResource {
     @GetMapping
     @ApiMessage("Get assigned classes successfully")
     public ResponseEntity<ResultPaginationDTO> getMyClasses(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Integer termId,
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "termId", required = false) Integer termId,
             @PageableDefault(size = 10, sort = {"createdDate", "id"}, direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(schoolClassService.getMySchoolClasses(search, termId, pageable));
     }

@@ -13,8 +13,19 @@ import java.io.IOException;
 
 public record GroupingRuleDTO(
         @NotNull GroupingRuleCode code,
-        @NotNull @Min(0) @Max(1000) @JsonDeserialize(using = IntegerValueDeserializer.class) Integer value
+        @NotNull @Min(0) @Max(1000) @JsonDeserialize(using = IntegerValueDeserializer.class) Integer value,
+        @NotNull @JsonDeserialize(using = StatusDeserializer.class) Boolean status
 ) {
+    public static class StatusDeserializer extends JsonDeserializer<Boolean> {
+        @Override
+        public Boolean deserialize(JsonParser parser, DeserializationContext context) throws IOException {
+            if (!parser.hasToken(JsonToken.VALUE_TRUE) && !parser.hasToken(JsonToken.VALUE_FALSE)) {
+                return (Boolean) context.handleUnexpectedToken(Boolean.class, parser);
+            }
+            return parser.getBooleanValue();
+        }
+    }
+
     public static class IntegerValueDeserializer extends JsonDeserializer<Integer> {
         @Override
         public Integer deserialize(JsonParser parser, DeserializationContext context) throws IOException {

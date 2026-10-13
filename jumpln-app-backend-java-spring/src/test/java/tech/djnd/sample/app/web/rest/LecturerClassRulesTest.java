@@ -3,6 +3,8 @@ package tech.djnd.sample.app.web.rest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -77,7 +79,8 @@ class LecturerClassRulesTest {
         mvc.perform(get(rulePath(ownClass))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.configured").value(false))
                 .andExpect(jsonPath("$.data.version").value(0))
-                .andExpect(jsonPath("$.data.rules.length()").value(GroupingRuleCode.values().length));
+                .andExpect(jsonPath("$.data.rules.length()").value(GroupingRuleCode.values().length))
+                .andExpect(jsonPath("$.data.rules[*].status", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(true))));
         assertThat(rules.findBySchoolClassId(ownClass.getId())).isEmpty();
     }
 
@@ -400,12 +403,118 @@ class LecturerClassRulesTest {
                         org.hamcrest.Matchers.not(org.hamcrest.Matchers.hasItem("INSUFFICIENT_SE_STUDENTS"))));
     }
 
+    @ParameterizedTest
+    @EnumSource(GroupingRuleCode.class)
+    void eachDisabledRuleIsExcludedFromRelatedChecksAndReenablingRevalidates(GroupingRuleCode code) throws Exception {
+        boolean majorsPair = code == GroupingRuleCode.MIN_MAJORS_PER_GROUP || code == GroupingRuleCode.MAX_MAJORS_PER_GROUP;
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload(0, 4, majorsPair ? 100 : 6,
+                code == GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP ? 7 : 1));
+        if (code == GroupingRuleCode.MIN_MEMBERS_PER_GROUP || code == GroupingRuleCode.MAX_MEMBERS_PER_GROUP) {
+            ruleItem(body, GroupingRuleCode.MIN_MEMBERS_PER_GROUP).put("value", 9);
+        } else if (code == GroupingRuleCode.MIN_GROUPS_PER_CLASS || code == GroupingRuleCode.MAX_GROUPS_PER_CLASS) {
+            ruleItem(body, GroupingRuleCode.MIN_GROUPS_PER_CLASS).put("value", 60);
+        } else if (majorsPair) {
+            ruleItem(body, GroupingRuleCode.MIN_MAJORS_PER_GROUP).put("value", 8);
+        }
+        ruleItem(body, code).put("status", false);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.version").value(1));
+        Rule stored = rules.findBySchoolClassId(ownClass.getId()).stream()
+                .filter(rule -> rule.getCode().equals(code.name())).findFirst().orElseThrow();
+        assertThat(stored.getStatus()).isFalse();
+        body.put("version", 1);
+        ruleItem(body, code).put("status", true);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+        assertThat(stored.getStatus()).isFalse();
+        assertThat(classes.findById(ownClass.getId()).orElseThrow().getRulesVersion()).isEqualTo(1);
+    }
+
+    @Test
+    void allDisabledRulesKeepValuesAndSuppressRuleWarningsEvenWithContradictoryValues() throws Exception {
+        Major other = new Major(); other.setCode("STATUS-MKT"); other.setName("Status Marketing"); other = majors.saveAndFlush(other);
+        saveRosterStudent("STATUS-ROSTER", ownClass, other, true);
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload(0, 1000, 1, 1000));
+        ruleItem(body, GroupingRuleCode.MIN_GROUPS_PER_CLASS).put("value", 1000);
+        ruleItem(body, GroupingRuleCode.MAX_GROUPS_PER_CLASS).put("value", 1);
+        ruleItem(body, GroupingRuleCode.MIN_MAJORS_PER_GROUP).put("value", 1000);
+        for (var item : body.path("rules")) ((com.fasterxml.jackson.databind.node.ObjectNode) item).put("status", false);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings").isEmpty())
+                .andExpect(jsonPath("$.data.configured").value(true));
+        mvc.perform(get(rulePath(ownClass))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.warnings").isEmpty())
+                .andExpect(jsonPath("$.data.rules[*].status", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(false))))
+                .andExpect(jsonPath("$.data.rules[6].value").value(1000));
+        body.put("version", 1);
+        ruleItem(body, GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP).put("status", true);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.warnings",
+                        org.hamcrest.Matchers.hasItem("INSUFFICIENT_SE_STUDENTS")));
+    }
+
+    @Test
+    void disablingMajorMinimumRemovesItFromSeCapacityChecksButActiveSeStillHasToFit() throws Exception {
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload(0, 4, 6, 6));
+        ruleItem(body, GroupingRuleCode.MIN_MAJORS_PER_GROUP).put("value", 3).put("status", false);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isOk());
+        body.put("version", 1);
+        ruleItem(body, GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP).put("value", 7);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("error.ruleSeExceedMembers"));
+    }
+
+    @Test
+    void statusIsIndependentPerClassAndStatusOnlyUpdatesHonorVersion() throws Exception {
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(payload(0, 4, 6))).andExpect(status().isOk());
+        mvc.perform(put(rulePath(anotherOwnClass)).contentType(MediaType.APPLICATION_JSON).content(payload(0, 4, 6))).andExpect(status().isOk());
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload(1, 4, 6));
+        ruleItem(body, GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP).put("status", false);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.version").value(2));
+        mvc.perform(get(rulePath(ownClass))).andExpect(jsonPath("$.data.rules[6].status").value(false))
+                .andExpect(jsonPath("$.data.rules[6].value").value(1));
+        mvc.perform(get(rulePath(anotherOwnClass))).andExpect(jsonPath("$.data.rules[6].status").value(true));
+        ruleItem(body, GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP).put("status", true);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isConflict());
+        assertThat(rules.findBySchoolClassId(ownClass.getId()).stream()
+                .filter(rule -> rule.getCode().equals(GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP.name()))
+                .findFirst().orElseThrow().getStatus()).isFalse();
+    }
+
+    @Test
+    void missingNullOrCoercedStatusAndInvalidDisabledValuesCannotBeSaved() throws Exception {
+        for (String invalidStatus : List.of("null", "1", "0", "\"true\"", "\"false\"", "{}", "[]")) {
+            String invalid = payload(0, 4, 6).replace("\"status\":true", "\"status\":" + invalidStatus);
+            mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(invalid))
+                    .andExpect(status().isBadRequest());
+        }
+        var body = (com.fasterxml.jackson.databind.node.ObjectNode) mapper.readTree(payload(0, 4, 6));
+        ruleItem(body, GroupingRuleCode.MIN_MEMBERS_PER_GROUP).remove("status");
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+        ruleItem(body, GroupingRuleCode.MIN_MEMBERS_PER_GROUP).put("status", false).put("value", 0);
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(mapper.writeValueAsString(body)))
+                .andExpect(status().isBadRequest());
+        assertThat(rules.findBySchoolClassId(ownClass.getId())).isEmpty();
+        assertThat(classes.findById(ownClass.getId()).orElseThrow().getRulesVersion()).isZero();
+    }
+
+    private com.fasterxml.jackson.databind.node.ObjectNode ruleItem(com.fasterxml.jackson.databind.JsonNode body, GroupingRuleCode code) {
+        for (var item : body.path("rules")) {
+            if (item.path("code").asText().equals(code.name())) return (com.fasterxml.jackson.databind.node.ObjectNode) item;
+        }
+        throw new IllegalArgumentException("Missing rule " + code);
+    }
+
     private String payload(long version, int minMembers, int maxMembers) throws Exception {
         return payload(version, minMembers, maxMembers, 1);
     }
 
     private String payload(long version, int minMembers, int maxMembers, int seMinimum) throws Exception {
-        var items = Arrays.stream(GroupingRuleCode.values()).map(code -> Map.of("code", code.name(), "value",
+        var items = Arrays.stream(GroupingRuleCode.values()).map(code -> Map.of("code", code.name(), "status", true, "value",
                 code == GroupingRuleCode.MIN_MEMBERS_PER_GROUP ? minMembers :
                 code == GroupingRuleCode.MAX_MEMBERS_PER_GROUP ? maxMembers :
                 code == GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP ? seMinimum : code.getSuggestedValue())).toList();

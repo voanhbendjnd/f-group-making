@@ -21,14 +21,14 @@ public class ClassRuleResource {
     @GetMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
     @ApiMessage("Get class rules successfully")
-    public ResponseEntity<ClassRulesDTO> getRules(@PathVariable Integer classId) {
+    public ResponseEntity<ClassRulesDTO> getRules(@PathVariable("classId") Integer classId) {
         return ResponseEntity.ok(classRuleService.getRules(classId));
     }
 
     @PutMapping
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
     @ApiMessage("Save class rules successfully")
-    public ResponseEntity<ClassRulesDTO> saveRules(@PathVariable Integer classId,
+    public ResponseEntity<ClassRulesDTO> saveRules(@PathVariable("classId") Integer classId,
                                                   @Valid @RequestBody SaveClassRulesDTO request) {
         return ResponseEntity.ok(classRuleService.saveRules(classId, request));
     }

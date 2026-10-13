@@ -45,7 +45,7 @@ class ClassRuleConcurrencyTest {
         var start = new CountDownLatch(1);
         var executor = Executors.newFixedThreadPool(2);
         var request = new SaveClassRulesDTO(0L, Arrays.stream(GroupingRuleCode.values())
-                .map(code -> new GroupingRuleDTO(code, code.getSuggestedValue())).toList());
+                .map(code -> new GroupingRuleDTO(code, code.getSuggestedValue(), true)).toList());
         java.util.concurrent.Callable<String> save = () -> {
             var context = SecurityContextHolder.createEmptyContext();
             context.setAuthentication(new UsernamePasswordAuthenticationToken("race-lecturer@example.com", "",

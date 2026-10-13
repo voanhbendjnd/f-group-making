@@ -48,7 +48,8 @@ public class ClassRuleService {
         List<Rule> storedRules = ruleRepository.findBySchoolClassId(classId);
         Map<String, Rule> byCode = storedRules.stream().collect(Collectors.toMap(Rule::getCode, Function.identity()));
         List<GroupingRuleDTO> rules = Arrays.stream(values()).map(code -> new GroupingRuleDTO(code,
-                byCode.containsKey(code.name()) ? byCode.get(code.name()).getValue() : code.getSuggestedValue())).toList();
+                byCode.containsKey(code.name()) ? byCode.get(code.name()).getValue() : code.getSuggestedValue(),
+                !byCode.containsKey(code.name()) || byCode.get(code.name()).getStatus())).toList();
         boolean configured = Arrays.stream(values()).allMatch(code -> byCode.containsKey(code.name()));
         return response(schoolClass, configured, rules);
     }
@@ -69,13 +70,14 @@ public class ClassRuleService {
             rule.setSchoolClassId(classId);
             rule.setCode(item.code().name());
             rule.setValue(item.value());
+            rule.setStatus(item.status());
             toSave.add(rule);
         }
         ruleRepository.saveAll(toSave);
         schoolClass.setRulesVersion(schoolClass.getRulesVersion() + 1);
         schoolClassRepository.save(schoolClass);
         List<GroupingRuleDTO> sorted = toSave.stream().map(rule -> new GroupingRuleDTO(
-                GroupingRuleCode.valueOf(rule.getCode()), rule.getValue()))
+                GroupingRuleCode.valueOf(rule.getCode()), rule.getValue(), rule.getStatus()))
                 .sorted(java.util.Comparator.comparing(GroupingRuleDTO::code)).toList();
         return response(schoolClass, true, sorted);
     }
@@ -93,44 +95,56 @@ public class ClassRuleService {
         if (values.size() != GroupingRuleCode.values().length) {
             throw invalid("incompleteRules");
         }
-        if (values.get(MIN_MEMBERS_PER_GROUP) > values.get(MAX_MEMBERS_PER_GROUP)
-                || values.get(MIN_GROUPS_PER_CLASS) > values.get(MAX_GROUPS_PER_CLASS)
-                || values.get(MIN_MAJORS_PER_GROUP) > values.get(MAX_MAJORS_PER_GROUP)) {
+        Map<GroupingRuleCode, Integer> active = activeValues(rules);
+        if (bound(active, MIN_MEMBERS_PER_GROUP, 1) > bound(active, MAX_MEMBERS_PER_GROUP, Long.MAX_VALUE)
+                || bound(active, MIN_GROUPS_PER_CLASS, 1) > bound(active, MAX_GROUPS_PER_CLASS, Long.MAX_VALUE)
+                || bound(active, MIN_MAJORS_PER_GROUP, 0) > bound(active, MAX_MAJORS_PER_GROUP, Long.MAX_VALUE)) {
             throw invalid("ruleMinGreaterThanMax");
         }
-        if (values.get(MIN_MAJORS_PER_GROUP) > values.get(MAX_MEMBERS_PER_GROUP)) {
+        long minMajors = bound(active, MIN_MAJORS_PER_GROUP, 0);
+        long maxMembers = bound(active, MAX_MEMBERS_PER_GROUP, Long.MAX_VALUE);
+        if (minMajors > maxMembers) {
             throw invalid("ruleMajorsExceedMembers");
         }
-        if (values.get(MIN_SE_MEMBERS_PER_GROUP) > 0
-                && values.get(MIN_SE_MEMBERS_PER_GROUP) + values.get(MIN_MAJORS_PER_GROUP) - 1
-                > values.get(MAX_MEMBERS_PER_GROUP)) {
+        long seMinimum = bound(active, MIN_SE_MEMBERS_PER_GROUP, 0);
+        if (seMinimum > 0 && seMinimum + Math.max(minMajors - 1, 0) > maxMembers) {
             throw invalid("ruleSeExceedMembers");
         }
     }
 
     private ClassRulesDTO response(SchoolClass schoolClass, boolean configured, List<GroupingRuleDTO> rules) {
-        Map<GroupingRuleCode, Integer> values = rules.stream()
-                .collect(Collectors.toMap(GroupingRuleDTO::code, GroupingRuleDTO::value));
+        Map<GroupingRuleCode, Integer> active = activeValues(rules);
         long students = studentRepository.countBySchoolClassId(schoolClass.getId());
         long majors = studentRepository.countDistinctMajorsBySchoolClassId(schoolClass.getId());
         List<String> warnings = new ArrayList<>();
         if (students == 0) {
             warnings.add("EMPTY_CLASS");
         } else {
-            int seMinimum = values.get(MIN_SE_MEMBERS_PER_GROUP);
-            int requiredMembers = Math.max(values.get(MIN_MEMBERS_PER_GROUP), seMinimum > 0
-                    ? seMinimum + values.get(MIN_MAJORS_PER_GROUP) - 1 : values.get(MIN_MAJORS_PER_GROUP));
-            long leastGroups = Math.max(values.get(MIN_GROUPS_PER_CLASS),
-                    (students + values.get(MAX_MEMBERS_PER_GROUP) - 1) / values.get(MAX_MEMBERS_PER_GROUP));
-            long mostGroups = Math.min(values.get(MAX_GROUPS_PER_CLASS), students / requiredMembers);
+            long seMinimum = bound(active, MIN_SE_MEMBERS_PER_GROUP, 0);
+            long minMajors = bound(active, MIN_MAJORS_PER_GROUP, 0);
+            long maxMembers = bound(active, MAX_MEMBERS_PER_GROUP, Long.MAX_VALUE);
+            long requiredMembers = Math.max(bound(active, MIN_MEMBERS_PER_GROUP, 1), seMinimum > 0
+                    ? seMinimum + Math.max(minMajors - 1, 0) : minMajors);
+            long leastGroups = Math.max(bound(active, MIN_GROUPS_PER_CLASS, 1), (students - 1) / maxMembers + 1);
+            long mostGroups = Math.min(bound(active, MAX_GROUPS_PER_CLASS, Long.MAX_VALUE), students / requiredMembers);
             if (leastGroups > mostGroups) warnings.add("GROUP_COUNTS_INFEASIBLE");
-            if (majors < values.get(MIN_MAJORS_PER_GROUP)) warnings.add("INSUFFICIENT_MAJORS");
+            if (majors < minMajors) warnings.add("INSUFFICIENT_MAJORS");
             if (seMinimum > 0 && studentRepository.countBySchoolClassIdAndMajorCode(schoolClass.getId(), "SE")
                     < leastGroups * seMinimum) {
                 warnings.add("INSUFFICIENT_SE_STUDENTS");
             }
         }
         return new ClassRulesDTO(schoolClass.getId(), schoolClass.getRulesVersion(), configured, rules, warnings);
+    }
+
+    // Disabled rules keep their stored values but never contribute a constraint.
+    private static Map<GroupingRuleCode, Integer> activeValues(List<GroupingRuleDTO> rules) {
+        return rules.stream().filter(rule -> Boolean.TRUE.equals(rule.status()))
+                .collect(Collectors.toMap(GroupingRuleDTO::code, GroupingRuleDTO::value));
+    }
+
+    private static long bound(Map<GroupingRuleCode, Integer> active, GroupingRuleCode code, long fallback) {
+        return active.containsKey(code) ? active.get(code) : fallback;
     }
 
     private static BadRequestResourceException invalid(String code) {

@@ -19,6 +19,18 @@ public class Rule extends AbstractAuditingEntity<Integer>{
     @Column(name = "`value`", nullable = false)
     private Integer value;
 
+    @Column(name = "status", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("true")
+    private boolean status = true;
+
+    public boolean getStatus() {
+        return status;
+    }
+
+    public void setStatus(boolean status) {
+        this.status = status;
+    }
+
     @Override
     public Integer getId() {
         return id;
