@@ -61,6 +61,8 @@ Mọi chuỗi văn bản được phân nhóm có hệ thống trong `vi.json` v
 | `nav` | Tiêu đề phân hệ, phụ đề học kỳ, nhãn aria trợ năng | `nav.adminSubtitle`, `nav.dashboard`, `nav.students` |
 | `sidebar` | Nhóm danh mục sidebar, quy trình 3 bước chuẩn | `sidebar.workflowTitle`, `sidebar.adminSection` |
 | `errors` | Bản dịch thông điệp lỗi nghiệp vụ và mã HTTP | `errors.invalidActivationKey`, `errors.badCredentials`, `errors.networkError` |
+| `classes` | Danh sách/chi tiết lớp, bộ lọc, bảng, trạng thái và nhãn trợ năng | `classes.title`, `classes.detailTitle`, `classes.searchLabel` |
+| `classAssignment` | Chọn/đổi giảng viên, lưu phân công và đối soát kết quả | `classAssignment.choose`, `classAssignment.change`, `classAssignment.save` |
 
 ---
 

@@ -6,7 +6,7 @@ Tài liệu này mô tả contract và luồng được triển khai trên nhán
 
 Giảng viên đăng nhập → `/lecturer/classes` → chọn lớp → `/lecturer/classes/:id` → xem danh sách sinh viên và xem hoặc chỉnh bảy điều kiện → lưu khi có quyền. Trang danh sách có tìm kiếm, phân trang, trạng thái tải/lỗi/trống. Trang chi tiết có thông tin lớp, form quy định và bảng sinh viên. Admin có thêm form quy định ngay tại `/admin/classes/:id`.
 
-Quy định nhóm mặc định được thu gọn thành nút trên trang chi tiết của admin/giảng viên. `ClassRulesDisclosure` chỉ tải form khi mở lần đầu; thu lại vẫn giữ form trong bộ nhớ để bảo toàn bản nháp, phiên bản và trạng thái lưu. Giảng viên/admin có nút "Quy định nhóm"; người chỉ đọc có nút "Xem quy định nhóm". Nút có `aria-expanded` và `aria-controls`, phần đã thu không xuất hiện trong thứ tự bàn phím.
+Quy định nhóm mặc định được thu gọn thành nút trên trang chi tiết của admin/giảng viên. Giảng viên dùng `ClassRulesDisclosure`; admin dùng `ClassManagementControls` với hai nút **Quy định nhóm** và **Chọn giảng viên** hoặc **Đổi giảng viên** cạnh nhau. Hai phần mở/thu độc lập, chỉ tải dữ liệu khi mở lần đầu và giữ form trong bộ nhớ khi thu để bảo toàn bản nháp, phiên bản, lựa chọn và trạng thái lưu. Người chỉ đọc có nút "Xem quy định nhóm". Các nút có `aria-expanded` và `aria-controls`, phần đã thu không xuất hiện trong thứ tự bàn phím.
 
 `ROLE_ADMIN` xem và sửa quy định mọi lớp. `ROLE_LECTURE` chỉ xem/quản lý lớp có `lecturerId` bằng ID tài khoản. `ROLE_LECTURE_MASTER` xem mọi lớp; chỉ sửa quy định lớp được phân công cho mình. Quyền trưởng bộ môn hoạt động độc lập, không cần có thêm `ROLE_LECTURE`. Khi có cả hai quyền giảng viên, quyền xem toàn bộ vẫn được giữ. Tài khoản có nhiều quyền ưu tiên trang chủ admin, giảng viên/trưởng bộ môn rồi sinh viên; admin cũng được vào khu vực giảng viên.
 
@@ -29,6 +29,25 @@ Mọi response thành công dùng envelope `statusCode/message/data` hiện hữ
 
 Hai API có sẵn được đồng bộ quyền: `GET /api/school-classes` dành cho admin/trưởng bộ môn, trả mọi lớp với tìm kiếm, học kỳ và phân trang; `GET /api/school-classes/{classId}/students` áp dụng cùng quyền đọc với API chi tiết lớp. Giảng viên thường không được dùng danh sách toàn bộ để xem lớp người khác.
 
+### Admin phân công hoặc đổi giảng viên
+
+Tại `/admin/classes/:id`, mở nút **Chọn giảng viên** (lớp trống) hoặc **Đổi giảng viên** (đã phân công) bên cạnh **Quy định nhóm** để xem phần **Giảng viên phụ trách**. Admin có ô tìm kiếm và danh sách chọn có phân trang; bấm **Lưu giảng viên** để ghi. Nút lưu bị khóa khi chưa chọn hoặc chọn đúng người hiện tại. Danh sách dùng `GET /api/lecturers` không lọc học kỳ, vì giảng viên chưa có lớp trong kỳ vẫn phải được chọn. Hiển thị mã/tên/email; không bắt admin nhập ID. Mở phần giảng viên không gọi API Rule và ngược lại.
+
+Các trang danh sách/chi tiết lớp của admin dùng `useTranslation` và bộ khóa `classes`, kết hợp các khóa chung về giảng viên/sinh viên. Tiêu đề, breadcrumb, bộ lọc, tiêu đề bảng, trạng thái tài khoản, thông báo tải/trống và nhãn trợ năng hỗ trợ VI/EN. Menu lớp/giảng viên cũng theo ngôn ngữ được chọn. Chuyển ngôn ngữ bằng `LanguageSwitcher` hiện hữu, không reload trang, không làm mất bộ lọc/lựa chọn/bản nháp, không tự gửi thêm request. Thông báo thành công/xung đột/kết quả chưa xác nhận và validation Rule do FE tạo được dịch khi đổi ngôn ngữ. Tên lớp/người/học kỳ và mã ngành là dữ liệu, giữ nguyên.
+
+Xác minh tách nút và đồng bộ VI/EN ngày 13/10/2026: toàn bộ 158 test frontend qua; sau điều chỉnh bố cục mobile và số ít/số nhiều, 59 test liên quan được kiểm tra lại và qua. Build thành công, lint không lỗi với 9 cảnh báo hiện hữu. Chromium dùng API fixture kiểm tra cả VI/EN ở 1440/390/320 px: hai nút cùng hàng, mở độc lập, giữ bản nháp/lựa chọn sau thu mở và đổi ngôn ngữ, dịch danh sách/chi tiết/trạng thái, không gọi thêm API sinh viên/Rule khi đổi ngôn ngữ, lưu giảng viên độc lập và không tràn ngang/lỗi JavaScript.
+
+`PUT /api/school-classes/{classId}/lecturer` chỉ dành cho `ROLE_ADMIN`, nhận `{"lecturerId":123,"expectedLecturerId":456}` (ID tài khoản đồng thời là `Lecturer.userId`). `lecturerId` là người mới, bắt buộc là số nguyên dương; `expectedLecturerId` là người hiện tại đã đọc từ chi tiết lớp, cho phép null nếu lớp trống. Bỏ trường expected tương đương null, nên request phân công lần đầu cũ vẫn hợp lệ. ID không chấp nhận chuỗi hoặc số thập phân. Thành công trả `SchoolClassDTO` đầy đủ và chỉ cập nhật `SchoolClass.lecturerId`; không đổi học kỳ, không lưu Rule và không tăng `rulesVersion`. Không thêm entity, quan hệ JPA hay migration.
+
+- Lớp/giảng viên không tồn tại trả 404 `classNotFound`/`lecturerNotFound`; payload sai trả 400; không có phiên trả 401; giảng viên thường/trưởng bộ môn/sinh viên trả 403.
+- `expectedLecturerId` khác người hiện tại trả 409 `lecturerAssignmentConflict`. Gửi đúng trạng thái hiện tại và cùng giảng viên trả 200, không thay đổi dữ liệu. Không có thao tác xóa phân công bằng null.
+- Backend khóa hàng lớp trước khi so sánh trạng thái và ghi. Hai admin cùng đổi từ một giảng viên sang hai người khác nhau chỉ một yêu cầu thành công. Import sinh viên dùng lookup có khóa và chỉ điền giảng viên khi đang null; không đổi giảng viên đã có.
+- Sau khi đổi, `ROLE_LECTURE` cũ mất quyền đọc lớp/sinh viên/Rule và ghi Rule; người mới có quyền theo ID được phân công. Trưởng bộ môn vẫn được xem toàn bộ nhưng chỉ quản lý lớp mình, đúng chính sách hiện có.
+- FE chỉ ghi khi admin bấm nút; khóa gửi lặp và chuyển học kỳ trong lúc chờ. Thành công cập nhật thông tin lớp và cache danh sách lớp/giảng viên, xóa lựa chọn đã lưu và vẫn cho phép chọn người khác ở lần tiếp theo. Form Rule độc lập.
+- Khi gặp xung đột hoặc kết quả ghi chưa xác nhận (mạng/5xx/body sai hợp đồng), giữ lựa chọn và khóa gửi tiếp. Admin chủ động **Đọc lại thông tin lớp**; nếu người phụ trách khác dữ liệu trước đó thì xóa lựa chọn để admin chọn lại, nếu vẫn như cũ thì giữ bản nháp. Không tự retry thao tác ghi.
+
+Xác minh cho phép đổi giảng viên ngày 13/10/2026: toàn bộ 137 test backend và 151 test frontend qua; frontend build thành công, lint không lỗi với 9 cảnh báo hiện hữu. Test kiểm tra phân công/đổi giảng viên, trạng thái cũ bị từ chối, chuyển quyền đọc lớp/sinh viên/Rule và ghi Rule, bảo toàn học kỳ/Rule, cùng hai transaction đổi từ cùng một giảng viên chỉ chấp nhận một thay đổi. Import vẫn giữ người đã phân công và điền lớp trống. Chromium với API fixture tại 1440/390/320 px kiểm tra chọn cùng người bị khóa, đổi nhiều lần, gửi đúng trạng thái trước, xung đột/đọc lại/chọn lại và giữ form cho lần đổi tiếp; không tràn ngang hoặc lỗi JavaScript. API được kiểm thử qua MockMvc/H2; không thay đổi database người dùng.
+
 ### Xem sinh viên theo lớp
 
 `GET /api/school-classes/{classId}/students` trả `data: StudentDTO[]`, sắp theo mã sinh viên tăng dần. `ROLE_LECTURE` chỉ được đọc lớp được phân công; admin/trưởng bộ môn đọc mọi lớp. Lớp không tồn tại trả 404; lớp trống trả mảng rỗng. Backend lọc bằng `Student.schoolClassId`, join User/Major qua ID và không trả activation key.
@@ -37,7 +56,7 @@ Hai API có sẵn được đồng bộ quyền: `GET /api/school-classes` dành
 
 API trả toàn bộ sinh viên của lớp, vì vậy lọc và phân trang được thực hiện trên FE. Dùng component `Pagination` chung, mặc định 10 dòng/trang, chọn 10/20/50/100 dòng; đổi bộ lọc hoặc kích thước trang về trang đầu, và trang hiển thị được giới hạn khi danh sách thay đổi. Các trạng thái tải, lỗi, lớp trống và tìm không thấy được phân biệt. Lỗi 401/403/404 không tự retry. Bảng cuộn ngang trên màn hình nhỏ. Cache và request gắn theo `classId`; request hỗ trợ hủy khi rời trang. Không có thao tác gửi thư hoặc chỉnh sửa sinh viên trong giao diện này.
 
-`Rule.schoolClassId` là Integer, không thêm association JPA. Unique `(school_class_id, code)` thay cho unique `code` toàn hệ thống. `SchoolClass.rulesVersion` tăng sau mỗi lần lưu thành công. Mọi bên có quyền ghi, kể cả admin, vẫn phải đáp ứng validation và phiên bản hiện tại.
+`Rule.schoolClassId` là Integer, không thêm association JPA. Unique `(school_class_id, code)` thay cho unique `code` toàn hệ thống. `Rule.status` là boolean: `true` bật, `false` tắt, mặc định bật cho dữ liệu cũ và gợi ý mới. Mỗi mã được bật/tắt độc lập theo lớp; tắt vẫn lưu giá trị và ID. `SchoolClass.rulesVersion` tăng sau mỗi lần lưu thành công, kể cả chỉ đổi trạng thái. Mọi bên có quyền ghi, kể cả admin, vẫn phải đáp ứng validation và phiên bản hiện tại.
 
 Body PUT:
 
@@ -45,13 +64,13 @@ Body PUT:
 {
   "version": 0,
   "rules": [
-    {"code": "MIN_MEMBERS_PER_GROUP", "value": 4},
-    {"code": "MAX_MEMBERS_PER_GROUP", "value": 6},
-    {"code": "MIN_GROUPS_PER_CLASS", "value": 1},
-    {"code": "MAX_GROUPS_PER_CLASS", "value": 50},
-    {"code": "MIN_MAJORS_PER_GROUP", "value": 1},
-    {"code": "MAX_MAJORS_PER_GROUP", "value": 6},
-    {"code": "MIN_SE_MEMBERS_PER_GROUP", "value": 1}
+    {"code": "MIN_MEMBERS_PER_GROUP", "value": 4, "status": true},
+    {"code": "MAX_MEMBERS_PER_GROUP", "value": 6, "status": true},
+    {"code": "MIN_GROUPS_PER_CLASS", "value": 1, "status": true},
+    {"code": "MAX_GROUPS_PER_CLASS", "value": 50, "status": true},
+    {"code": "MIN_MAJORS_PER_GROUP", "value": 1, "status": true},
+    {"code": "MAX_MAJORS_PER_GROUP", "value": 6, "status": true},
+    {"code": "MIN_SE_MEMBERS_PER_GROUP", "value": 1, "status": false}
   ]
 }
 ```
@@ -61,13 +80,15 @@ Body PUT:
 ## Validation, quyền và cập nhật đồng thời
 
 - Gửi đủ bảy mã, không mã lạ, mã trùng hay phần tử null. Sáu quy định ban đầu nhận số nguyên 1–1000; riêng `MIN_SE_MEMBERS_PER_GROUP` nhận số nguyên 0–1000. Giá trị 0 bỏ yêu cầu SE; số âm, thập phân, chuỗi số và null đều không hợp lệ.
-- Mỗi cặp tối thiểu/tối đa phải có `min <= max`. Số ngành tối thiểu không vượt số thành viên tối đa.
-- Khi yêu cầu SE > 0, `minSE + minMajors - 1 <= maxMembers`: SE là một ngành; mỗi ngành còn lại cần ít nhất một thành viên. Cấu hình vượt sức chứa trả 400 `ruleSeExceedMembers`.
+- `status` bắt buộc là JSON boolean `true`/`false` cho cả bảy mã, kể cả mã tắt. Thiếu, null, chuỗi hoặc số trả 400; không tự bật lại rule khi client cũ bỏ trường. Giá trị tắt vẫn phải đúng kiểu/phạm vi để lưu một cấu hình hợp lệ.
+- Chỉ quy định bật tham gia kiểm tra chéo và cảnh báo. Mỗi cặp tối thiểu/tối đa chỉ kiểm tra `min <= max` khi cả hai bật. Số ngành tối thiểu chỉ so với số thành viên tối đa khi cả hai bật.
+- Khi SE và giới hạn tối đa thành viên bật, SE > 0 yêu cầu `minSE + max(activeMinMajors - 1, 0) <= maxMembers`. `activeMinMajors=0` nếu rule số ngành tối thiểu tắt; tắt rule SE bỏ toàn bộ yêu cầu SE. Cấu hình vượt sức chứa trả 400 `ruleSeExceedMembers`.
+- Khi tính khả thi, giới hạn tối đa tắt nghĩa là không có giới hạn từ rule đó; tối thiểu thành viên/số nhóm tắt chỉ giữ điều kiện cơ bản nhóm có ít nhất một người và lớp có sinh viên có ít nhất một nhóm. Tối thiểu ngành/SE tắt tương đương không yêu cầu. Tắt cả bảy rule không phát cảnh báo ràng buộc; `EMPTY_CLASS` vẫn phản ánh lớp trống.
 - `warnings` kiểm tra lớp trống, khả năng chia sĩ số theo giới hạn số nhóm/thành viên và số ngành khác nhau hiện có. Cảnh báo không chặn lưu vì danh sách lớp có thể chưa hoàn tất. Đây chưa phải chứng minh khả thi đầy đủ cho phân bố ngành hoặc nhóm hiện có.
 - `INSUFFICIENT_SE_STUDENTS`: số SE trong lớp nhỏ hơn số nhóm tối thiểu cần tạo nhân số SE tối thiểu mỗi nhóm. SE được nhận diện qua `Student.majorId = Major.id` và mã ngành bằng `SE` sau khi chuẩn hóa hoa/thường và khoảng trắng; không dùng tiền tố MSSV hay mã ngành có chứa chữ SE. Giá trị SE = 0 không phát cảnh báo này. Giới hạn số nhóm khả thi tính thêm số thành viên cần để đáp ứng SE và số ngành tối thiểu.
 - Không có phiên: 401; sai vai trò hoặc khác giảng viên phụ trách: 403; lớp không tồn tại: 404; cấu hình sai: 400; phiên bản cũ: 409 `rulesVersionConflict`.
 - PUT khóa hàng lớp trước khi kiểm tra quyền, phiên bản và ghi cả bộ. Hai yêu cầu cùng phiên bản không thể cùng ghi đè thành công, kể cả lần insert đầu tiên.
-- Form kiểm tra trước khi gửi, giữ giá trị khi lỗi, khóa gửi lặp và không tự retry mutation.
+- Form dùng chung admin/giảng viên có bốn công tắc VI/EN: thành viên, số nhóm, số ngành và SE. Ba mục đầu bật/tắt min/max cùng lúc và gửi cùng trạng thái cho hai mã trong PUT; SE có công tắc riêng. Rule tắt hiển thị giá trị chỉ đọc, giữ giá trị để bật lại. Dữ liệu cũ có cặp lệch trạng thái được hiển thị “Đang bật một phần” kèm trạng thái từng giới hạn, không tự đổi hoặc tự lưu; thao tác công tắc tiếp theo đồng bộ cả cặp. Trạng thái có hiệu lực sau khi lưu; đổi ngôn ngữ, thu/mở form và lỗi/xung đột vẫn giữ bản nháp. Người chỉ có quyền xem không bật/tắt được. Form kiểm tra trước khi gửi, khóa gửi lặp và không tự retry mutation.
 - Xung đột hoặc kết quả ghi chưa xác nhận do mạng/5xx/body sai hợp đồng: giữ bản nháp, yêu cầu người dùng chủ động đọc lại. Nút đọc lại ghi rõ sẽ thay bản nháp bằng dữ liệu hiện tại. Không tự gửi lại sau đăng nhập.
 
 ## Database và vận hành
@@ -75,6 +96,16 @@ Body PUT:
 Rule SE là mã mới trong bảng hiện có, không cần thêm cột hay migration mới. Giá trị gợi ý là 1 và chỉ được lưu khi PUT thành công. Lớp đã có sáu Rule giữ nguyên giá trị/ID/phiên bản; GET bổ sung gợi ý SE, đánh dấu `configured=false` và không ghi database. Lần lưu tiếp gửi bảy Rule để bổ sung dòng SE. Cập nhật BE/FE cùng phiên bản vì payload cũ chỉ sáu Rule sẽ trả 400.
 
 Chạy [migration MySQL](../sql/20261012_class_rules.sql) trước khi khởi động backend cập nhật trên database cũ, sau khi dừng ghi và sao lưu. Hibernate `ddl-auto=update` không tự gỡ unique index cũ trên `code`.
+
+Sau migration lớp, chạy [migration status](../sql/20261013_rule_status.sql) để thêm `rules.status BOOLEAN NOT NULL DEFAULT TRUE`. Rule cũ giữ trạng thái bật; chạy lại giữ các dòng đã tắt. Cập nhật BE/FE cùng phiên bản vì payload mới bắt buộc `status`. Migration này chưa chạy trên database người dùng.
+
+Hiện repo chưa có service tạo/random/chốt nhóm. Việc lọc `status` đã áp dụng vào validation và cảnh báo ở `ClassRuleService`; khi bổ sung các service nhóm cần sử dụng trạng thái đã lưu trước khi áp dụng từng điều kiện, không dùng giá trị của rule tắt hoặc gợi ý chưa lưu.
+
+API giảng viên khai báo rõ `@RequestParam(name="search")`, `@RequestParam(name="termId")` và `@PathVariable("classId")` ở API Rule. Điều này tránh lỗi 500 khi IDE/compiler không lưu tên tham số (`-parameters`). `LecturerRequestBindingTest` loại bỏ thông tin tên tham số khỏi bytecode controller để kiểm tra GET danh sách có/không bộ lọc và GET/PUT Rule; bản cũ tái hiện đúng lỗi trong log, bản sửa trả 200. Sau khi cập nhật, rebuild và khởi động lại backend để thay các class đang chạy.
+
+Xác minh giao diện công tắc chung min/max ngày 13/10/2026: 173 test FE qua, build thành công, lint không có lỗi (9 cảnh báo có sẵn). Test bao gồm đổi cả cặp khi bật/tắt, giữ giá trị, lưu chỉ đổi trạng thái, bật lại kiểm tra mâu thuẫn, VI/EN, bỏ bản nháp/đọc lại và dữ liệu cũ lệch trạng thái. Chromium tại 1440/390/320 px, cả VI/EN, xác nhận đúng bốn công tắc, PUT gửi chung trạng thái min/max cả lúc tắt lẫn bật lại, không tràn ngang hoặc lỗi JavaScript.
+
+Xác minh bổ sung ngày 13/10/2026 cho trạng thái Rule: 154 test BE và 174 test FE qua, build FE thành công, lint không có lỗi (9 cảnh báo có sẵn ở các phần khác). Test kiểm tra bật/tắt từng mã, giữ giá trị khi tắt, bỏ ràng buộc/cảnh báo của rule tắt, bật lại kiểm tra mâu thuẫn, trạng thái riêng theo lớp và version, boolean nghiêm ngặt, form chỉ đọc, giữ bản nháp và VI/EN. Chromium với API fixture kiểm tra lưu trạng thái tại 1440/390/320 px cho cả VI/EN, không tràn ngang hoặc lỗi JavaScript. Backend dùng H2; migration status chưa được thực thi trên MySQL hoặc database người dùng.
 
 Migration lưu Rule toàn cục cũ vào `rules_global_legacy_20261012` và tạo bản sao cho từng lớp hiện có; giá trị lớp đã có được giữ ưu tiên. Các mã chưa được hỗ trợ vẫn được bảo toàn, nhưng không được hiển thị như điều kiện đang thực thi. Lớp tạo mới dùng gợi ý chưa lưu. Không tự chạy migration trên dữ liệu người dùng trong quá trình phát triển tính năng.
 
