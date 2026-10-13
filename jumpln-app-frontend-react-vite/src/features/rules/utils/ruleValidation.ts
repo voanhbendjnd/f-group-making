@@ -1,6 +1,6 @@
-import type { RuleCode, RuleValues } from '../types';
+import type { RuleCode, RuleFormValues } from '../types';
 
-export function validateRuleValues(values: RuleValues): Partial<Record<RuleCode, string>> {
+export function validateRuleValues(values: RuleFormValues): Partial<Record<RuleCode, string>> {
   const errors: Partial<Record<RuleCode, string>> = {};
   const pairs: [RuleCode, RuleCode][] = [
     ['MIN_MEMBERS_PER_GROUP', 'MAX_MEMBERS_PER_GROUP'],
@@ -8,13 +8,15 @@ export function validateRuleValues(values: RuleValues): Partial<Record<RuleCode,
     ['MIN_MAJORS_PER_GROUP', 'MAX_MAJORS_PER_GROUP'],
   ];
   for (const [min, max] of pairs) {
-    if (values[min] > values[max]) errors[min] = 'rules.minGreaterThanMax';
+    if (values.statuses[min] && values.statuses[max] && values[min] > values[max]) errors[min] = 'rules.minGreaterThanMax';
   }
-  if (values.MIN_MAJORS_PER_GROUP > values.MAX_MEMBERS_PER_GROUP) {
+  const minMajors = values.statuses.MIN_MAJORS_PER_GROUP ? values.MIN_MAJORS_PER_GROUP : 0;
+  if (values.statuses.MAX_MEMBERS_PER_GROUP && minMajors > values.MAX_MEMBERS_PER_GROUP) {
     errors.MIN_MAJORS_PER_GROUP = 'rules.majorsExceedMembers';
   }
-  if (values.MIN_SE_MEMBERS_PER_GROUP > 0
-      && values.MIN_SE_MEMBERS_PER_GROUP + values.MIN_MAJORS_PER_GROUP - 1 > values.MAX_MEMBERS_PER_GROUP) {
+  if (values.statuses.MIN_SE_MEMBERS_PER_GROUP && values.statuses.MAX_MEMBERS_PER_GROUP
+      && values.MIN_SE_MEMBERS_PER_GROUP > 0
+      && values.MIN_SE_MEMBERS_PER_GROUP + Math.max(minMajors - 1, 0) > values.MAX_MEMBERS_PER_GROUP) {
     errors.MIN_SE_MEMBERS_PER_GROUP = 'rules.seExceedMembers';
   }
   return errors;

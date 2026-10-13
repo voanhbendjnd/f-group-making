@@ -24,7 +24,7 @@ const ownClass: SchoolClass = {
 };
 const otherClass = { ...ownClass, id: 2, name: 'Other class', lecturerId: 20 };
 const config = { schoolClassId: 2, version: 0, configured: false, warnings: [],
-  rules: RULE_CODES.map((code, index) => ({ code, value: [4, 6, 1, 50, 1, 6, 1][index]! })) };
+  rules: RULE_CODES.map((code, index) => ({ code, status: true, value: [4, 6, 1, 50, 1, 6, 1][index]! })) };
 const clients: QueryClient[] = [];
 
 function renderPage(detail = false) {

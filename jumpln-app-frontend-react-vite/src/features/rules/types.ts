@@ -7,12 +7,14 @@ export const RULE_CODES = [
 
 export type RuleCode = typeof RULE_CODES[number];
 export type RuleValues = Record<RuleCode, number>;
+export type RuleStatuses = Record<RuleCode, boolean>;
+export type RuleFormValues = RuleValues & { statuses: RuleStatuses };
 
 export function getRuleMinimum(code: RuleCode): number {
   return code === 'MIN_SE_MEMBERS_PER_GROUP' ? 0 : 1;
 }
 
-export interface GroupingRule { code: RuleCode; value: number }
+export interface GroupingRule { code: RuleCode; value: number; status: boolean }
 
 export interface ClassRules {
   schoolClassId: number;

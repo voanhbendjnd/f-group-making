@@ -16,8 +16,8 @@ function parseRules(value: unknown, classId: number): ClassRules {
   const rules = value.rules.map(item => {
     if (!isRecord(item) || !RULE_CODES.includes(item.code as RuleCode)
         || !Number.isInteger(item.value) || Number(item.value) < getRuleMinimum(item.code as RuleCode)
-        || Number(item.value) > 1000) return invalid();
-    return { code: item.code as RuleCode, value: Number(item.value) };
+        || Number(item.value) > 1000 || typeof item.status !== 'boolean') return invalid();
+    return { code: item.code as RuleCode, value: Number(item.value), status: item.status };
   });
   if (rules.length !== RULE_CODES.length || new Set(rules.map(rule => rule.code)).size !== RULE_CODES.length
       || !value.warnings.every(item => typeof item === 'string')) return invalid();

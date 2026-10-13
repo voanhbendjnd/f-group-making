@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { AlertCircle, CheckCircle2, Info, RefreshCw, Save } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { Input } from '@/components/common/Input';
 import { getApiError } from '@/services/api/types';
-import { RULE_CODES, type ClassRules, type RuleCode, type RuleValues, type SaveClassRules } from '../types';
+import { RULE_CODES, getRuleMinimum, type ClassRules, type RuleCode, type RuleFormValues, type RuleStatuses, type SaveClassRules } from '../types';
 import { validateRuleValues } from '../utils/ruleValidation';
 
 interface Props {
@@ -15,8 +15,11 @@ interface Props {
   onReload: () => Promise<ClassRules>;
 }
 
-function formValues(data: ClassRules): RuleValues {
-  return Object.fromEntries(data.rules.map(rule => [rule.code, rule.value])) as RuleValues;
+function formValues(data: ClassRules): RuleFormValues {
+  return {
+    ...Object.fromEntries(data.rules.map(rule => [rule.code, rule.value])),
+    statuses: Object.fromEntries(data.rules.map(rule => [rule.code, rule.status])) as RuleStatuses,
+  } as RuleFormValues;
 }
 
 const sections = [
@@ -32,11 +35,12 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
   const invalidField = useRef<RuleCode | null>(null);
   const [configured, setConfigured] = useState(initial.configured);
   const [warnings, setWarnings] = useState(initial.warnings);
-  const [notice, setNotice] = useState<{ kind: 'success' | 'error' | 'warning'; text: string } | null>(null);
+  const [notice, setNotice] = useState<{ kind: 'success' | 'error' | 'warning'; key?: string; text?: string } | null>(null);
   const [mustReload, setMustReload] = useState(false);
   const [reloading, setReloading] = useState(false);
-  const { register, handleSubmit, setError, setFocus, clearErrors, reset,
-    formState: { errors, isSubmitting, isDirty } } = useForm<RuleValues>({ defaultValues: formValues(initial) });
+  const { register, handleSubmit, setError, setFocus, clearErrors, reset, control, setValue,
+    formState: { errors, isSubmitting, isDirty } } = useForm<RuleFormValues>({ defaultValues: formValues(initial) });
+  const statuses = useWatch({ control, name: 'statuses' });
 
   useEffect(() => {
     // Focus after the submitting fieldset is enabled again.
@@ -54,30 +58,31 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
     setMustReload(false);
   };
 
-  const save = async (values: RuleValues) => {
+  const save = async (values: RuleFormValues) => {
     if (readOnly || busy.current || mustReload) return;
     clearErrors();
     const validation = validateRuleValues(values);
     const entries = Object.entries(validation) as [RuleCode, string][];
     if (entries.length) {
       invalidField.current = entries[0]![0];
-      entries.forEach(([code, key]) => setError(code, { message: t(key) }));
+      entries.forEach(([code, key]) => setError(code, { message: key }));
       return;
     }
     busy.current = true;
     setNotice(null);
     try {
       const data = await onSave({ version: baseline.current.version,
-        rules: RULE_CODES.map(code => ({ code, value: values[code] })) });
+        rules: RULE_CODES.map(code => ({ code, value: values[code], status: values.statuses[code] })) });
       accept(data);
-      setNotice({ kind: 'success', text: t('rules.saved') });
+      setNotice({ kind: 'success', key: 'rules.saved' });
     } catch (value: unknown) {
       const error = getApiError(value);
       const unknown = error.outcomeUnknown || error.status === 0 || error.status >= 500;
       const conflict = error.status === 409;
       setMustReload(Boolean(unknown || conflict || error.status === 403));
       setNotice({ kind: unknown || conflict ? 'warning' : 'error',
-        text: unknown ? t('rules.unknownSave') : conflict ? t('rules.conflict') : error.message || t('rules.saveFailed') });
+        key: unknown ? 'rules.unknownSave' : conflict ? 'rules.conflict' : error.message ? undefined : 'rules.saveFailed',
+        text: error.message });
     } finally {
       busy.current = false;
     }
@@ -89,13 +94,52 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
     setReloading(true);
     try {
       accept(await onReload());
-      setNotice({ kind: 'success', text: t('rules.reloaded') });
+      setNotice({ kind: 'success', key: 'rules.reloaded' });
     } catch (value: unknown) {
-      setNotice({ kind: 'error', text: getApiError(value).message || t('rules.loadFailed') });
+      const message = getApiError(value).message;
+      setNotice({ kind: 'error', key: message ? undefined : 'rules.loadFailed', text: message });
     } finally {
       busy.current = false;
       setReloading(false);
     }
+  };
+
+  const ruleToggle = (codes: readonly RuleCode[], label: string) => {
+    const enabled = codes.some(code => statuses[code]);
+    const mixed = enabled && !codes.every(code => statuses[code]);
+    return <div className="rule-status">
+      <label className="rule-status-control">
+        <input type="checkbox" role="switch" disabled={readOnly} checked={enabled}
+          aria-label={t('rules.toggleLabel', { rule: label })}
+          onChange={event => {
+            if (readOnly || busy.current) return;
+            const checked = event.target.checked;
+            codes.forEach(code => setValue(`statuses.${code}`, checked, { shouldDirty: true }));
+            clearErrors();
+          }} />
+        <span>{t(mixed ? 'rules.partlyEnabled' : enabled ? 'rules.enabled' : 'rules.disabled')}</span>
+      </label>
+      {mixed && <p className="form-hint">{t('rules.mixedStatusHint', {
+        minimum: t(statuses[codes[0]!] ? 'rules.enabled' : 'rules.disabled'),
+        maximum: t(statuses[codes[1]!] ? 'rules.enabled' : 'rules.disabled'),
+      })}</p>}
+      {!enabled && <p className="form-hint">{t('rules.disabledHint')}</p>}
+    </div>;
+  };
+
+  const ruleField = (code: RuleCode, label: string) => {
+    const minimum = getRuleMinimum(code);
+    const validationKey = minimum === 0 ? 'rules.seIntegerRequired' : 'rules.integerRequired';
+    return <div key={code} className={`rule-field ${statuses[code] ? '' : 'rule-field-inactive'}`}>
+      <Input id={`rule-${code}`} type="number" min={minimum} max={1000} step={1} required
+        readOnly={readOnly || !statuses[code]} label={label}
+        error={errors[code]?.message ? t(errors[code].message) : undefined}
+        {...register(code, {
+          valueAsNumber: true,
+          required: validationKey,
+          validate: value => Number.isInteger(value) && value >= minimum && value <= 1000 || validationKey,
+        })} />
+    </div>;
   };
 
   return <section className="card lecturer-card" aria-labelledby="class-rules-heading">
@@ -105,6 +149,7 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
     </div>
     {readOnly && <div className="alert alert-info"><Info size={20} aria-hidden="true" /><p>{t('rules.readOnly')}</p></div>}
     {!configured && <div className="alert alert-info"><Info size={20} aria-hidden="true" /><p>{t(readOnly ? 'rules.readOnlySuggestions' : 'rules.suggestions')}</p></div>}
+    <p className="rules-help">{t('rules.statusHint')}</p>
     <form onSubmit={event => { void handleSubmit(save, fieldErrors => {
       invalidField.current = Object.keys(fieldErrors)[0] as RuleCode;
     })(event); }} noValidate>
@@ -113,33 +158,17 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
           {sections.map(section => <fieldset key={section.name} className="rules-section">
             <legend>{t(`rules.sections.${section.name}.title`)}</legend>
             <p>{t(`rules.sections.${section.name}.hint`)}</p>
+            {ruleToggle([section.min, section.max], t(`rules.sections.${section.name}.title`))}
             <div className="rules-pair">
-              {[section.min, section.max].map((code, index) => <Input
-                key={code} id={`rule-${code}`} type="number" min={1} max={1000} step={1} required
-                readOnly={readOnly}
-                label={t(index === 0 ? 'rules.minimum' : 'rules.maximum')}
-                aria-invalid={Boolean(errors[code])}
-                aria-describedby={errors[code] ? `rule-${code}-error` : undefined}
-                error={errors[code]?.message}
-                {...register(code, {
-                  valueAsNumber: true,
-                  required: t('rules.integerRequired'),
-                  validate: value => Number.isInteger(value) && value >= 1 && value <= 1000 || t('rules.integerRequired'),
-                })}
-              />)}
+              {[section.min, section.max].map((code, index) => ruleField(code,
+                t(index === 0 ? 'rules.minimum' : 'rules.maximum')))}
             </div>
           </fieldset>)}
           <fieldset className="rules-section">
             <legend>{t('rules.sections.seMembers.title')}</legend>
             <p>{t('rules.sections.seMembers.hint')}</p>
-            <Input id="rule-MIN_SE_MEMBERS_PER_GROUP" type="number" min={0} max={1000} step={1}
-              required readOnly={readOnly} label={t('rules.seMinimumLabel')}
-              error={errors.MIN_SE_MEMBERS_PER_GROUP?.message}
-              {...register('MIN_SE_MEMBERS_PER_GROUP', {
-                valueAsNumber: true,
-                required: t('rules.seIntegerRequired'),
-                validate: value => Number.isInteger(value) && value >= 0 && value <= 1000 || t('rules.seIntegerRequired'),
-              })} />
+            {ruleToggle(['MIN_SE_MEMBERS_PER_GROUP'], t('rules.sections.seMembers.title'))}
+            {ruleField('MIN_SE_MEMBERS_PER_GROUP', t('rules.seMinimumLabel'))}
           </fieldset>
         </div>
       </fieldset>
@@ -152,7 +181,7 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
       </div>}
       {notice && <div className={`alert alert-${notice.kind}`} role={notice.kind === 'error' ? 'alert' : 'status'}>
         {notice.kind === 'success' ? <CheckCircle2 size={20} aria-hidden="true" /> : <AlertCircle size={20} aria-hidden="true" />}
-        <p>{notice.text}</p>
+        <p>{notice.key ? t(notice.key) : notice.text}</p>
       </div>}
       {!readOnly && <div className="rules-actions">
         <Button type="submit" loading={isSubmitting} disabled={reloading || mustReload || (configured && !isDirty)} icon={<Save size={18} />}>
