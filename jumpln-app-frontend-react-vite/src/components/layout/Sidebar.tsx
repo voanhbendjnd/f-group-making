@@ -13,16 +13,28 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
+import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
 import { TermSelect } from '@/features/terms/components/TermSelect';
 
 export interface SidebarProps {
+  area?: 'admin' | 'lecturer' | 'student';
   showTermFilter?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilter = false }) => {
-  const { user, isAdmin, logout } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({
+  area,
+  isOpen,
+  onClose,
+  showTermFilter = false,
+}) => {
+  const { user, isAdmin: hasAdminRole, logout } = useAuth();
+  const isAdmin = area ? area === 'admin' : hasAdminRole;
+  const isLecturer = area === 'lecturer';
+  const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
+  const allClasses = canViewAllClasses(user?.authorities || []);
+
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -40,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilte
         },
         {
           to: '/admin/classes',
-          label: 'Lớp học',
+          label: t('classes.label'),
           icon: <Layers size={18} />,
         },
         {
@@ -60,11 +72,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilte
         },
         {
           to: '/admin/lecturers',
-          label: 'Giảng viên',
+          label: t('lecturer.role'),
           icon: <UserCheck size={18} />,
         },
       ]
-    : [
+    : isLecturer ? [
+        { to: '/lecturer/classes', label: t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses'), icon: <Layers size={18} /> },
+      ] : [
         {
           to: '/student/dashboard',
           label: t('nav.studentDashboard'),
@@ -130,7 +144,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilte
             marginBottom: '0.25rem',
           }}
         >
-          {isAdmin ? t('sidebar.adminSection') : t('sidebar.studentSection')}
+          {isAdmin ? t('sidebar.adminSection') : isLecturer ? t('lecturer.section') : t('sidebar.studentSection')}
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -233,7 +247,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, showTermFilte
                 </span>
               ) : (
                 <span className="badge badge-success" style={{ fontSize: '0.6875rem', padding: '1px 6px' }}>
-                  <UserCheck size={11} /> {t('sidebar.studentRole')}
+                  <UserCheck size={11} /> {isLecturer ? t(isMaster ? 'lecturer.masterRole' : 'lecturer.role') : t('sidebar.studentRole')}
                 </span>
               )}
             </div>

@@ -1,4 +1,4 @@
-import React, { forwardRef, useState } from 'react';
+import React, { forwardRef, useId, useState } from 'react';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,7 +13,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   ({ label, hint, error, required, type = 'text', className = '', id, ...props }, ref) => {
     const { t } = useTranslation();
     const [showPassword, setShowPassword] = useState(false);
-    const inputId = id || `input-${Math.random().toString(36).substring(2, 9)}`;
+    const generatedId = useId();
+    const inputId = id || generatedId;
     const isPassword = type === 'password';
     const effectiveType = isPassword ? (showPassword ? 'text' : 'password') : type;
 
@@ -33,6 +34,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             ref={ref}
             id={inputId}
             type={effectiveType}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
             className={`form-control ${error ? 'is-invalid' : ''} ${className}`}
             style={isPassword ? { paddingRight: '2.5rem' } : undefined}
             {...props}
@@ -62,10 +65,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
 
-        {hint && !error && <div className="form-hint">{hint}</div>}
+        {hint && !error && <div id={`${inputId}-hint`} className="form-hint">{hint}</div>}
 
         {error && (
-          <div className="form-error">
+          <div id={`${inputId}-error`} className="form-error">
             <AlertCircle size={14} />
             <span>{error}</span>
           </div>

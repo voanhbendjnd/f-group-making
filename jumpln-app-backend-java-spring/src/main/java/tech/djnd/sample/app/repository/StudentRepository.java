@@ -13,6 +13,14 @@ import java.util.Optional;
 
 @Repository
 public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpecificationExecutor<Student> {
+    long countBySchoolClassId(Integer schoolClassId);
+
+    @Query("SELECT COUNT(DISTINCT s.majorId) FROM Student s WHERE s.schoolClassId = :classId")
+    long countDistinctMajorsBySchoolClassId(@Param("classId") Integer classId);
+
+    @Query("SELECT COUNT(s) FROM Student s JOIN Major m ON s.majorId = m.id "
+            + "WHERE s.schoolClassId = :classId AND UPPER(TRIM(m.code)) = UPPER(:majorCode)")
+    long countBySchoolClassIdAndMajorCode(@Param("classId") Integer classId, @Param("majorCode") String majorCode);
     List<Student> findByRollNumberIn(List<String> rollNumbers);
 
     List<Student> findByRollNumberIgnoreCaseIn(List<String> rollNumbers);

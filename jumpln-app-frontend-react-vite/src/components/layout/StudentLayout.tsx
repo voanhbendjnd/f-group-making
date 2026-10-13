@@ -38,10 +38,11 @@ export const StudentLayout: React.FC = () => {
         />
       )}
 
-      <Sidebar isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Sidebar area="student" isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       <div className="main-content">
         <TopNavbar
+          area="student"
           isSidebarCollapsed={isCollapsed}
           onToggleSidebar={handleToggleSidebar}
         />

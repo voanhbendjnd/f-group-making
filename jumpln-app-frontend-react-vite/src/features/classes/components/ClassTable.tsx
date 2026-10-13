@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Users, Calendar, ArrowRight } from 'lucide-react';
 import type { SchoolClass } from '../types';
 
@@ -15,24 +16,25 @@ export const ClassTable: React.FC<ClassTableProps> = ({
   page,
   pageSize,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="table-container" style={{ overflowX: 'auto' }}>
       <table className="table" style={{ width: '100%' }}>
         <thead>
           <tr>
-            <th style={{ width: '60px' }}>STT</th>
-            <th>Tên lớp học</th>
-            <th>Học kỳ</th>
-            <th>Giảng viên phụ trách</th>
-            <th>Sĩ số sinh viên</th>
-            <th style={{ textAlign: 'right' }}>Thao tác</th>
+            <th style={{ width: '60px' }}>{t('classStudents.index')}</th>
+            <th>{t('classes.className')}</th>
+            <th>{t('lecturer.term')}</th>
+            <th>{t('classAssignment.title')}</th>
+            <th>{t('classes.studentCount')}</th>
+            <th style={{ textAlign: 'right' }}>{t('lecturer.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {classes.length === 0 ? (
             <tr>
               <td colSpan={6} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
-                Không tìm thấy lớp học nào phù hợp.
+                {t('classes.empty')}
               </td>
             </tr>
           ) : (
@@ -90,7 +92,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
 
                   {/* Giảng viên */}
                   <td>
-                    {cls.lecturerCode ? (
+                    {cls.lecturerId !== null ? (
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                           <span
@@ -103,7 +105,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                               fontWeight: 700,
                             }}
                           >
-                            {cls.lecturerCode}
+                            {cls.lecturerCode || t('classAssignment.assigned')}
                           </span>
                           {cls.lecturerName && (
                             <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
@@ -119,7 +121,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                       </div>
                     ) : (
                       <span style={{ color: '#94a3b8', fontStyle: 'italic', fontSize: '0.8125rem' }}>
-                        Chưa phân công
+                        {t('classes.unassigned')}
                       </span>
                     )}
                   </td>
@@ -141,7 +143,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                       }}
                     >
                       <Users size={13} />
-                      {cls.studentCount} sinh viên
+                      {t('lecturer.students', { count: cls.studentCount })}
                     </span>
                   </td>
 
@@ -149,6 +151,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                   <td style={{ textAlign: 'right' }}>
                     <button
                       type="button"
+                      aria-label={t('classes.openClass', { name: cls.name })}
                       onClick={(e) => {
                         e.stopPropagation();
                         onSelectClass(cls);
@@ -161,7 +164,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                         fontWeight: 600,
                       }}
                     >
-                      <span>Xem sinh viên</span>
+                      <span>{t('classes.viewStudents')}</span>
                       <ArrowRight size={14} />
                     </button>
                   </td>

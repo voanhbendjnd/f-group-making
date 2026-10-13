@@ -177,7 +177,7 @@ describe('Academic Term filter', () => {
     await screen.findByText('Student 2');
     await switchTerm(1);
     await screen.findByText('Student 1');
-    fireEvent.click(screen.getByRole('link', { name: 'Lớp học' }));
+    fireEvent.click(screen.getByRole('link', { name: i18n.t('classes.label') }));
     await screen.findByText('Class 1');
     expect(screen.getByRole('combobox', { name: 'Academic Term' })).toHaveTextContent('SP26');
     expect(classApi.getClasses).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 1 }));

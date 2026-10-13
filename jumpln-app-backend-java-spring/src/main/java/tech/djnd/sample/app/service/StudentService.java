@@ -212,7 +212,7 @@ public class StudentService {
                 Long lecturerId = lecturer != null ? lecturer.getUserId() : null;
 
                 SchoolClass schoolClass = schoolClassRepository
-                        .findByNameIgnoreCaseAndTermId(groupName, effectiveTermId)
+                        .findByNameAndTermIdForUpdate(groupName, effectiveTermId)
                         .orElseGet(() -> {
                             SchoolClass sc = new SchoolClass();
                             sc.setName(groupName);

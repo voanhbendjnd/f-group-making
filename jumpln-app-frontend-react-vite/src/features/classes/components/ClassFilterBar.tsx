@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Search, X, RotateCcw } from 'lucide-react';
 import type { SchoolClassFilterParams } from '../types';
 
@@ -16,10 +17,10 @@ const STYLES = `
   padding:12px; background:#fff; border:1px solid var(--cf-border); border-radius:16px;
   box-shadow:0 1px 2px rgba(16,24,40,.05); font-family:inherit;
 }
-.cf-left{display:flex; flex-wrap:wrap; align-items:center; gap:12px; flex:1; min-width:280px}
+.cf-left{display:flex; flex-wrap:wrap; align-items:center; gap:12px; flex:1; min-width:min(100%,280px)}
 
 /* Search */
-.cf-search{position:relative; flex:1 1 280px}
+.cf-search{position:relative; flex:1 1 280px; min-width:0}
 .cf-search-icon{position:absolute; left:14px; top:50%; transform:translateY(-50%); width:16px; height:16px; color:#9ca3af; pointer-events:none; transition:color .15s}
 .cf-input{
   box-sizing:border-box; width:100%; padding:10px 40px 10px 40px; font:500 14px/1.2 inherit; color:var(--cf-text);
@@ -54,6 +55,7 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
   onChange,
   onReset,
 }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
 
   // Debounce search update
@@ -79,8 +81,8 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
           <input
             type="text"
             className="cf-input"
-            placeholder="Tìm theo tên lớp (vd: EXE101_G01), giảng viên..."
-            aria-label="Tìm kiếm lớp học"
+            placeholder={t('classes.searchPlaceholder')}
+            aria-label={t('classes.searchLabel')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -88,7 +90,7 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
             <button
               type="button"
               className="cf-clear"
-              aria-label="Xóa nội dung tìm kiếm"
+              aria-label={t('students.clearSearchAria')}
               onClick={() => setSearchTerm('')}
             >
               <X size={14} />
@@ -108,7 +110,7 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
           }}
         >
           <RotateCcw size={14} />
-          Xóa bộ lọc
+          {t('students.clearFilters')}
         </button>
       )}
     </div>

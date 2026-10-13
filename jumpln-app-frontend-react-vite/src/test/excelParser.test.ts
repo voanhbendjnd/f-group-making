@@ -82,6 +82,7 @@ describe('excelParser client validation', () => {
       ['HEADER 2', '', '', '', '', ''],
       [1, 'SE180099', 'Sinh Viên 1', 'BEN_SE_ET_19C', 'SV1', 'sv1@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
       [2, 'SE180099', 'Sinh Viên 2', 'BEN_SE_ET_19C', 'SV2', 'sv2@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
+
     ];
 
     const worksheet = XLSX.utils.aoa_to_sheet(data);

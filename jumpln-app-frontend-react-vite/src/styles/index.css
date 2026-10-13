@@ -805,4 +805,95 @@ select.form-control {
   transform: scale(1.08);
 }
 
+/* Lecturer pages share the existing surface, controls and semantic colors. */
+.lecturer-card { padding: 1.5rem; }
+.lecturer-page > .card + .card { margin-top: 1.5rem; }
+.top-navbar-leading, .top-navbar-actions { display: flex; align-items: center; gap: 1rem; min-width: 0; }
+.top-navbar-subtitle { font-size: 0.875rem; color: var(--color-text-muted); }
+.top-navbar-profile { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; min-width: 0; }
+.top-navbar-profile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14rem; }
+.lecturer-search { display: flex; align-items: flex-end; gap: 1rem; }
+.lecturer-search .form-group { flex: 1; margin-bottom: 0; }
+.lecturer-class-table { min-width: 560px; width: 100%; }
+.lecturer-class-table th[scope="row"] { font-weight: 600; text-transform: none; }
+.lecturer-class-table a { overflow-wrap: anywhere; }
+.class-students-card { padding: 0; min-width: 0; }
+.class-rules-disclosure { margin: 1.5rem 0; }
+.class-rules-disclosure-panel:not([hidden]) { margin-top: 1rem; }
+.class-management-controls { margin: 1.5rem 0; }
+.class-management-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.class-management-panel:not([hidden]) { margin-top: 1rem; }
+@media (max-width: 600px) {
+  .class-management-actions { flex-wrap: nowrap; gap: 0.5rem; }
+  .class-management-actions > .btn { flex: 1 1 0; min-width: 0; white-space: normal;
+    padding: 0.625rem 0.5rem; font-size: 0.8125rem; line-height: 1.3; gap: 0.375rem; }
+  .class-management-actions > .btn > span { min-width: 0; }
+  .class-management-actions svg { flex-shrink: 0; }
+  .class-management-actions .class-management-indicator { display: none; }
+}
+.class-lecturer-assignment { margin-bottom: 1rem; min-width: 0; }
+.class-lecturer-assignment h3 { margin-bottom: 0.5rem; }
+.class-lecturer-assignment > p { margin-bottom: 0.75rem; }
+.class-lecturer-name { overflow-wrap: anywhere; }
+.class-assignment-fields { border: 0; padding: 0; margin: 1rem 0 0; min-width: 0; }
+.class-assignment-search { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0.75rem; margin-bottom: 1rem; }
+.class-assignment-search .form-group { flex: 1 1 220px; min-width: 0; margin: 0; }
+.class-assignment-fields .form-control { width: 100%; min-width: 0; }
+.student-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 1rem; align-items: flex-end; }
+.student-filter-grid > div { min-width: 0; }
+.student-filter-grid .form-control { min-width: 0; }
+.student-filter-search { grid-column: span 2; }
+.class-students-table { width: 100%; min-width: 900px; }
+.class-students-table th[scope="row"] { font-weight: 600; text-transform: none; }
+.class-students-table td { overflow-wrap: anywhere; }
+.lecturer-list-summary { border-bottom: 1px solid var(--color-border); font-weight: 600; }
+.lecturer-pagination { padding: 0 1rem; }
+.lecturer-overview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.5rem; }
+.lecturer-overview dt, .rules-help { color: var(--color-text-muted); font-size: 0.875rem; }
+.lecturer-overview dd { margin-top: 0.375rem; font-weight: 600; overflow-wrap: anywhere; }
+.lecturer-section-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; }
+.lecturer-section-header h2 { font-size: 1.25rem; }
+.lecturer-section-header p { color: var(--color-text-muted); margin-top: 0.5rem; }
+.lecturer-section-header .badge { flex-shrink: 0; }
+.rules-fieldset { border: 0; min-width: 0; }
+.rules-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; margin-bottom: 1rem; }
+.rules-section { border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 1rem; min-width: 0; }
+.rules-section legend { font-weight: 600; padding: 0 0.25rem; }
+.rules-section > p { font-size: 0.875rem; color: var(--color-text-muted); min-height: 4.5rem; margin-bottom: 1rem; }
+.rules-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+.rules-pair .form-group { margin-bottom: 0; }
+.rule-field { min-width: 0; }
+.rule-status { margin-bottom: 0.75rem; }
+.rule-status .rule-status-control { margin-bottom: 0; }
+.rule-status .form-hint { margin-top: 0.5rem; margin-bottom: 0; }
+.rule-status-control { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; font-size: 0.875rem; cursor: pointer; }
+.rule-status-control input { appearance: none; width: 2.25rem; height: 1.25rem; flex-shrink: 0; border: 1px solid var(--color-border-hover); border-radius: 999px; background: var(--color-surface-muted); cursor: inherit; }
+.rule-status-control input::before { content: ''; display: block; width: 0.875rem; height: 0.875rem; margin: 0.125rem; border-radius: 50%; background: var(--color-text-muted); transition: transform 0.15s ease; }
+.rule-status-control input:checked { background: var(--color-primary); border-color: var(--color-primary); }
+.rule-status-control input:checked::before { transform: translateX(1rem); background: var(--color-surface); }
+.rule-status-control input:disabled { opacity: 0.65; }
+.rule-status-control:has(input:disabled) { cursor: default; }
+.rule-field-inactive .form-control { background: var(--color-surface-muted); color: var(--color-text-muted); }
+.rules-help { margin: 1rem 0; }
+.rules-warning-list { padding-left: 1.25rem; margin: 0.5rem 0; }
+.rules-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; padding-top: 1rem; border-top: 1px solid var(--color-border); }
+.rules-actions .rules-help { margin: 0; }
+.rules-actions .btn { min-height: 44px; }
+
+@media (max-width: 1100px) {
+  .rules-grid { grid-template-columns: 1fr; }
+  .rules-section > p { min-height: 0; }
+}
+@media (max-width: 600px) {
+  .student-filter-search { grid-column: auto; }
+  .top-navbar-subtitle, .top-navbar-profile { display: none; }
+  .top-navbar-actions { gap: 0.5rem; }
+  .top-navbar-actions .btn-sm { padding: 0.5rem; }
+  .lecturer-card { padding: 1rem; }
+  .lecturer-search { flex-direction: column; align-items: stretch; }
+  .lecturer-overview { grid-template-columns: 1fr; gap: 1rem; }
+  .lecturer-section-header { flex-direction: column; }
+  .rules-actions { align-items: stretch; flex-direction: column; }
+}
+
 

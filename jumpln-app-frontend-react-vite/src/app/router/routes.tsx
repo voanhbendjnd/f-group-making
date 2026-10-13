@@ -3,6 +3,10 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { StudentLayout } from '@/components/layout/StudentLayout';
+import { LecturerLayout } from '@/components/layout/LecturerLayout';
+import { LecturerClassListPage } from '@/pages/lecturer/LecturerClassListPage';
+import { LecturerClassDetailPage } from '@/pages/lecturer/LecturerClassDetailPage';
+import { getHomeRoute } from '@/features/auth/utils/roleRouting';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleRoute } from './RoleRoute';
 import { PublicRoute } from './PublicRoute';
@@ -27,21 +31,13 @@ import { NotFoundPage } from '@/pages/errors/NotFoundPage';
 
 // Root index redirector
 const RootRedirector: React.FC = () => {
-  const { isAuthenticated, isAdmin, isStudent } = useAuth();
+  const { isAuthenticated, user } = useAuth();
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  if (isAdmin) {
-    return <Navigate to="/admin/dashboard" replace />;
-  }
-
-  if (isStudent) {
-    return <Navigate to="/student/dashboard" replace />;
-  }
-
-  return <Navigate to="/login" replace />;
+  return <Navigate to={getHomeRoute(user?.authorities || [])} replace />;
 };
 
 export const router = createBrowserRouter([
@@ -137,6 +133,21 @@ export const router = createBrowserRouter([
         path: 'classes/:id',
         element: <ClassDetailPage />,
       },
+    ],
+  },
+
+  // Lecturer routes: the server also checks ownership for every class request.
+  {
+    path: '/lecturer',
+    element: (
+      <ProtectedRoute>
+        <RoleRoute requiredRole="ROLE_LECTURE"><LecturerLayout /></RoleRoute>
+      </ProtectedRoute>
+    ),
+    children: [
+      { index: true, element: <Navigate to="/lecturer/classes" replace /> },
+      { path: 'classes', element: <LecturerClassListPage /> },
+      { path: 'classes/:id', element: <LecturerClassDetailPage /> },
     ],
   },
 

@@ -11,7 +11,7 @@ import { ToastProvider } from '@/app/providers/ToastContext';
 import { termApi } from '@/features/terms/api/termApi';
 
 vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 } }) }));
-vi.mock('@/features/terms/api/termApi', () => ({ termApi: { getTerms: vi.fn(), getCurrentTerm: vi.fn() } }));
+vi.mock('@/features/terms/api/termApi', () => ({ termApi: { getTerms: vi.fn(), getCurrentTerm: vi.fn(), createTerm: vi.fn() } }));
 
 vi.mock('@/features/import/api/importApi', () => ({ importApi: { importExcel: vi.fn() } }));
 vi.mock('@/features/import/utils/excelParser', () => ({ parseExcelClientSide: vi.fn() }));
@@ -46,8 +46,10 @@ describe('Student import major confirmation', () => {
     localStorage.removeItem('f_group_selected_term_1');
     vi.mocked(termApi.getCurrentTerm).mockResolvedValue({ id: 1, name: 'FALL26', isCurrent: true });
     vi.mocked(termApi.getTerms).mockResolvedValue([{ id: 1, name: 'FALL26', isCurrent: true }]);
+
     vi.mocked(parseExcelClientSide).mockResolvedValue({ rows: [{ rowNumber: 3, rollNumber: 'SE001', fullName: 'Student',
       originalMajor: 'BEN_ABC_ET', extractedMajorCode: 'ABC', memberCode: 'MEM001', email: 'student@example.com',
+      groupName: 'Class A', lecturerCode: 'LECTURER',
       isValid: true, validationErrors: [] }], totalRows: 1, validCount: 1, invalidCount: 0, hasErrors: false });
     vi.mocked(importApi.importExcel).mockResolvedValueOnce(pending).mockResolvedValueOnce(success);
   });

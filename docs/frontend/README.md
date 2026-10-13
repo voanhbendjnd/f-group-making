@@ -1,6 +1,7 @@
 # Đặc tả frontend React — F Group Making
 
-**Cập nhật 12/10/2026:** Frontend đã triển khai Academic Term Filter. Xem [11 — Academic Term Filter](11-academic-term-filter.md) cho state, API, cache và nghiệm thu mới; các phần dưới có nội dung thiết kế từ 29/09/2026.
+> **Cập nhật 12/10/2026:** Đã triển khai Academic Term Filter ([11 — Academic Term Filter](11-academic-term-filter.md)) và khu vực giảng viên, quản lý lớp/Rule cùng kiểm tra quyền theo lớp ([11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md)). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
+
 
 > Mục tiêu ưu tiên: người không rành công nghệ biết mình đang ở đâu, cần làm gì tiếp theo và thao tác vừa rồi đã có kết quả gì.
 

@@ -8,9 +8,10 @@ import type { StudentFilterParams } from '../types';
 interface Props {
   filters: StudentFilterParams;
   onFilterChange: (filters: StudentFilterParams) => void;
+  majorOptions?: Major[];
 }
 
-export function MajorSearchFilter({ filters, onFilterChange }: Props) {
+export function MajorSearchFilter({ filters, onFilterChange, majorOptions }: Props) {
   const { t } = useTranslation();
   const id = useId();
   const externalInput = filters.majorLabel || filters.majorSearch || '';
@@ -39,10 +40,13 @@ export function MajorSearchFilter({ filters, onFilterChange }: Props) {
   const { data, isFetching, isError } = useQuery({
     queryKey: ['majors', 'suggestions', debouncedText],
     queryFn: () => majorApi.getMajors({ search: debouncedText, page: 1, size: 10, sort: 'code,asc' }),
-    enabled: focused && filters.majorId === undefined && input.trim() === debouncedText,
+    enabled: majorOptions === undefined && focused && filters.majorId === undefined && input.trim() === debouncedText,
     staleTime: 10 * 60 * 1000,
   });
-  const suggestions = input.trim() === debouncedText && !isError ? data?.result || [] : [];
+  const localSuggestions = majorOptions?.filter(major => [major.code, major.name]
+    .some(value => value.toLocaleLowerCase().includes(debouncedText.toLocaleLowerCase()))).slice(0, 10);
+  const suggestionError = majorOptions === undefined && isError;
+  const suggestions = input.trim() === debouncedText && !suggestionError ? localSuggestions ?? data?.result ?? [] : [];
   const expanded = focused && filters.majorId === undefined;
 
   function applyText(value: string) {
@@ -101,8 +105,8 @@ export function MajorSearchFilter({ filters, onFilterChange }: Props) {
           <strong>{major.code}</strong> — {major.name}
         </li>)}
       </ul>
-      {isError ? <p role="status" style={{ padding: '0.75rem' }}>{t('students.majorSuggestionError')}</p>
-        : isFetching || input.trim() !== debouncedText ? <p role="status" style={{ padding: '0.75rem' }}>{t('common.loading')}</p>
+      {suggestionError ? <p role="status" style={{ padding: '0.75rem' }}>{t('students.majorSuggestionError')}</p>
+        : (majorOptions === undefined && isFetching) || input.trim() !== debouncedText ? <p role="status" style={{ padding: '0.75rem' }}>{t('common.loading')}</p>
         : suggestions.length === 0 ? <p role="status" style={{ padding: '0.75rem' }}>{t('students.majorNoMatches')}</p> : null}
     </div>}
   </div>;

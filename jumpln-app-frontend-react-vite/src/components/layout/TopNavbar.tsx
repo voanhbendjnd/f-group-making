@@ -6,15 +6,18 @@ import { useNavigate } from 'react-router-dom';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 
 export interface TopNavbarProps {
+  area?: 'admin' | 'lecturer' | 'student';
   onToggleSidebar?: () => void;
   isSidebarCollapsed?: boolean;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
+  area,
   onToggleSidebar,
   isSidebarCollapsed = false,
 }) => {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin: hasAdminRole, logout } = useAuth();
+  const isAdmin = area ? area === 'admin' : hasAdminRole;
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -25,7 +28,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
   return (
     <header className="top-navbar">
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="top-navbar-leading">
         {onToggleSidebar && (
           <button
             type="button"
@@ -50,19 +53,19 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           </button>
         )}
 
-        <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+        <div className="top-navbar-subtitle">
           {isAdmin ? (
             <span>{t('nav.adminSubtitle')}</span>
           ) : (
-            <span>{t('nav.studentSubtitle')}</span>
+            <span>{area === 'lecturer' ? t('lecturer.subtitle') : t('nav.studentSubtitle')}</span>
           )}
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+      <div className="top-navbar-actions">
         <LanguageSwitcher size="sm" />
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem' }}>
+        <div className="top-navbar-profile">
           <UserIcon size={16} style={{ color: 'var(--color-text-subtle)' }} />
           <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
             {user?.name || user?.email}

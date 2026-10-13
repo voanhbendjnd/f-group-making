@@ -1,15 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { Search, X, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { MajorSearchFilter } from './MajorSearchFilter';
 import { Button } from '@/components/common/Button';
 import type { StudentFilterParams } from '../types';
+import type { Major } from '@/features/majors/types';
 
 export interface StudentFilterBarProps {
   filters: StudentFilterParams;
   onFilterChange: (newFilters: StudentFilterParams) => void;
   onReset: () => void;
   isLoading?: boolean;
+  majorOptions?: Major[];
 }
 
 export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
@@ -17,8 +19,10 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
   onFilterChange,
   onReset,
   isLoading = false,
+  majorOptions,
 }) => {
   const { t } = useTranslation();
+  const id = useId();
   // Local state for smooth typing without lag or focus loss
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
   const [lastExternalSearch, setLastExternalSearch] = useState(filters.search || '');
@@ -100,17 +104,10 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
         backgroundColor: '#ffffff',
       }}
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '1rem',
-          alignItems: 'flex-end',
-        }}
-      >
+      <div className="student-filter-grid">
         {/* Search input */}
-        <div style={{ gridColumn: 'span 2', minWidth: '240px' }}>
-          <label className="form-label" style={{ marginBottom: '0.375rem' }}>
+        <div className="student-filter-search">
+          <label htmlFor={`${id}-search`} className="form-label" style={{ marginBottom: '0.375rem' }}>
             {t('students.searchLabel')}
           </label>
           <div style={{ position: 'relative' }}>
@@ -141,6 +138,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
               />
             )}
             <input
+              id={`${id}-search`}
               type="text"
               className="form-control"
               placeholder={t('students.searchPlaceholder')}
@@ -178,14 +176,15 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
           </div>
         </div>
 
-        <MajorSearchFilter key={majorResetVersion} filters={filters} onFilterChange={onFilterChange} />
+        <MajorSearchFilter key={majorResetVersion} filters={filters} onFilterChange={onFilterChange} majorOptions={majorOptions} />
 
         {/* Account status filter */}
         <div>
-          <label className="form-label" style={{ marginBottom: '0.375rem' }}>
+          <label htmlFor={`${id}-activated`} className="form-label" style={{ marginBottom: '0.375rem' }}>
             {t('students.activationStatusLabel')}
           </label>
           <select
+            id={`${id}-activated`}
             className="form-control"
             value={currentStatusValue}
             onChange={handleStatusChange}
@@ -198,10 +197,11 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
 
         {/* Key / Invitation status filter */}
         <div>
-          <label className="form-label" style={{ marginBottom: '0.375rem' }}>
+          <label htmlFor={`${id}-key`} className="form-label" style={{ marginBottom: '0.375rem' }}>
             {t('students.emailStatusLabel')}
           </label>
           <select
+            id={`${id}-key`}
             className="form-control"
             value={currentKeyValue}
             onChange={handleKeyStatusChange}

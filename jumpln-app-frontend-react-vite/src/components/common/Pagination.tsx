@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
 import type { PaginationMeta } from '@/features/students/types';
@@ -17,6 +17,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   onPageSizeChange,
 }) => {
   const { t } = useTranslation();
+  const sizeId = useId();
   const pageSize = meta?.pageSize || 10;
   const total = meta?.total || 0;
   const totalPages = Math.max(1, meta?.pages || 1);
@@ -60,7 +61,7 @@ export const Pagination: React.FC<PaginationProps> = ({
         color: 'var(--color-text-muted)',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
         <span>
           <Trans
             i18nKey="pagination.showing"
@@ -71,8 +72,9 @@ export const Pagination: React.FC<PaginationProps> = ({
 
         {onPageSizeChange && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', marginLeft: '0.5rem' }}>
-            <span>{t('pagination.perPage')}</span>
+            <label htmlFor={sizeId}>{t('pagination.perPage')}</label>
             <select
+              id={sizeId}
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
               style={{
@@ -124,6 +126,7 @@ export const Pagination: React.FC<PaginationProps> = ({
               key={num}
               type="button"
               onClick={() => onPageChange(num)}
+              aria-current={isActive ? 'page' : undefined}
               style={{
                 minWidth: '36px',
                 height: '36px',

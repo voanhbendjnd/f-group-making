@@ -15,9 +15,11 @@ import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { classApi } from '@/features/classes/api/classApi';
+import { ClassManagementControls } from '@/features/classes/components/ClassManagementControls';
 import { useTranslation } from 'react-i18next';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
+
 
 export const ClassDetailPage: React.FC = () => <TermScope><ClassDetailContent /></TermScope>;
 
@@ -80,7 +82,7 @@ const ClassDetailContent: React.FC = () => {
   if (isClassLoading || isStudentsLoading) {
     return (
       <div className="card" style={{ padding: '4rem' }}>
-        <LoadingSpinner message="Đang tải thông tin lớp học và danh sách sinh viên..." />
+        <LoadingSpinner message={t('classes.loadingDetail')} />
       </div>
     );
   }
@@ -89,7 +91,7 @@ const ClassDetailContent: React.FC = () => {
     return (
       <div className="card" style={{ padding: '2rem' }}>
         <ErrorState
-          message={(classError as any)?.message || 'Không tìm thấy thông tin lớp học.'}
+          message={(classError as any)?.message || t('lecturer.classNotFound')}
           onRetry={() => refetchClass()}
         />
       </div>
@@ -102,11 +104,11 @@ const ClassDetailContent: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title={`Lớp học: ${classDetail.name}`}
-        description="Chi tiết lớp học và danh sách sinh viên thuộc lớp."
+        title={t('classes.detailTitle', { name: classDetail.name })}
+        description={t('classes.detailDescription')}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin/dashboard' },
-          { label: 'Lớp học', href: '/admin/classes' },
+          { label: t('breadcrumbs.admin'), href: '/admin/dashboard' },
+          { label: t('classes.label'), href: '/admin/classes' },
           { label: classDetail.name },
         ]}
         action={
@@ -116,7 +118,7 @@ const ClassDetailContent: React.FC = () => {
             icon={<ArrowLeft size={16} />}
             onClick={() => navigate('/admin/classes')}
           >
-            Quay lại danh sách lớp
+            {t('classes.back')}
           </Button>
         }
       />
@@ -135,7 +137,7 @@ const ClassDetailContent: React.FC = () => {
         {/* Tên lớp */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-subtle)', fontWeight: 600 }}>
-            Tên lớp học
+            {t('classes.className')}
           </span>
           <span
             style={{
@@ -152,12 +154,12 @@ const ClassDetailContent: React.FC = () => {
         {/* Học kỳ */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-subtle)', fontWeight: 600 }}>
-            Học kỳ
+            {t('lecturer.term')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <Calendar size={18} style={{ color: '#64748b' }} />
             <span style={{ fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-              {classDetail.termName || 'Chưa thiết lập'}
+              {classDetail.termName || t('lecturer.noTerm')}
             </span>
           </div>
         </div>
@@ -165,9 +167,9 @@ const ClassDetailContent: React.FC = () => {
         {/* Giảng viên phụ trách */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-subtle)', fontWeight: 600 }}>
-            Giảng viên phụ trách
+            {t('classAssignment.title')}
           </span>
-          {classDetail.lecturerCode ? (
+          {classDetail.lecturerId !== null ? (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span
@@ -180,7 +182,7 @@ const ClassDetailContent: React.FC = () => {
                     fontSize: '0.875rem',
                   }}
                 >
-                  {classDetail.lecturerCode}
+                  {classDetail.lecturerCode || t('classAssignment.assigned')}
                 </span>
                 {classDetail.lecturerName && (
                   <span style={{ fontWeight: 700, color: 'var(--color-text-main)' }}>
@@ -195,24 +197,26 @@ const ClassDetailContent: React.FC = () => {
               )}
             </div>
           ) : (
-            <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>Chưa phân công</span>
+            <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>{t('classes.unassigned')}</span>
           )}
         </div>
 
         {/* Tổng sinh viên */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <span style={{ fontSize: '0.8125rem', color: 'var(--color-text-subtle)', fontWeight: 600 }}>
-            Sĩ số sinh viên
+            {t('classes.studentCount')}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
             <Users size={18} style={{ color: '#059669' }} />
             <span style={{ fontSize: '1.5rem', fontWeight: 800, color: '#059669' }}>
               {students.length}
             </span>
-            <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>sinh viên</span>
+            <span style={{ fontSize: '0.875rem', color: '#64748b', fontWeight: 500 }}>{t('classes.studentUnit', { count: students.length })}</span>
           </div>
         </div>
       </div>
+
+      <ClassManagementControls key={classId} schoolClass={classDetail} />
 
       {/* Student List in Class */}
       <div className="card">
@@ -231,7 +235,7 @@ const ClassDetailContent: React.FC = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Users size={18} style={{ color: 'var(--color-primary, #4f6bed)' }} />
             <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-              Danh sách sinh viên trong lớp ({filteredStudents.length} / {students.length})
+              {t('classes.studentsTitle', { count: filteredStudents.length, total: students.length })}
             </h3>
           </div>
 
@@ -249,7 +253,8 @@ const ClassDetailContent: React.FC = () => {
             />
             <input
               type="text"
-              placeholder="Tìm theo MSSV, tên, email..."
+              placeholder={t('students.searchPlaceholder')}
+              aria-label={t('students.searchLabel')}
               value={searchStudent}
               onChange={(e) => setSearchStudent(e.target.value)}
               style={{
@@ -265,6 +270,7 @@ const ClassDetailContent: React.FC = () => {
             {searchStudent && (
               <button
                 type="button"
+                aria-label={t('students.clearSearchAria')}
                 onClick={() => setSearchStudent('')}
                 style={{
                   position: 'absolute',
@@ -288,13 +294,13 @@ const ClassDetailContent: React.FC = () => {
           <table className="table" style={{ width: '100%' }}>
             <thead>
               <tr>
-                <th style={{ width: '60px' }}>STT</th>
-                <th>MSSV</th>
-                <th>Họ và tên</th>
-                <th>Email</th>
-                <th>Mã sinh viên</th>
-                <th>Chuyên ngành</th>
-                <th>Trạng thái tài khoản</th>
+                <th style={{ width: '60px' }}>{t('classStudents.index')}</th>
+                <th>{t('students.colRollNumber')}</th>
+                <th>{t('students.colFullName')}</th>
+                <th>{t('students.colEmail')}</th>
+                <th>{t('students.colMemberCode')}</th>
+                <th>{t('students.colMajor')}</th>
+                <th>{t('students.colAccountStatus')}</th>
               </tr>
             </thead>
             <tbody>
@@ -302,8 +308,8 @@ const ClassDetailContent: React.FC = () => {
                 <tr>
                   <td colSpan={7} style={{ textAlign: 'center', padding: '3rem', color: 'var(--color-text-muted)' }}>
                     {searchStudent
-                      ? 'Không tìm thấy sinh viên nào khớp với từ khóa tìm kiếm.'
-                      : 'Lớp học này hiện chưa có sinh viên nào.'}
+                      ? t('classes.noStudentMatches')
+                      : t('classes.noStudents')}
                   </td>
                 </tr>
               ) : (
@@ -365,12 +371,12 @@ const ClassDetailContent: React.FC = () => {
                       {student.activated ? (
                         <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <CheckCircle2 size={13} />
-                          Đã kích hoạt
+                          {t('students.activated')}
                         </span>
                       ) : (
                         <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <Clock size={13} />
-                          Chờ kích hoạt
+                          {t('students.unactivated')}
                         </span>
                       )}
                     </td>

@@ -1,5 +1,7 @@
 # 02 — Luồng sử dụng và đặc tả màn hình
 
+> Luồng bổ sung 12/10/2026: giảng viên đăng nhập → `/lecturer/classes` → `/lecturer/classes/:id` → đọc/chỉnh/lưu quy định. Chi tiết trạng thái và quyền ở [11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md).
+
 [Về mục lục](README.md) · [Hợp đồng API](01-tinh-nang-va-hop-dong-api.md)
 
 ## 1. Nguyên tắc trải nghiệm
