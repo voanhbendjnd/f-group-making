@@ -33,12 +33,7 @@ public class SchoolClass extends AbstractAuditingEntity<Integer>{
         this.rulesVersion = rulesVersion;
     }
     @JsonIgnore
-    @ManyToMany
-    @JoinTable(
-            name = "school_class_deadline",
-            joinColumns = {@JoinColumn(name = "school_class_id", referencedColumnName = "id")},
-            inverseJoinColumns = {@JoinColumn(name = "deadline_id", referencedColumnName = "id")}
-    )
+    @ManyToMany(mappedBy = "schoolClasses")
     @org.hibernate.annotations.Cache(usage = CacheConcurrencyStrategy.NONSTRICT_READ_WRITE)
     @BatchSize(size = 20)
     private List<Deadline> deadlines = new ArrayList<>();

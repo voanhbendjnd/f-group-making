@@ -156,6 +156,14 @@ public class AccountResource {
         userService.activateAccountAndSetPassword(vm.getKey(), vm.getPassword());
     }
 
+    @PostMapping("/account/activate/request")
+    @ResponseStatus(HttpStatus.OK)
+    @ApiMessage("If the email is valid and eligible, activation instructions have been sent.")
+    public void requestSelfActivation(@Valid @RequestBody ResetPasswordInitVM vm) {
+        userService.requestAccountActivation(vm.getEmail())
+                .ifPresent(mailService::sendActivationEmail);
+    }
+
     @GetMapping("/account/reset-password/verify")
     @ApiMessage("Reset key verified successfully")
     public ResponseEntity<ResetKeyVerifyDTO> verifyResetKey(@RequestParam("key") String key) {

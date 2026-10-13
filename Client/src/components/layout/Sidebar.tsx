@@ -11,6 +11,7 @@ import {
   UserCheck,
   GraduationCap,
   Layers,
+  Clock,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
 import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
@@ -75,9 +76,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: t('lecturer.role'),
           icon: <UserCheck size={18} />,
         },
+        {
+          to: '/admin/deadlines',
+          label: t('nav.adminDeadlines'),
+          icon: <Clock size={18} />,
+        },
       ]
     : isLecturer ? [
         { to: '/lecturer/classes', label: t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses'), icon: <Layers size={18} /> },
+        { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
       ] : [
         {
           to: '/student/dashboard',

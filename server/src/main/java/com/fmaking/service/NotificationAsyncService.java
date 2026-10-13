@@ -32,4 +32,36 @@ public class NotificationAsyncService {
             }
         });
     }
+
+    private static final java.time.format.DateTimeFormatter DATE_TIME_FORMATTER =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")
+                    .withZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+
+    @Async
+    public void sendDeadlineNotificationBatch(com.fmaking.domain.Deadline deadline, List<com.fmaking.service.dto.StudentDeadlineRow> students) {
+        if (students == null || students.isEmpty() || deadline == null) {
+            return;
+        }
+        String startTimeStr = DATE_TIME_FORMATTER.format(deadline.getStartTime());
+        String endTimeStr = DATE_TIME_FORMATTER.format(deadline.getEndTime());
+        String clientBaseUrl = mailService.getClientBaseUrl();
+
+        for (com.fmaking.service.dto.StudentDeadlineRow student : students) {
+            try {
+                String targetUrl = String.format("%s/student/groups/select?deadlineId=%d&classId=%d",
+                        clientBaseUrl, deadline.getId(), student.schoolClassId());
+                mailService.sendDeadlineEmailSync(
+                        student.email(),
+                        student.fullName(),
+                        deadline.getName(),
+                        deadline.getDescription(),
+                        startTimeStr,
+                        endTimeStr,
+                        targetUrl
+                );
+            } catch (Exception e) {
+                log.error("Failed to send deadline notification email to student {} ({})", student.email(), student.userId(), e);
+            }
+        }
+    }
 }
