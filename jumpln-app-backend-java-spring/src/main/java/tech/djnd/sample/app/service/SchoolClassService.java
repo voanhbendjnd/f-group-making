@@ -4,8 +4,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
 import tech.djnd.sample.app.repository.SchoolClassRepository;
+import tech.djnd.sample.app.repository.LecturerRepository;
 import tech.djnd.sample.app.repository.StudentRepository;
 import tech.djnd.sample.app.service.dto.ResultPaginationDTO;
 import tech.djnd.sample.app.service.dto.SchoolClassDTO;
@@ -13,9 +15,11 @@ import tech.djnd.sample.app.service.dto.StudentDTO;
 import tech.djnd.sample.app.service.errors.BadRequestResourceException;
 import tech.djnd.sample.app.service.projection.StudentRow;
 import tech.djnd.sample.app.web.rest.errors.NotFoundAlertException;
+import tech.djnd.sample.app.web.rest.errors.ConflictAlertException;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -26,17 +30,40 @@ public class SchoolClassService {
     private final StudentRepository studentRepository;
     private final SchoolClassAccessService accessService;
     private final TermService termService;
+    private final LecturerRepository lecturerRepository;
 
     public SchoolClassService(
             SchoolClassRepository schoolClassRepository,
             StudentRepository studentRepository,
             SchoolClassAccessService accessService,
-            TermService termService
+            TermService termService,
+            LecturerRepository lecturerRepository
     ) {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
         this.accessService = accessService;
         this.termService = termService;
+        this.lecturerRepository = lecturerRepository;
+    }
+
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public SchoolClassDTO assignLecturer(Integer classId, Long lecturerId, Long expectedLecturerId) {
+        var schoolClass = schoolClassRepository.findByIdForUpdate(classId)
+                .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
+        if (!Objects.equals(schoolClass.getLecturerId(), expectedLecturerId)) {
+            throw new ConflictAlertException("The class lecturer has changed", "schoolClass", "lecturerAssignmentConflict");
+        }
+        if (lecturerId == null || lecturerId <= 0) {
+            throw new BadRequestResourceException("A positive lecturer ID is required", "schoolClass", "invalidLecturerId");
+        }
+        if (!lecturerRepository.existsById(lecturerId)) {
+            throw new NotFoundAlertException("Lecturer not found", "schoolClass", "lecturerNotFound");
+        }
+        if (!Objects.equals(schoolClass.getLecturerId(), lecturerId)) {
+            schoolClass.setLecturerId(lecturerId);
+            schoolClassRepository.saveAndFlush(schoolClass);
+        }
+        return schoolClassRepository.findClassDTOById(classId).orElseThrow();
     }
 
     /**

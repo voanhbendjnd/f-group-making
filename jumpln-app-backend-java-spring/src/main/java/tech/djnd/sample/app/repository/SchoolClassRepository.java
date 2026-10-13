@@ -19,6 +19,11 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
 
     Optional<SchoolClass> findByNameIgnoreCaseAndTermId(String name, Integer termId);
 
+    // Import and manual assignment must serialize against the same class row.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT sc FROM SchoolClass sc WHERE LOWER(sc.name) = LOWER(:name) AND sc.termId = :termId")
+    Optional<SchoolClass> findByNameAndTermIdForUpdate(@Param("name") String name, @Param("termId") Integer termId);
+
     List<SchoolClass> findByTermId(Integer termId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

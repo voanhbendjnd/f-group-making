@@ -1,6 +1,7 @@
 package tech.djnd.sample.app.web.rest;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -8,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import tech.djnd.sample.app.service.SchoolClassService;
+import tech.djnd.sample.app.service.dto.AssignClassLecturerDTO;
 import tech.djnd.sample.app.service.dto.ResultPaginationDTO;
 import tech.djnd.sample.app.service.dto.SchoolClassDTO;
 import tech.djnd.sample.app.service.dto.StudentDTO;
@@ -69,5 +71,13 @@ public class SchoolClassResource {
         log.debug("REST request to get students of class: id={}", id);
         List<StudentDTO> result = schoolClassService.getStudentsByClassId(id);
         return ResponseEntity.ok(result);
+    }
+
+    @PutMapping("/{id}/lecturer")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @ApiMessage("Assign class lecturer successfully")
+    public ResponseEntity<SchoolClassDTO> assignLecturer(
+            @PathVariable("id") Integer id, @Valid @RequestBody AssignClassLecturerDTO request) {
+        return ResponseEntity.ok(schoolClassService.assignLecturer(id, request.lecturerId(), request.expectedLecturerId()));
     }
 }
