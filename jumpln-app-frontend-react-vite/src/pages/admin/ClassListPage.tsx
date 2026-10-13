@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTerm } from '@/app/providers/TermContext';
@@ -17,6 +18,7 @@ import type { SchoolClass, SchoolClassFilterParams } from '@/features/classes/ty
 export const ClassListPage: React.FC = () => <TermScope><ClassListContent /></TermScope>;
 
 const ClassListContent: React.FC = () => {
+  const { t } = useTranslation();
   const { selectedTermId } = useTerm();
   const navigate = useNavigate();
 
@@ -54,11 +56,11 @@ const ClassListContent: React.FC = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Quản lý Lớp học"
-        description="Xem danh sách các lớp học theo kỳ, giảng viên phụ trách và sĩ số sinh viên."
+        title={t('classes.title')}
+        description={t('classes.description')}
         breadcrumbs={[
-          { label: 'Admin', href: '/admin/dashboard' },
-          { label: 'Lớp học' },
+          { label: t('breadcrumbs.admin'), href: '/admin/dashboard' },
+          { label: t('classes.label') },
         ]}
         action={
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -68,7 +70,7 @@ const ClassListContent: React.FC = () => {
               icon={<Upload size={16} />}
               onClick={() => navigate('/admin/students/import')}
             >
-              Import sinh viên & Lớp
+              {t('classes.import')}
             </Button>
           </div>
         }
@@ -84,12 +86,12 @@ const ClassListContent: React.FC = () => {
       {/* Main Content Area */}
       {isLoading ? (
         <div className="card" style={{ padding: '3rem' }}>
-          <LoadingSpinner message="Đang tải danh sách lớp học..." />
+          <LoadingSpinner message={t('classes.loadingList')} />
         </div>
       ) : isError ? (
         <div className="card" style={{ padding: '2rem' }}>
           <ErrorState
-            message={(error as any)?.message || 'Không thể tải danh sách lớp học.'}
+            message={(error as any)?.message || t('classes.loadFailed')}
             onRetry={() => refetch()}
           />
         </div>
@@ -109,7 +111,7 @@ const ClassListContent: React.FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Layers size={18} style={{ color: 'var(--color-primary, #4f6bed)' }} />
               <span style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--color-text-main)' }}>
-                Tổng số lớp học:
+                {t('classes.total')}
               </span>
               <span
                 style={{

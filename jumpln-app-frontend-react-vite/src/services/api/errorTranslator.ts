@@ -19,6 +19,12 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'error.lecturerAssignmentConflict':
+    case 'lecturerAssignmentConflict':
+      return i18n.t('classAssignment.conflict');
+    case 'error.lecturerNotFound':
+    case 'lecturerNotFound':
+      return i18n.t('classAssignment.lecturerNotFound');
     case 'termNotFound':
     case 'error.termNotFound':
       return i18n.t('terms.invalid');

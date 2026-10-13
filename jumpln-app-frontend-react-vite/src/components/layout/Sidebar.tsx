@@ -52,7 +52,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           to: '/admin/classes',
-          label: 'Lớp học',
+          label: t('classes.label'),
           icon: <Layers size={18} />,
         },
         {
@@ -72,7 +72,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
         {
           to: '/admin/lecturers',
-          label: 'Giảng viên',
+          label: t('lecturer.role'),
           icon: <UserCheck size={18} />,
         },
       ]
