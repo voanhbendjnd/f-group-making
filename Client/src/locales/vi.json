@@ -616,5 +616,40 @@
       "classAccessDenied": "Bạn không được phân công phụ trách lớp này.",
       "rulesVersionConflict": "Quy định đã thay đổi. Đọc lại quy định trước khi lưu tiếp."
     }
+  },
+  "accountPreview": {
+    "noGroup": "Hiện tại chưa có nhóm",
+    "loading": "Đang tải thông tin học tập...",
+    "noProfile": "Chưa có hồ sơ sinh viên liên kết.",
+    "loadError": "Chưa thể tải thông tin học tập.",
+    "refreshError": "Chưa thể cập nhật thông tin. Đang hiển thị dữ liệu đã tải."
+  },
+  "studentProfile": {
+    "title": "Hồ sơ của tôi",
+    "description": "Thông tin cá nhân và học tập của bạn.",
+    "details": "Thông tin hồ sơ sinh viên",
+    "studentId": "MSSV",
+    "major": "Ngành học",
+    "class": "Lớp",
+    "term": "Học kỳ",
+    "email": "Email",
+    "group": "Nhóm hiện tại",
+    "active": "Tài khoản đã kích hoạt",
+    "inactive": "Tài khoản chưa kích hoạt",
+    "loading": "Đang tải hồ sơ...",
+    "error": "Không thể tải hồ sơ. Vui lòng thử lại.",
+    "forbidden": "Bạn không có quyền xem hồ sơ sinh viên.",
+    "emptyTitle": "Chưa có hồ sơ sinh viên",
+    "emptyDescription": "Tài khoản của bạn chưa được liên kết với hồ sơ sinh viên. Vui lòng liên hệ quản trị viên.",
+    "missingName": "Chưa có họ tên",
+    "unavailable": "Chưa có thông tin",
+    "invalidLink": "Thông tin liên kết chưa hợp lệ",
+    "noMajor": "Chưa có ngành học",
+    "noClass": "Chưa được phân lớp",
+    "noTerm": "Chưa có thông tin học kỳ",
+    "noGroup": "Hiện tại bạn chưa có nhóm",
+    "account": "Tài khoản",
+    "accountDetails": "Thông tin tài khoản",
+    "open": "Xem hồ sơ của tôi"
   }
 }

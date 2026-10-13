@@ -32,6 +32,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, isAdmin: hasAdminRole, logout } = useAuth();
   const isAdmin = area ? area === 'admin' : hasAdminRole;
   const isLecturer = area === 'lecturer';
+  const isStudentArea = !isAdmin && !isLecturer;
+  const FooterProfile = isStudentArea ? 'button' : 'div';
   const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
   const allClasses = canViewAllClasses(user?.authorities || []);
 
@@ -85,6 +87,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <LayoutDashboard size={18} />,
         },
       ];
+
+  if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
 
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
@@ -207,7 +211,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           justifyContent: 'space-between',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
+        <FooterProfile className={isStudentArea ? 'sidebar-profile-link' : undefined}
+          type={isStudentArea ? 'button' : undefined}
+          aria-label={isStudentArea ? t('studentProfile.open') : undefined}
+          onClick={isStudentArea ? () => { navigate('/student/profile'); onClose?.(); } : undefined}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
           <div
             style={{
               width: '36px',
@@ -252,7 +260,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
           </div>
-        </div>
+        </FooterProfile>
 
         <button
           type="button"

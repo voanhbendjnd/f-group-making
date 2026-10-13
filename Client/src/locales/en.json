@@ -616,5 +616,40 @@
       "classAccessDenied": "You are not assigned to this class.",
       "rulesVersionConflict": "The rules changed. Read the current rules before saving again."
     }
+  },
+  "accountPreview": {
+    "noGroup": "You are not in a group yet",
+    "loading": "Loading academic information...",
+    "noProfile": "No student profile is linked to this account.",
+    "loadError": "Academic information is currently unavailable.",
+    "refreshError": "Unable to update information. Showing previously loaded data."
+  },
+  "studentProfile": {
+    "title": "My Profile",
+    "description": "Your personal and academic account information.",
+    "details": "Student profile information",
+    "studentId": "Student ID",
+    "major": "Major",
+    "class": "Class",
+    "term": "Academic Term",
+    "email": "Email",
+    "group": "Current Group",
+    "active": "Account activated",
+    "inactive": "Account not activated",
+    "loading": "Loading your profile...",
+    "error": "Unable to load your profile. Please try again.",
+    "forbidden": "You do not have permission to view a student profile.",
+    "emptyTitle": "No student profile",
+    "emptyDescription": "Your account is not linked to a student profile. Please contact an administrator.",
+    "missingName": "Name unavailable",
+    "unavailable": "Information unavailable",
+    "invalidLink": "Linked information is invalid",
+    "noMajor": "No major assigned",
+    "noClass": "No class assigned",
+    "noTerm": "Academic term unavailable",
+    "noGroup": "You are not in a group yet",
+    "account": "Account",
+    "accountDetails": "Account information",
+    "open": "View my profile"
   }
 }

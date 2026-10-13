@@ -1,5 +1,6 @@
 import React from 'react';
-import { Menu, LogOut, User as UserIcon } from 'lucide-react';
+import { Menu, LogOut } from 'lucide-react';
+import { AccountPopover } from './AccountPopover';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +17,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   isSidebarCollapsed = false,
 }) => {
-  const { user, isAdmin: hasAdminRole, logout } = useAuth();
+  const { isAdmin: hasAdminRole, logout } = useAuth();
   const isAdmin = area ? area === 'admin' : hasAdminRole;
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -65,12 +66,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       <div className="top-navbar-actions">
         <LanguageSwitcher size="sm" />
 
-        <div className="top-navbar-profile">
-          <UserIcon size={16} style={{ color: 'var(--color-text-subtle)' }} />
-          <span style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
-            {user?.name || user?.email}
-          </span>
-        </div>
+        <AccountPopover />
 
         <button
           type="button"
