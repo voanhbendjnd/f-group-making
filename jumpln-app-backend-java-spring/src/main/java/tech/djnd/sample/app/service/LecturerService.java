@@ -44,6 +44,7 @@ public class LecturerService {
     private final UserService userService;
     private final NotificationAsyncService notificationAsyncService;
     private final org.springframework.cache.CacheManager cacheManager;
+    private final TermService termService;
 
     public LecturerService(
             LecturerRepository lecturerRepository,
@@ -52,7 +53,8 @@ public class LecturerService {
             AuthorityRepository authorityRepository,
             UserService userService,
             NotificationAsyncService notificationAsyncService,
-            org.springframework.cache.CacheManager cacheManager
+            org.springframework.cache.CacheManager cacheManager,
+            TermService termService
     ) {
         this.lecturerRepository = lecturerRepository;
         this.lecturerQueryRepository = lecturerQueryRepository;
@@ -61,6 +63,7 @@ public class LecturerService {
         this.userService = userService;
         this.notificationAsyncService = notificationAsyncService;
         this.cacheManager = cacheManager;
+        this.termService = termService;
     }
 
     /**
@@ -131,8 +134,16 @@ public class LecturerService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getLecturers(
             String search, Boolean activated, Boolean hasActivationKey, Pageable pageable) {
+        return getLecturers(search, activated, hasActivationKey, pageable, null);
+    }
 
-        Specification<Lecturer> spec = LecturerSpecifications.withFilter(search, activated, hasActivationKey);
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getLecturers(String search, Boolean activated, Boolean hasActivationKey,
+            Pageable pageable, Integer termId) {
+        termService.validateTerm(termId);
+
+        Specification<Lecturer> spec = LecturerSpecifications.withFilter(search, activated, hasActivationKey)
+                .and(LecturerSpecifications.withTerm(termId));
         Page<LecturerRow> page = lecturerQueryRepository.search(spec, pageable);
 
         List<LecturerDTO> dtoList = page.getContent().stream()
@@ -153,7 +164,13 @@ public class LecturerService {
     }
 
     public BatchActivationResultDTO activateAllMatching(String search) {
-        Specification<Lecturer> spec = LecturerSpecifications.withFilter(search, false, null);
+        return activateAllMatching(search, null);
+    }
+
+    public BatchActivationResultDTO activateAllMatching(String search, Integer termId) {
+        termService.validateTerm(termId);
+        Specification<Lecturer> spec = LecturerSpecifications.withFilter(search, false, null)
+                .and(LecturerSpecifications.withTerm(termId));
         List<Lecturer> matchingLecturers = lecturerRepository.findAll(spec);
 
         List<Long> userIds = matchingLecturers.stream()
@@ -453,10 +470,23 @@ public class LecturerService {
     }
 
     public void deleteLecturers(List<Long> userIds) {
+        deleteLecturers(userIds, null);
+    }
+
+    public void deleteLecturers(List<Long> userIds, Integer termId) {
+        termService.validateUserIdsInTerm(userIds, termId);
         if (userIds == null || userIds.isEmpty()) {
             return;
         }
         List<Long> distinctIds = userIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (termId != null) {
+            long matching = lecturerRepository.findAll(LecturerSpecifications.withTerm(termId)).stream()
+                    .filter(lecturer -> distinctIds.contains(lecturer.getUserId())).count();
+            if (matching != distinctIds.size()) {
+                throw new tech.djnd.sample.app.service.errors.BadRequestResourceException(
+                        "One or more lecturers do not belong to the selected term", "lecturerManagement", "lecturerOutsideTerm");
+            }
+        }
         List<Lecturer> lecturers = lecturerRepository.findAllById(distinctIds);
         if (!lecturers.isEmpty()) {
             lecturerRepository.deleteAll(lecturers);

@@ -19,6 +19,14 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'termNotFound':
+    case 'error.termNotFound':
+      return i18n.t('terms.invalid');
+    case 'userOutsideTerm':
+    case 'error.userOutsideTerm':
+    case 'lecturerOutsideTerm':
+    case 'error.lecturerOutsideTerm':
+      return i18n.t('terms.outsideScope');
     case 'error.emailnotfound':
     case 'emailnotfound':
       return i18n.t('errors.emailNotFound');

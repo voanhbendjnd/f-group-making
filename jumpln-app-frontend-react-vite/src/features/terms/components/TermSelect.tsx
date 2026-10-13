@@ -1,14 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
+import { useTerm } from '@/app/providers/TermContext';
 import { CalendarDays, ChevronDown, Plus, Check, Info } from 'lucide-react';
 import { termApi } from '../api/termApi';
-import type { Term } from '../types';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
 import { useToast } from '@/app/providers/ToastContext';
 
 interface TermSelectProps {
-  selectedTermId: number | null;
-  onSelectTerm: (termId: number) => void;
+  compact?: boolean;
   disabled?: boolean;
 }
 
@@ -93,50 +94,126 @@ const STYLES = `
 .ts-error{margin:8px 0 0; font-size:13px; color:var(--ts-danger)}
 .ts-actions{display:flex; justify-content:flex-end; gap:8px; padding-top:16px; border-top:1px solid #f3f4f6}
 @media (max-width:480px){.ts-seasons{grid-template-columns:1fr}}
+
+/* Term filter uses the existing F-Team design tokens. The menu is portalled. */
+.ts-root{--ts-accent:var(--color-primary);--ts-accent-soft:var(--color-primary-light);--ts-accent-soft-hover:var(--color-primary-border);--ts-border:var(--color-border);--ts-text:var(--color-text-main);--ts-muted:var(--color-text-muted);--ts-danger:var(--color-error);--ts-ok:var(--color-success);background:var(--color-surface);box-shadow:var(--shadow-xs)}
+.ts-label{color:var(--color-text-muted);min-width:0}
+.ts-badge{margin-left:auto;gap:4px;padding:3px 7px;color:var(--color-success);background:var(--color-success-bg);font-size:11px}
+.ts-dot::before,.ts-dot::after{background:var(--color-success)}
+.ts-select{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;text-align:left;font-family:inherit;font-size:14px;font-weight:600;line-height:1.4;padding:10px 12px;background:var(--color-surface-muted);border-color:var(--color-border);border-radius:var(--radius-md)}
+.ts-select:hover:not(:disabled){background:var(--color-surface-hover);border-color:var(--color-border-hover)}
+.ts-select:focus-visible{outline:2px solid var(--color-primary);outline-offset:2px;box-shadow:none}
+.ts-select:focus{border-color:var(--color-border-focus);background:var(--color-surface);box-shadow:none}
+.ts-chevron{position:static;transform:none;flex-shrink:0;color:var(--color-text-subtle);transition:transform var(--transition-fast)}
+.ts-chevron.is-open{transform:rotate(180deg)}
+.ts-compact{display:flex;flex-direction:column;align-items:stretch;width:100%;padding:8px;border-radius:var(--radius-md)}
+.ts-compact .ts-label{padding:0;margin-bottom:6px;font-size:12px;gap:6px}
+.ts-compact .ts-label > span:nth-child(2){min-width:0;white-space:normal;line-height:1.4}
+.ts-compact .ts-label-icon{width:26px;height:26px;border-radius:var(--radius-sm);flex-shrink:0}
+.ts-compact .ts-select-wrap{min-width:0}
+.ts-menu{z-index:101;overflow-y:auto;overscroll-behavior:contain;padding:4px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);box-shadow:var(--shadow-lg);font-family:var(--font-family)}
+.ts-option{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:40px;padding:9px 10px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;color:var(--color-text-main);cursor:pointer}
+.ts-option.is-active{background:var(--color-surface-muted);outline:1px solid var(--color-border);outline-offset:-1px}
+.ts-option[aria-selected="true"]{background:var(--color-primary-light);color:var(--color-primary);font-weight:600}
+.ts-option[aria-selected="true"].is-active{outline-color:var(--color-primary-border)}
+.ts-option-current{margin-left:8px;font-size:11px;font-weight:500;color:var(--color-success)}
 `;
 
 export const TermSelect: React.FC<TermSelectProps> = ({
-                                                        selectedTermId,
-                                                        onSelectTerm,
+                                                        compact = false,
                                                         disabled = false,
                                                       }) => {
   const { success, error: toastError } = useToast();
-  const [terms, setTerms] = useState<Term[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const { t } = useTranslation();
+  const { terms, currentTerm, selectedTermId, selectedTerm, selectTerm: onSelectTerm, isLoading,
+    isError, isLocked, refreshTerms, lockTermSelection } = useTerm();
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({});
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
+  const selectDisabled = disabled || isLoading || isError || isLocked || terms.length === 0;
+
+  const openMenu = (last = false) => {
+    if (selectDisabled || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const below = window.innerHeight - rect.bottom - 16;
+    const above = rect.top - 16;
+    const opensAbove = below < 160 && above > below;
+    const width = Math.min(rect.width, window.innerWidth - 16);
+    setMenuStyle({
+      position: 'fixed', width,
+      left: Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)),
+      ...(opensAbove ? { bottom: window.innerHeight - rect.top + 6 } : { top: rect.bottom + 6 }),
+      maxHeight: Math.min(280, Math.max(48, opensAbove ? above : below)),
+    });
+    const selectedIndex = terms.findIndex((term) => term.id === selectedTermId);
+    setActiveIndex(last ? terms.length - 1 : Math.max(0, selectedIndex));
+    setIsMenuOpen(true);
+  };
+
+  if (selectDisabled && isMenuOpen) setIsMenuOpen(false);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const closeOutside = (event: Event) => {
+      const target = event.target as Node;
+      if (!triggerRef.current?.contains(target) && !menuRef.current?.contains(target)) setIsMenuOpen(false);
+    };
+    const closeOnLayoutChange = (event: Event) => {
+      if (event.type !== 'scroll' || !menuRef.current?.contains(event.target as Node)) setIsMenuOpen(false);
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('focusin', closeOutside);
+    window.addEventListener('resize', closeOnLayoutChange);
+    document.addEventListener('scroll', closeOnLayoutChange, true);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('focusin', closeOutside);
+      window.removeEventListener('resize', closeOnLayoutChange);
+      document.removeEventListener('scroll', closeOnLayoutChange, true);
+    };
+  }, [isMenuOpen]);
+
+  useEffect(() => {
+    if (isMenuOpen) menuRef.current?.children[activeIndex]?.scrollIntoView?.({ block: 'nearest' });
+  }, [activeIndex, isMenuOpen]);
+
+  const handleSelectTerm = (termId: number) => {
+    if (selectDisabled) return;
+    onSelectTerm(termId);
+    setIsMenuOpen(false);
+    triggerRef.current?.focus();
+  };
+
+  const handleSelectKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key === 'Tab') { setIsMenuOpen(false); return; }
+    if (event.key === 'Escape') { event.preventDefault(); setIsMenuOpen(false); return; }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      if (!isMenuOpen) openMenu(event.key === 'ArrowUp');
+      else setActiveIndex((index) => (index + (event.key === 'ArrowDown' ? 1 : -1) + terms.length) % terms.length);
+    } else if (event.key === 'Home' || event.key === 'End') {
+      event.preventDefault();
+      if (!isMenuOpen) openMenu();
+      setActiveIndex(event.key === 'Home' ? 0 : terms.length - 1);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      if (isMenuOpen && terms[activeIndex]) handleSelectTerm(terms[activeIndex].id);
+      else openMenu();
+    } else if (isMenuOpen && event.key.length === 1) {
+      const index = terms.findIndex((term) => term.name.toLowerCase().startsWith(event.key.toLowerCase()));
+      if (index >= 0) { event.preventDefault(); setActiveIndex(index); }
+    }
+  };
 
   // Modal create term state
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [newTermName, setNewTermName] = useState<string>('');
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  const fetchTerms = async () => {
-    try {
-      setIsLoading(true);
-      const data = await termApi.getTerms(true);
-      setTerms(data);
-
-      // If no term selected yet, default to the current active term
-      if (selectedTermId === null && data.length > 0) {
-        const current = data.find((t) => t.isCurrent);
-        onSelectTerm(current ? current.id : data[0].id);
-      }
-    } catch (err: any) {
-      toastError(err?.response?.data?.message || 'Không thể tải danh sách học kỳ.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchTerms();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const selectedTerm = useMemo(
-      () => terms.find((t) => t.id === selectedTermId) ?? null,
-      [terms, selectedTermId],
-  );
 
   const handleOpenModal = () => {
     setNewTermName('');
@@ -160,6 +237,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
 
   const handleCreateTerm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isCreating || isLocked) return;
     const cleanName = newTermName.trim().toUpperCase();
 
     if (!cleanName) {
@@ -172,6 +250,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
       return;
     }
 
+    const unlock = lockTermSelection();
     try {
       setIsCreating(true);
       setFormError(null);
@@ -180,71 +259,90 @@ export const TermSelect: React.FC<TermSelectProps> = ({
       setIsModalOpen(false);
 
       // Refresh terms list and select newly created term
-      const updatedList = await termApi.getTerms(true);
-      setTerms(updatedList);
-      onSelectTerm(created.id);
+      const updated = await refreshTerms();
+      if (updated.isError) toastError(t('terms.loadError'));
+      else {
+        unlock();
+        onSelectTerm(created.id);
+      }
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Tạo học kỳ thất bại. Vui lòng kiểm tra lại.';
+      const msg = err?.message || 'Tạo học kỳ thất bại. Vui lòng kiểm tra lại.';
       setFormError(msg);
     } finally {
       setIsCreating(false);
+      unlock();
     }
   };
 
   return (
-      <div className="ts-root">
+      <div className={`ts-root${compact ? ' ts-compact' : ''}`}>
         <style>{STYLES}</style>
-
         <div className="ts-label">
         <span className="ts-label-icon">
           <CalendarDays size={16} />
         </span>
-          <span>Học kỳ áp dụng</span>
+          <span>{t('terms.label')}</span>
+          {currentTerm && <span className="ts-badge" title={`${t('terms.current')}: ${currentTerm.name}`}>
+            <span className="ts-dot" aria-hidden="true" />
+            {t('terms.current')}{selectedTermId !== currentTerm.id ? ` · ${currentTerm.name}` : ''}
+          </span>}
         </div>
 
         <div className="ts-select-wrap">
-          <select
+          <button
+              ref={triggerRef}
+              type="button"
+              role="combobox"
               className="ts-select"
-              value={selectedTermId ?? ''}
-              onChange={(e) => onSelectTerm(Number(e.target.value))}
-              disabled={disabled || isLoading}
-              aria-label="Chọn học kỳ"
+              aria-label={t('terms.label')}
+              aria-haspopup="listbox"
+              aria-expanded={isMenuOpen}
+              aria-controls={isMenuOpen ? listId : undefined}
+              aria-activedescendant={isMenuOpen ? `${listId}-option-${activeIndex}` : undefined}
+              disabled={selectDisabled}
+              onClick={() => isMenuOpen ? setIsMenuOpen(false) : openMenu()}
+              onKeyDown={handleSelectKeyDown}
           >
-            {isLoading ? (
-                <option value="">Đang tải học kỳ...</option>
-            ) : terms.length === 0 ? (
-                <option value="">Không có học kỳ khả dụng</option>
-            ) : (
-                terms.map((term) => (
-                    <option key={term.id} value={term.id}>
-                      {term.name}
-                      {term.isCurrent ? ' (Hiện tại)' : ''}
-                    </option>
-                ))
-            )}
-          </select>
-          <ChevronDown className="ts-chevron" />
+            <span>{isLoading ? t('terms.loading') : selectedTerm?.name ?? (terms.length === 0 ? t('terms.empty') : t('terms.selectRequired'))}</span>
+            <ChevronDown size={16} className={isMenuOpen ? 'ts-chevron is-open' : 'ts-chevron'} aria-hidden="true" />
+          </button>
+          {isMenuOpen && createPortal(
+            <div ref={menuRef} id={listId} role="listbox" aria-label={t('terms.label')} className="ts-menu" style={menuStyle}>
+              {terms.map((term, index) => (
+                <div
+                    key={term.id}
+                    id={`${listId}-option-${index}`}
+                    role="option"
+                    aria-selected={term.id === selectedTermId}
+                    className={`ts-option${index === activeIndex ? ' is-active' : ''}`}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => handleSelectTerm(term.id)}
+                >
+                  <span>{term.name}{term.id === currentTerm?.id && <span className="ts-option-current">{t('terms.current')}</span>}</span>
+                  {term.id === selectedTermId && <Check size={16} aria-hidden="true" />}
+                </div>
+              ))}
+            </div>, document.body,
+          )}
         </div>
 
-        {selectedTerm?.isCurrent && (
-            <span className="ts-badge">
-          <span className="ts-dot" />
-          Đang diễn ra
-        </span>
-        )}
+        {isLocked && <p role="status" className="ts-hint">{t('terms.busy')}</p>}
+        {isError && <div role="alert" className="ts-error">{t('terms.loadError')}{' '}
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => void refreshTerms()}>{t('common.retry')}</button>
+        </div>}
+        {!compact && <span className="ts-sep" />}
 
-        <span className="ts-sep" />
-
-        <button
+        {!compact && <button
             type="button"
             className="ts-add"
             onClick={handleOpenModal}
-            disabled={disabled}
+            disabled={disabled || isLocked || isLoading || isError}
             title="Tạo học kỳ tương lai"
         >
           <Plus size={16} />
           <span>Tạo kỳ mới</span>
-        </button>
+        </button>}
 
         <Modal
             open={isModalOpen}

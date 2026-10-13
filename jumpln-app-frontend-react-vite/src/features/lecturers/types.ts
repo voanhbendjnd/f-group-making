@@ -12,6 +12,7 @@ export interface Lecturer {
 }
 
 export interface LecturerFilterParams {
+  termId?: number;
   search?: string;
   activated?: boolean;
   hasActivationKey?: boolean;

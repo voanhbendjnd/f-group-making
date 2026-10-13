@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, keepPreviousData } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 import { Layers, Upload } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
@@ -12,7 +14,10 @@ import { ClassTable } from '@/features/classes/components/ClassTable';
 import { classApi } from '@/features/classes/api/classApi';
 import type { SchoolClass, SchoolClassFilterParams } from '@/features/classes/types';
 
-export const ClassListPage: React.FC = () => {
+export const ClassListPage: React.FC = () => <TermScope><ClassListContent /></TermScope>;
+
+const ClassListContent: React.FC = () => {
+  const { selectedTermId } = useTerm();
   const navigate = useNavigate();
 
   const [filters, setFilters] = useState<SchoolClassFilterParams>({
@@ -22,9 +27,8 @@ export const ClassListPage: React.FC = () => {
   });
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['school-classes', filters],
-    queryFn: () => classApi.getClasses(filters),
-    placeholderData: keepPreviousData,
+    queryKey: ['school-classes', selectedTermId, filters],
+    queryFn: () => classApi.getClasses({ ...filters, termId: selectedTermId! }),
   });
 
   const classes = data?.result || [];

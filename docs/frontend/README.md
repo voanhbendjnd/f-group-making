@@ -1,5 +1,7 @@
 # Đặc tả frontend React — F Group Making
 
+**Cập nhật 12/10/2026:** Frontend đã triển khai Academic Term Filter. Xem [11 — Academic Term Filter](11-academic-term-filter.md) cho state, API, cache và nghiệm thu mới; các phần dưới có nội dung thiết kế từ 29/09/2026.
+
 > Mục tiêu ưu tiên: người không rành công nghệ biết mình đang ở đâu, cần làm gì tiếp theo và thao tác vừa rồi đã có kết quả gì.
 
 Bộ tài liệu này là căn cứ triển khai frontend, thiết kế giao diện và phối hợp giữa người phát triển với agent. Đây là tài liệu thiết kế; chưa tạo ứng dụng React, chưa thay đổi backend, chưa gọi API để ghi dữ liệu hoặc gửi email.

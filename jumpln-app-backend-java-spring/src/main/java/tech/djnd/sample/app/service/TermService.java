@@ -24,6 +24,36 @@ public class TermService {
         this.termRepository = termRepository;
     }
 
+    @Transactional(readOnly = true)
+    public void validateTerm(Integer termId) {
+        if (termId != null && (termId <= 0 || !termRepository.existsById(termId))) {
+            throw new BadRequestResourceException("Term not found", "termManagement", "termNotFound");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void validateUserIdsInTerm(List<Long> userIds, Integer termId) {
+        validateTerm(termId);
+        if (termId == null) return;
+        if (userIds == null || userIds.isEmpty() || userIds.stream().anyMatch(java.util.Objects::isNull)) {
+            throw new BadRequestResourceException("User IDs must not be empty or null", "termManagement", "invalidids");
+        }
+        List<Long> distinctIds = userIds.stream().distinct().toList();
+        if (termRepository.findUserIdsInTerm(distinctIds, termId).size() != distinctIds.size()) {
+            throw new BadRequestResourceException("One or more users do not belong to the selected term",
+                    "termManagement", "userOutsideTerm");
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void validateEmailInTerm(String email, Integer termId) {
+        validateTerm(termId);
+        if (termId == null) return;
+        Long userId = termRepository.findUserIdByEmail(email.trim())
+                .orElseThrow(() -> new BadRequestResourceException("User not found", "termManagement", "usernotfound"));
+        validateUserIdsInTerm(List.of(userId), termId);
+    }
+
     /**
      * Ensures that the current active term exists in DB. If not, automatically creates it.
      */

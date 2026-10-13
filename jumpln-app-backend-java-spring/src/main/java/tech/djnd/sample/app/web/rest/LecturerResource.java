@@ -44,11 +44,12 @@ public class LecturerResource {
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "activated", required = false) Boolean activated,
             @RequestParam(name = "hasActivationKey", required = false) Boolean hasActivationKey,
+            @RequestParam(name = "termId", required = false) Integer termId,
             @PageableDefault(size = 20, sort = {"createdDate", "userId"}, direction = Sort.Direction.DESC) Pageable pageable) {
 
         log.debug("REST request to get lecturers with filter: search={}, activated={}, hasKey={}",
                 search, activated, hasActivationKey);
-        ResultPaginationDTO result = lecturerService.getLecturers(search, activated, hasActivationKey, pageable);
+        ResultPaginationDTO result = lecturerService.getLecturers(search, activated, hasActivationKey, pageable, termId);
         return ResponseEntity.ok(result);
     }
 
@@ -78,10 +79,11 @@ public class LecturerResource {
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     @ApiMessage("Batch activation emails sent successfully")
     public ResponseEntity<BatchActivationResultDTO> activateAllMatching(
-            @RequestParam(name = "search", required = false) String search) {
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "termId", required = false) Integer termId) {
 
         log.debug("REST request to activate all matching lecturers: search={}", search);
-        BatchActivationResultDTO result = lecturerService.activateAllMatching(search);
+        BatchActivationResultDTO result = lecturerService.activateAllMatching(search, termId);
         return ResponseEntity.ok(result);
     }
 
@@ -103,9 +105,10 @@ public class LecturerResource {
     @PostMapping("/batch-delete")
     @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
     @ApiMessage("Delete lecturers successfully")
-    public ResponseEntity<Void> deleteLecturersBatch(@RequestBody java.util.List<Long> userIds) {
+    public ResponseEntity<Void> deleteLecturersBatch(@RequestBody java.util.List<Long> userIds,
+            @RequestParam(name = "termId", required = false) Integer termId) {
         log.debug("REST request to delete batch lecturers: userIds={}", userIds);
-        lecturerService.deleteLecturers(userIds);
+        lecturerService.deleteLecturers(userIds, termId);
         return ResponseEntity.noContent().build();
     }
 }

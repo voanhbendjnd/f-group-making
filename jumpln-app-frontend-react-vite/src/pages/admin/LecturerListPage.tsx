@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 import { Upload, Users, Mail, Trash2, Clock } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
@@ -9,6 +12,7 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Pagination } from '@/components/common/Pagination';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { Select } from '@/components/common/Select';
 import { LecturerFilterBar } from '@/features/lecturers/components/LecturerFilterBar';
 import { LecturerTable } from '@/features/lecturers/components/LecturerTable';
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
@@ -16,6 +20,34 @@ import { useToast } from '@/app/providers/ToastContext';
 import type { Lecturer, LecturerFilterParams } from '@/features/lecturers/types';
 
 export const LecturerListPage: React.FC = () => {
+  const { t } = useTranslation();
+  const { isLocked } = useTerm();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const global = searchParams.get('scope') === 'all';
+
+  return <div>
+    <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
+      <Select id="lecturer-scope" label={t('terms.lecturerScope')} value={global ? 'all' : 'term'} disabled={isLocked}
+        options={[
+          { value: 'term', label: t('terms.selectedTermScope') },
+          { value: 'all', label: t('terms.allLecturers') },
+        ]}
+        onChange={(event) => {
+          const next = new URLSearchParams(searchParams);
+          if (event.target.value === 'all') next.set('scope', 'all');
+          else next.delete('scope');
+          setSearchParams(next);
+        }} />
+      {global && <p className="card-subtitle" style={{ marginTop: '0.5rem' }}>{t('terms.globalLecturerNotice')}</p>}
+    </div>
+    <TermScope global={global}><LecturerListContent global={global} /></TermScope>
+  </div>;
+};
+
+const LecturerListContent: React.FC<{ global: boolean }> = ({ global }) => {
+  const { selectedTermId, lockTermSelection } = useTerm();
+  const termId = global ? undefined : selectedTermId!;
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { success, error: showError } = useToast();
@@ -70,9 +102,8 @@ export const LecturerListPage: React.FC = () => {
   const [isBatchDeleteModalOpen, setIsBatchDeleteModalOpen] = useState<boolean>(false);
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['lecturers', filters],
-    queryFn: () => lecturerApi.getLecturers(filters),
-    placeholderData: keepPreviousData,
+    queryKey: ['lecturers', termId ?? 'all', filters],
+    queryFn: () => lecturerApi.getLecturers({ ...filters, termId }),
   });
 
   const lecturers = data?.result || [];
@@ -97,9 +128,11 @@ export const LecturerListPage: React.FC = () => {
 
   const handleFilterChange = (newFilters: Partial<LecturerFilterParams>) => {
     setFilters((prev) => ({ ...prev, ...newFilters }));
+    setSelectedUserIds([]);
   };
 
   const handleResetFilters = () => {
+    setSelectedUserIds([]);
     setFilters({
       page: 1,
       size: 10,
@@ -118,10 +151,12 @@ export const LecturerListPage: React.FC = () => {
   };
 
   const handleSendSingleActivation = async (lecturer: Lecturer) => {
+    if (isActivating) return;
+    const unlock = lockTermSelection();
     setIsActivating(true);
     try {
-      await lecturerApi.sendSingleActivation(lecturer.userId, lecturer.email);
-      success(`Đã gửi email kích hoạt tài khoản tới ${lecturer.email}`);
+      await lecturerApi.sendSingleActivation(lecturer.userId, lecturer.email, termId);
+      success(t('terms.activationAccepted'));
       const newExpiries = { ...cooldownExpiries, [lecturer.userId]: Date.now() + 60000 };
       setCooldownExpiries(newExpiries);
       try {
@@ -134,15 +169,17 @@ export const LecturerListPage: React.FC = () => {
       showError(err.message || 'Không thể gửi email kích hoạt');
     } finally {
       setIsActivating(false);
+      unlock();
     }
   };
 
   const handleBatchActivation = async () => {
-    if (selectedUserIds.length === 0) return;
+    if (selectedUserIds.length === 0 || isActivating) return;
+    const unlock = lockTermSelection();
     setIsActivating(true);
     try {
-      const res = await lecturerApi.sendBatchActivation(selectedUserIds);
-      success(`Đã gửi ${res.totalProcessed} email kích hoạt thành công.`);
+      const res = await lecturerApi.sendBatchActivation(selectedUserIds, termId);
+      success(t('terms.batchActivationAccepted', { count: res.totalProcessed }));
       const newExpiries = { ...cooldownExpiries };
       const expTime = Date.now() + 60000;
       selectedUserIds.forEach((id) => {
@@ -160,38 +197,48 @@ export const LecturerListPage: React.FC = () => {
       showError(err.message || 'Không thể gửi email kích hoạt hàng loạt');
     } finally {
       setIsActivating(false);
+      unlock();
     }
   };
 
   const handleConfirmDeleteSingle = async () => {
-    if (!deletingLecturer) return;
+    if (!deletingLecturer || isDeleting) return;
+    const unlock = lockTermSelection();
     setIsDeleting(true);
     try {
-      await lecturerApi.deleteLecturer(deletingLecturer.userId);
+      if (termId !== undefined) await lecturerApi.deleteBatchLecturers([deletingLecturer.userId], termId);
+      else await lecturerApi.deleteLecturer(deletingLecturer.userId);
       success(`Đã xóa giảng viên "${deletingLecturer.code}" (${deletingLecturer.email}) thành công.`);
       setDeletingLecturer(null);
       setSelectedUserIds((prev) => prev.filter((id) => id !== deletingLecturer.userId));
       void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
+      void queryClient.invalidateQueries({ queryKey: ['school-classes'] });
+      void queryClient.invalidateQueries({ queryKey: ['school-class'] });
     } catch (err: any) {
       showError(err.message || 'Không thể xóa giảng viên');
     } finally {
       setIsDeleting(false);
+      unlock();
     }
   };
 
   const handleConfirmBatchDelete = async () => {
-    if (selectedUserIds.length === 0) return;
+    if (selectedUserIds.length === 0 || isDeleting) return;
+    const unlock = lockTermSelection();
     setIsDeleting(true);
     try {
-      await lecturerApi.deleteBatchLecturers(selectedUserIds);
+      await lecturerApi.deleteBatchLecturers(selectedUserIds, termId);
       success(`Đã xóa ${selectedUserIds.length} giảng viên đã chọn thành công.`);
       setSelectedUserIds([]);
       setIsBatchDeleteModalOpen(false);
       void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
+      void queryClient.invalidateQueries({ queryKey: ['school-classes'] });
+      void queryClient.invalidateQueries({ queryKey: ['school-class'] });
     } catch (err: any) {
       showError(err.message || 'Không thể xóa danh sách giảng viên');
     } finally {
       setIsDeleting(false);
+      unlock();
     }
   };
 

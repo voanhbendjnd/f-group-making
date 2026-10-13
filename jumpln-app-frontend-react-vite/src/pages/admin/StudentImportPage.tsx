@@ -16,11 +16,15 @@ import { useQueryClient } from '@tanstack/react-query';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { TermSelect } from '@/features/terms/components/TermSelect';
 import type { ImportResult } from '@/features/import/types';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 
-export const StudentImportPage: React.FC = () => {
+export const StudentImportPage: React.FC = () => <TermScope><StudentImportContent /></TermScope>;
+
+const StudentImportContent: React.FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const [selectedTermId, setSelectedTermId] = useState<number | null>(null);
+  const { selectedTermId, lockTermSelection } = useTerm();
   const [pendingMajorCodes, setPendingMajorCodes] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsingClient, setIsParsingClient] = useState<boolean>(false);
@@ -31,6 +35,7 @@ export const StudentImportPage: React.FC = () => {
   const [genericError, setGenericError] = useState<string | null>(null);
 
   const handleFileSelect = async (file: File) => {
+    const unlock = lockTermSelection();
     setSelectedFile(file);
     setClientParseResult(null);
     setServerResult(null);
@@ -46,6 +51,7 @@ export const StudentImportPage: React.FC = () => {
       setClientParseResult(null);
     } finally {
       setIsParsingClient(false);
+      unlock();
     }
   };
 
@@ -58,7 +64,8 @@ export const StudentImportPage: React.FC = () => {
   };
 
   const handleConfirmImport = async (confirmedMajorCodes: string[] = []) => {
-    if (!selectedFile || isSubmitting) return;
+    if (!selectedFile || isSubmitting || selectedTermId === null) return;
+    const unlock = lockTermSelection();
 
     setIsSubmitting(true);
     setGenericError(null);
@@ -71,6 +78,11 @@ export const StudentImportPage: React.FC = () => {
       if (result.success) {
         void queryClient.invalidateQueries({ queryKey: ['students'] });
         void queryClient.invalidateQueries({ queryKey: ['majors'] });
+        void queryClient.invalidateQueries({ queryKey: ['school-classes'] });
+        void queryClient.invalidateQueries({ queryKey: ['school-class'] });
+        void queryClient.invalidateQueries({ queryKey: ['school-class-students'] });
+        void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
+        void queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
         try {
           confetti({ particleCount: 90, spread: 70 });
         } catch {
@@ -81,6 +93,7 @@ export const StudentImportPage: React.FC = () => {
       setGenericError(err.message || t('import.errorOccurred'));
     } finally {
       setIsSubmitting(false);
+      unlock();
     }
   };
 
@@ -146,8 +159,6 @@ export const StudentImportPage: React.FC = () => {
               </p>
             </div>
             <TermSelect
-              selectedTermId={selectedTermId}
-              onSelectTerm={setSelectedTermId}
               disabled={isParsingClient || isSubmitting}
             />
           </div>
