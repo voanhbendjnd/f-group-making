@@ -86,10 +86,14 @@ public class SecurityConfiguration {
         List<String> publicEndpoints = List.of(
                 "/api/register",
                 "/api/login",
+                "/api/account/activate",
+                "/api/account/activate/verify",
                 "/refresh",
                 "/account/activate/**",
-                "/account/reset-password/init",
-                "/account/reset-password/finish",
+                "/api/account/reset-password/init",
+                "/api/account/reset-password/finish",
+                "/api/account/reset-password/verify",
+                "/account/reset-password/**",
                 "/files/**");
         http.cors(cors -> cors.configurationSource(corsConfig))
                 .csrf(AbstractHttpConfigurer::disable)
@@ -97,8 +101,11 @@ public class SecurityConfiguration {
                         auth -> auth
                                 .requestMatchers(HttpMethod.POST, "/api/register").permitAll()
                                 .requestMatchers(HttpMethod.POST, "/api/login").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/activate").permitAll()
-                                .requestMatchers(HttpMethod.POST, "/api/activate/mul").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/account/activate").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/account/activate/verify").permitAll()
+                                .requestMatchers(HttpMethod.GET, "/api/account/reset-password/verify").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/account/reset-password/init").permitAll()
+                                .requestMatchers(HttpMethod.POST, "/api/account/reset-password/finish").permitAll()
 
                                 .requestMatchers(whiteList).permitAll()
                                 .anyRequest().authenticated()

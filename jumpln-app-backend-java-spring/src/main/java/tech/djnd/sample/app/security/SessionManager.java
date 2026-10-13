@@ -6,14 +6,6 @@ import lombok.experimental.FieldDefaults;
 import org.springframework.stereotype.Service;
 import tech.djnd.sample.app.domain.User;
 import tech.djnd.sample.app.repository.UserRepository;
-
-import java.util.UUID;
-
-import lombok.AccessLevel;
-import lombok.RequiredArgsConstructor;
-import lombok.experimental.FieldDefaults;
-import org.springframework.stereotype.Service;
-import tech.djnd.sample.app.repository.UserRepository;
 import tech.djnd.sample.app.service.errors.DataResourceNotFoundException;
 import tech.djnd.sample.app.service.errors.NotAuthorizedException;
 

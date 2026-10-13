@@ -8,7 +8,7 @@ import lombok.Setter;
 import lombok.experimental.FieldDefaults;
 
 @Entity
-@Table(name = "students")
+@Table(name = "students", indexes = @Index(name = "idx_students_major_id", columnList = "major_id"))
 @Getter
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
@@ -26,13 +26,14 @@ public class Student{
     @Column(name = "major_id", nullable = false)
     Integer majorId;
     @NotNull
-    @Column(name = "major_code", nullable = false)
-    String majorCode;
-    @NotNull
     @Column(name = "member_code", nullable = false)
     String memberCode;
-    @NotNull
-    @Column(name = "email", nullable = false)
-    String email;
+    @Column(name = "school_class_id")
+    Integer schoolClassId;
+    @Column(name = "group_id")
+    Long groupId;
+//    @NotNull
+//    @Column(name = "email", nullable = false)
+//    String email;
 
 }

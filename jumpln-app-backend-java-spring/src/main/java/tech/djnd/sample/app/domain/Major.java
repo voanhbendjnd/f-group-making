@@ -6,6 +6,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.FieldDefaults;
+import org.hibernate.validator.constraints.Length;
 
 import java.io.Serial;
 import java.io.Serializable;
@@ -21,11 +22,13 @@ public class Major extends AbstractAuditingEntity <Integer> implements Serializa
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Integer id;
     @NotNull
-    @Column(name = "code", unique = true,  nullable = false)
+    @Length(max = 20)
+    @Column(name = "code", unique = true,  nullable = false, length = 20)
     String code;
 
     @NotNull
-    @Column(name = "name", unique = true, nullable = false)
+    @Length(max = 50, min = 1)
+    @Column(name = "name", unique = true,length = 50)
     String name;
 
 }

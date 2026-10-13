@@ -24,6 +24,7 @@ public class UserDTO {
     private boolean activated;
     private Set<String> authorities;
     private String activationKey;
+    private String resetKey;
     public UserDTO() {
     }
 
@@ -116,5 +117,13 @@ public class UserDTO {
 
     public void setActivationKey(String activationKey) {
         this.activationKey = activationKey;
+    }
+
+    public String getResetKey() {
+        return resetKey;
+    }
+
+    public void setResetKey(String resetKey) {
+        this.resetKey = resetKey;
     }
 }

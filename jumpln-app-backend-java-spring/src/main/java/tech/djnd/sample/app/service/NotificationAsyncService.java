@@ -25,10 +25,10 @@ public class NotificationAsyncService {
     public void sendMailActivatedAccount(List<UserDTO> users){
         users.forEach(user -> {
             try{
-                mailService.sendActivationEmail(user);
+                mailService.sendActivationEmailSync(user);
             }
             catch(Exception e){
-                log.error(e.getMessage());
+                log.error("Failed to process activation email for user {}", user.getEmail(), e);
             }
         });
     }

@@ -1,7 +1,14 @@
-/jumpln-app-backend-java-spring/src/main/resources/application.properties
-/jumpln-app-backend-java-spring/.gradle
-/jumpln-app-backend-java-spring/.gradle
+jumpln-app-backend-java-spring/src/main/resources/application.properties
+jumpln-app-backend-java-spring/src/main/resources
+
+# Gradle cache and build outputs
+.gradle/
 **/.gradle/
+build/
+**/build/
+bin/
+**/bin/
+
 **/mysql_data/
 mysql_data/
 
@@ -12,3 +19,13 @@ mysql_data/
 # Environment variables
 .env
 .env.*
+!**/.env.example
+
+# Frontend dependencies & build
+**/node_modules/
+node_modules/
+**/dist/
+dist/
+/jumpln-app-frontend-react-vite/.idea
+~$*
+**/~$*

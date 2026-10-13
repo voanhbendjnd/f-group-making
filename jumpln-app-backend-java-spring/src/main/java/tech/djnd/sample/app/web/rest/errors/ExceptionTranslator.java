@@ -5,6 +5,7 @@ import javax.annotation.Nullable;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.NativeWebRequest;
@@ -28,6 +29,14 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
 
     @Value("${djnd.app.name}")
     private String applicationName;
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Problem> handleDataConflict(DataIntegrityViolationException ex, NativeWebRequest request) {
+        // A concurrent import/update can pass validation before a unique/FK constraint changes.
+        return create(new ConflictAlertException(
+                "Data changed or conflicts with an existing record. Reload and retry the request.",
+                "data", "dataconflict"), request);
+    }
     @Override
     public ResponseEntity<Problem> process(@Nullable ResponseEntity<Problem> entity, NativeWebRequest request) {
         if (entity == null) {

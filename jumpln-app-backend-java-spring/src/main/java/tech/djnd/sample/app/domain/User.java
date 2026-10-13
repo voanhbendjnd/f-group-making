@@ -59,6 +59,10 @@ public class User extends AbstractAuditingEntity <Long> implements Serializable 
     @JsonIgnore
     private String activationKey;
 
+    @Column(name = "activation_key_expires_at")
+    @JsonIgnore
+    private Instant activationKeyExpiresAt;
+
     @Size(max = 20)
     @Column(length = 20, name ="reset_key")
     @JsonIgnore

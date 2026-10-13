@@ -2,6 +2,7 @@ package tech.djnd.sample.app.repository;
 
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.jpa.repository.EntityGraph;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -12,6 +13,8 @@ import tech.djnd.sample.app.domain.User;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+
+import jakarta.persistence.LockModeType;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
@@ -29,7 +32,13 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findOneByEmail(String email);
 
-    List<User> findAllByActivatedIsFalseAndActivationKeyNotNullAndCreatedDateBefore(Instant createdDateBefore);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<User> findOneByActivationKey(String activationKey);
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    Optional<User> findOneByResetKey(String resetKey);
+    Optional<User> findByActivationKey(String activationKey);
+
+    List<User> findAllByActivatedIsFalseAndActivationKeyNotNullAndLastModifiedDateBefore(Instant lastModifiedDateBefore);
 
     @Query(value = "delete from User u where u.id in :userIds")
     @Modifying
@@ -41,4 +50,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
 
     List<User> findByIdIn(List<Long> userIds);
+
+    List<User> findByEmailIn(List<String> emails);
+
 }
