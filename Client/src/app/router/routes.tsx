@@ -25,8 +25,11 @@ import { LecturerListPage } from '@/pages/admin/LecturerListPage';
 import { LecturerImportPage } from '@/pages/admin/LecturerImportPage';
 import { ClassListPage } from '@/pages/admin/ClassListPage';
 import { ClassDetailPage } from '@/pages/admin/ClassDetailPage';
+import { AdminDeadlinePage } from '@/pages/admin/AdminDeadlinePage';
+import { LecturerDeadlinePage } from '@/pages/lecturer/LecturerDeadlinePage';
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
 import { StudentProfilePage } from '@/pages/student/StudentProfilePage';
+import { SelectGroupPage } from '@/pages/student/SelectGroupPage';
 import { UnauthorizedPage } from '@/pages/errors/UnauthorizedPage';
 import { NotFoundPage } from '@/pages/errors/NotFoundPage';
 
@@ -134,6 +137,10 @@ export const router = createBrowserRouter([
         path: 'classes/:id',
         element: <ClassDetailPage />,
       },
+      {
+        path: 'deadlines',
+        element: <AdminDeadlinePage />,
+      },
     ],
   },
 
@@ -149,6 +156,7 @@ export const router = createBrowserRouter([
       { index: true, element: <Navigate to="/lecturer/classes" replace /> },
       { path: 'classes', element: <LecturerClassListPage /> },
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
+      { path: 'deadlines', element: <LecturerDeadlinePage /> },
     ],
   },
 
@@ -172,6 +180,10 @@ export const router = createBrowserRouter([
         element: <StudentDashboardPage />,
       },
       { path: 'profile', element: <StudentProfilePage /> },
+      {
+        path: 'groups/select',
+        element: <SelectGroupPage />,
+      },
     ],
   },
 

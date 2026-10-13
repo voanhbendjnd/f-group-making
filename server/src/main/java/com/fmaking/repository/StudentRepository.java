@@ -52,4 +52,14 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
         order by s.rollNumber asc
     """)
     List<StudentRow> findStudentsBySchoolClassId(@Param("classId") Integer classId);
+
+    @Query(value = """
+        select new com.fmaking.service.dto.StudentDeadlineRow(
+            s.userId, s.fullName, u.email, s.schoolClassId
+        )
+        from Student s
+        join User u on s.userId = u.id
+        where s.schoolClassId in :classIds
+    """)
+    List<com.fmaking.service.dto.StudentDeadlineRow> findStudentDeadlineRowsBySchoolClassIdIn(@Param("classIds") List<Integer> classIds);
 }

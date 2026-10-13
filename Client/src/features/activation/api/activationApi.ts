@@ -15,4 +15,8 @@ export const activationApi = {
       password: request.password,
     });
   },
+
+  async requestActivation(email: string): Promise<void> {
+    await apiClient.post('/api/account/activate/request', { email });
+  },
 };

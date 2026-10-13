@@ -103,6 +103,28 @@ public class UserService {
         dto.setActivationKey(user.getActivationKey());
         return dto;
     }
+
+    public Optional<UserDTO> requestAccountActivation(String email) {
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
+        Optional<User> userOpt = userRepository.findOneByEmail(normalizedEmail);
+        if (userOpt.isEmpty()) {
+            return Optional.empty();
+        }
+        User user = userOpt.get();
+        if (Boolean.TRUE.equals(user.getActivated())) {
+            return Optional.empty();
+        }
+        assignNewActivationKey(user);
+        userRepository.save(user);
+
+        UserDTO dto = new UserDTO();
+        dto.setEmail(user.getEmail());
+        dto.setActivationKey(user.getActivationKey());
+        return Optional.of(dto);
+    }
     public List<UserDTO> initActivateKeyMulAccount(List<Long> userIds){
         if (userIds == null || userIds.isEmpty() || userIds.stream().anyMatch(Objects::isNull)) {
             throw new BadRequestResourceException(
