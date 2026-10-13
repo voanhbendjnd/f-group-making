@@ -1,6 +1,6 @@
 # 04 — Kiến trúc và cấu trúc React
 
-> Cập nhật triển khai 12/10/2026: mở rộng stack thực tế trong `jumpln-app-frontend-react-vite`: CSS token/component hiện có, Lucide, Axios, React Hook Form và TanStack Query. Không đưa Material UI vào ứng dụng đã dùng hệ thống component riêng. Admin/giảng viên dùng chung `ManagementLayout`; cache riêng từng tài khoản. Chi tiết ở [11](11-giang-vien-va-quy-dinh-nhom.md).
+> Cập nhật triển khai 12/10/2026: mở rộng stack thực tế trong `Client`: CSS token/component hiện có, Lucide, Axios, React Hook Form và TanStack Query. Không đưa Material UI vào ứng dụng đã dùng hệ thống component riêng. Admin/giảng viên dùng chung `ManagementLayout`; cache riêng từng tài khoản. Chi tiết ở [11](11-giang-vien-va-quy-dinh-nhom.md).
 
 [Về mục lục](README.md) · [Quy tắc triển khai](08-quy-tac-cho-nguoi-va-agent.md)
 

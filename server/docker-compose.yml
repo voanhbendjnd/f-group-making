@@ -1,0 +1,20 @@
+# Stable infrastructure identity across source-directory renames.
+name: jumpln-app-backend-java-spring
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql-fgroup-making-local
+    restart: always
+    environment:
+      MYSQL_DATABASE: fgroup-making
+      MYSQL_ROOT_PASSWORD: 1607
+    ports:
+      - "3307:3306"
+    volumes:
+      - "./mysql_data:/var/lib/mysql"
+  redis-happy-farm:
+    image: redis:alpine
+    container_name: redis-fgroup-making-local
+    restart: always
+    ports:
+      - "6379:6379"
