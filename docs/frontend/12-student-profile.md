@@ -39,6 +39,10 @@ Admin/Lecturer chỉ hiện thông tin tài khoản hỗ trợ bởi AuthContext
 Student hoặc suy luận trạng thái activation. Menu có giới hạn kích thước theo
 viewport; cuộn bên trong không đóng card.
 
+Cập nhật Lecturer Profile: đoạn trên mô tả phạm vi ban đầu. Lecturer/Master hiện
+dùng API hồ sơ riêng và cache chung với trang `/lecturer/profile`, bổ sung Code
+và activation thật; Admin vẫn chỉ dùng AuthContext. Xem [Lecturer Profile](15-lecturer-profile.md).
+
 GroupRepository chỉ bổ sung đọc Entity Group hiện có; không triển khai quản lý
 nhóm hoặc sửa schema. Môi trường có Student.groupId phải có bảng groups đúng
 schema Entity; lỗi schema được hiển thị như lỗi tải, không giả thành chưa có nhóm.

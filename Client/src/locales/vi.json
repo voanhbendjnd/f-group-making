@@ -1,6 +1,9 @@
 {
   "terms": {
-    "label": "Academic Term",
+    "profileGlobal": "Hồ sơ cá nhân không phụ thuộc học kỳ đang chọn.",
+    "studentScopeNotice": "Màn hình này chưa lọc theo học kỳ đang chọn. Thông tin sinh viên và liên kết hạn chót theo lớp thực tế được phân công.",
+    "deadlineScopeNotice": "Hạn chót hiện bao gồm các học kỳ bạn có quyền truy cập. Bộ lọc học kỳ chưa áp dụng cho màn hình này.",
+    "label": "Học kỳ",
     "current": "Hiện tại",
     "invalid": "Học kỳ này không còn khả dụng. Tải lại danh sách và chọn học kỳ hợp lệ.",
     "outsideScope": "Một số tài khoản đã chọn không thuộc học kỳ này. Tải lại danh sách và chọn lại tài khoản.",
@@ -653,6 +656,25 @@
     "account": "Tài khoản",
     "accountDetails": "Thông tin tài khoản",
     "open": "Xem hồ sơ của tôi"
+  },
+  "lecturerProfile": {
+    "description": "Thông tin tài khoản giảng viên của bạn.",
+    "details": "Thông tin hồ sơ giảng viên",
+    "loading": "Đang tải hồ sơ giảng viên...",
+    "error": "Không tải được hồ sơ. Vui lòng thử lại.",
+    "forbidden": "Hồ sơ này chỉ dành cho giảng viên và giảng viên phụ trách.",
+    "code": "Mã giảng viên",
+    "incomplete": "Hồ sơ giảng viên chưa hoàn chỉnh. Hệ thống hiển thị thông tin tài khoản hiện có; vui lòng liên hệ quản trị viên để bổ sung hồ sơ giảng viên.",
+    "classes": "Các lớp được phân công",
+    "showing": "Hiển thị <strong>{{start}} – {{end}}</strong> trong <strong>{{total}}</strong> lớp",
+    "classesDescription": "Chỉ hiển thị các lớp được phân công cho bạn, thuộc tất cả học kỳ.",
+    "total": "{{count}} lớp được phân công",
+    "total_one": "{{count}} lớp được phân công",
+    "total_other": "{{count}} lớp được phân công",
+    "classesLoading": "Đang tải các lớp được phân công...",
+    "classesError": "Không tải được các lớp được phân công. Vui lòng thử lại.",
+    "noClasses": "Chưa có lớp được phân công",
+    "noClassesDescription": "Bạn chưa được phân công lớp nào. Vui lòng liên hệ quản trị viên nếu cần được phân công."
   },
   "addLecturer": {
     "listTitle": "Quản lý Giảng viên / Mentor",

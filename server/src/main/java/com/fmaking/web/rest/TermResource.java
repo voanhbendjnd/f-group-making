@@ -35,7 +35,7 @@ public class TermResource {
      * By default returns terms from current term to future terms.
      */
     @GetMapping
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_STUDENT', 'ROLE_LECTURE', 'ROLE_LECTURE_MASTER')")
     @ApiMessage("Get available terms successfully")
     public ResponseEntity<List<TermDTO>> getTerms(
             @RequestParam(name = "currentAndFutureOnly", defaultValue = "true") Boolean currentAndFutureOnly) {
@@ -48,7 +48,7 @@ public class TermResource {
      * GET /api/terms/current : Get current active term.
      */
     @GetMapping("/current")
-    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_STUDENT', 'ROLE_LECTURE', 'ROLE_LECTURE_MASTER')")
     @ApiMessage("Get current term successfully")
     public ResponseEntity<TermDTO> getCurrentTerm() {
         log.debug("REST request to get current term");

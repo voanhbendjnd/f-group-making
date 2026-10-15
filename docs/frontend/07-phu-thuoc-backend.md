@@ -104,3 +104,6 @@ Chỉ sau khi có nghiệp vụ và API mới thêm menu “Nhóm của tôi”,
 ## 6. Quy trình cập nhật một phụ thuộc
 
 Khi một mục BE được xử lý: gắn thay đổi backend và hợp đồng mới → ghi fixture thực tế đã làm sạch → cập nhật 01 → cập nhật 02/05 → thêm ca kiểm thử 06 → mới đổi capability để mở UI. Việc chỉ sửa một endpoint không tự động làm cả hành trình hoàn chỉnh; cần kiểm thử từ đầu đến cuối theo mục 3.
+
+
+Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutureOnly=false for history) and GET /api/terms/current support ROLE_ADMIN, ROLE_STUDENT, ROLE_LECTURE, ROLE_LECTURE_MASTER. POST /api/terms remains Admin-only. See [Academic Term Filter](11-academic-term-filter.md) for supported screens and explicitly unfiltered Deadline/Student screens.

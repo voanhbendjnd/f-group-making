@@ -1,3 +1,6 @@
+import { TermProvider } from '@/app/providers/TermContext';
+import { TermSelect } from '@/features/terms/components/TermSelect';
+import { termApi } from '@/features/terms/api/termApi';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -15,6 +18,8 @@ vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: {
   getClasses: vi.fn(), getMyClasses: vi.fn(), getClassById: vi.fn(), getClassStudents: vi.fn(),
 } }));
+vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+vi.mock('@/features/terms/api/termApi', () => ({ termApi: { getTerms: vi.fn(), getCurrentTerm: vi.fn() } }));
 vi.mock('@/features/rules/api/ruleApi', () => ({ ruleApi: { getRules: vi.fn(), saveRules: vi.fn() } }));
 
 const ownClass: SchoolClass = {
@@ -31,15 +36,18 @@ function renderPage(detail = false) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   clients.push(client);
   return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[detail ? '/lecturer/classes/2' : '/lecturer/classes']}>
-    <Routes>
+    <TermProvider><TermSelect compact /><Routes>
       <Route path="/lecturer/classes" element={<LecturerClassListPage />} />
       <Route path="/lecturer/classes/:id" element={<LecturerClassDetailPage />} />
-    </Routes>
+    </Routes></TermProvider>
   </MemoryRouter></QueryClientProvider>);
 }
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  localStorage.clear();
+  vi.mocked(termApi.getCurrentTerm).mockResolvedValue({ id: 1, name: 'FALL26', isCurrent: true });
+  vi.mocked(termApi.getTerms).mockResolvedValue([{ id: 1, name: 'FALL26', isCurrent: true }, { id: 2, name: 'SP26', isCurrent: false }]);
   auth.user.authorities = ['ROLE_LECTURE'];
   await i18n.changeLanguage('vi');
   vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [ownClass], meta: { page: 1, pageSize: 10, pages: 1, total: 1 } });
@@ -52,6 +60,34 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); });
 
 describe('Class permissions in lecturer pages', () => {
+  it.each(['ROLE_LECTURE', 'ROLE_LECTURE_MASTER'])('changes term and resets pagination without stale classes for %s', async role => {
+    auth.user.authorities = [role];
+    const api = role === 'ROLE_LECTURE' ? classApi.getMyClasses : classApi.getClasses;
+    vi.mocked(api).mockImplementation(async params => ({
+      result: params?.termId === 2 ? [] : [ownClass],
+      meta: { page: params?.page || 1, pageSize: 10, pages: 2, total: params?.termId === 2 ? 0 : 12 },
+    }));
+    renderPage(); await screen.findByText('Owned class');
+    fireEvent.click(screen.getByRole('button', { name: '2', exact: true }));
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 1, page: 2 }), expect.any(AbortSignal)));
+    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByRole('option', { name: 'SP26' }));
+    await waitFor(() => expect(api).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 2, page: 1 }), expect.any(AbortSignal)));
+    expect(screen.queryByText('Owned class')).not.toBeInTheDocument();
+    expect(localStorage.getItem('f_group_selected_term_10')).toBe('2');
+  });
+
+  it('does not load students or rules for a class outside the selected term', async () => {
+    renderPage(true); await screen.findByRole('heading', { name: i18n.t('lecturer.classTitle', { name: 'Other class' }) });
+    await waitFor(() => expect(classApi.getClassStudents).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByRole('option', { name: 'SP26' }));
+    await screen.findByText(i18n.t('terms.classOutsideTerm'));
+    expect(screen.queryByText('Other class')).not.toBeInTheDocument();
+    expect(ruleApi.getRules).not.toHaveBeenCalled();
+    expect(classApi.getClassStudents).toHaveBeenCalledTimes(1);
+  });
+
   it('loads only assigned classes for an ordinary lecturer', async () => {
     renderPage();
     await screen.findByText('Owned class');

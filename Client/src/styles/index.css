@@ -337,6 +337,8 @@ select.form-control {
 
 /* Student profile: uses the shared card, badge and layout tokens. */
 .card.student-profile-card { padding: 0; overflow: hidden; }
+.lecturer-profile-page > .card { margin: 0; }
+.lecturer-profile-notice { margin: 1rem 1.5rem 0; }
 .student-profile-header { display: flex; align-items: center; gap: 1.25rem; padding: 1.5rem; background: var(--color-surface-hover); border-bottom: 1px solid var(--color-border); }
 .student-profile-avatar { width: 56px; height: 56px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border-radius: var(--radius-full); background: var(--color-primary-light); color: var(--color-primary); font-size: 1.25rem; font-weight: 700; }
 .student-profile-identity { flex: 1; min-width: 0; overflow-wrap: anywhere; }

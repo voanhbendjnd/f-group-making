@@ -1,3 +1,5 @@
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -13,13 +15,18 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { canManageClassRules } from '@/features/auth/utils/roleRouting';
 
 export function LecturerClassDetailPage() {
+  return <TermScope><LecturerClassDetailPageContent /></TermScope>;
+}
+
+function LecturerClassDetailPageContent() {
+  const { selectedTermId } = useTerm();
   const { id } = useParams();
   const { user } = useAuth();
   const classId = Number(id);
   const validId = Boolean(id && /^\d+$/.test(id) && Number.isSafeInteger(classId) && classId > 0);
   const { t } = useTranslation();
   const query = useQuery({
-    queryKey: ['school-class', classId],
+    queryKey: ['school-class', selectedTermId, classId],
     queryFn: ({ signal }) => classApi.getClassById(classId, signal),
     enabled: validId,
     retry: (count, error) => count < 1 && ![401, 403, 404].includes(getApiError(error).status),
@@ -33,6 +40,9 @@ export function LecturerClassDetailPage() {
   }
   if (query.isPending || !query.data) return <LoadingSpinner message={t('lecturer.loadingClass')} />;
   const schoolClass = query.data;
+  if (schoolClass.termId !== selectedTermId) return <div className="card lecturer-card">
+    <p role="alert">{t('terms.classOutsideTerm')}</p>{back}
+  </div>;
   const readOnly = !canManageClassRules(user, schoolClass.lecturerId);
   return <div className="space-y-6 lecturer-page">
     <PageHeader title={t('lecturer.classTitle', { name: schoolClass.name })}

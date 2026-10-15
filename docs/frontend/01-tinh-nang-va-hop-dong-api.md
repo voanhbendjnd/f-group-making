@@ -215,3 +215,6 @@ Import trả tổng số và lỗi, không trả ID người dùng, email đã l
 7. CORS, base URL email và cấu hình mail hoạt động trong môi trường kiểm thử.
 
 Việc thực hiện các kiểm chứng trên thuộc giai đoạn triển khai, chưa được thực hiện trong lần viết tài liệu này.
+
+
+Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutureOnly=false for history) and GET /api/terms/current support ROLE_ADMIN, ROLE_STUDENT, ROLE_LECTURE, ROLE_LECTURE_MASTER. POST /api/terms remains Admin-only. See [Academic Term Filter](11-academic-term-filter.md) for supported screens and explicitly unfiltered Deadline/Student screens.

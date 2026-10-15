@@ -1,3 +1,5 @@
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -16,14 +18,19 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
 
 export function LecturerClassListPage() {
+  return <TermScope><LecturerClassListPageContent /></TermScope>;
+}
+
+function LecturerClassListPageContent() {
+  const { selectedTermId } = useTerm();
   const { t } = useTranslation();
   const { user } = useAuth();
   const allClasses = canViewAllClasses(user?.authorities || []);
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({ page: 1, size: 10, search: '' });
   const query = useQuery({
-    queryKey: [allClasses ? 'school-classes' : 'my-school-classes', filters],
-    queryFn: ({ signal }) => allClasses ? classApi.getClasses(filters, signal) : classApi.getMyClasses(filters, signal),
+    queryKey: [allClasses ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, filters],
+    queryFn: ({ signal }) => allClasses ? classApi.getClasses({ ...filters, termId: selectedTermId! }, signal) : classApi.getMyClasses({ ...filters, termId: selectedTermId! }, signal),
     retry: (count, error) => count < 1 && ![401, 403].includes(getApiError(error).status),
   });
   const error = getApiError(query.error);
