@@ -50,7 +50,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
       case 'ACCEPTED':
         return <Tag color="green" icon={<ShieldCheck size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.accepted')}</Tag>;
       case 'REVOKED':
-        return <Tag color="red" icon={<AlertTriangle size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.revoked')}</Tag>;
+        return <Tag color="red" icon={<AlertTriangle size={12} style={{ marginRight: 4 }} />}>{t('groupLifecycle.revoked')}</Tag>;
       case 'DISBANDED':
         return <Tag color="default">{t('studentGroup.status.disbanded')}</Tag>;
       default:
@@ -60,7 +60,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
 
   const isPending = group.status === 'PENDING';
   const isAccepted = group.status === 'ACCEPTED';
-  const isOpen = group.status === 'OPEN';
+  const isOpen = group.status === 'OPEN' || group.status === 'REVOKED';
   const canModify = isOpen && !isDeadlineExpired;
 
   return (

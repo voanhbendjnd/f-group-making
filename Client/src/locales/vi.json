@@ -1,5 +1,24 @@
 {
-  "terms": {
+  "deadlineLifecycle": {
+    "reopen": "Mở lại hạn chót",
+    "reopened": "Đã mở lại hạn chót, giữ nguyên nhóm và lịch sử duyệt.",
+    "confirmScope": "Tôi xác nhận thay đổi áp dụng cho tất cả lớp liệt kê phía trên.",
+    "sessionExists": "Lớp đã có phiên chọn nhóm. Hãy gia hạn hoặc mở lại hạn chót hiện có.",
+    "scopeRequired": "Vui lòng xem và xác nhận tất cả lớp bị ảnh hưởng."
+  },
+  "groupLifecycle": {
+    "createDraft": "Tạo nhóm nháp",
+    "draftDescription": "Tạo nhóm nháp để phân bổ. Hoàn tất quy định lớp, sau đó gửi duyệt nhóm.",
+    "unlock": "Mở khóa để chỉnh sửa",
+    "submit": "Gửi duyệt nhóm",
+    "submitted": "Đã gửi nhóm chờ duyệt.",
+    "rulesRequired": "Cần đạt các quy định đang bật trước khi nộp hoặc duyệt nhóm.",
+    "draftCreated": "Đã tạo nhóm nháp {{name}}. Hoàn tất phân bổ rồi gửi duyệt.",
+    "revoked": "Cần chỉnh sửa và duyệt lại",
+    "draftNotice": "Giảng viên được sắp xếp nhóm nháp sau hạn. Nhóm đã duyệt vẫn khóa; nhóm đã mở khóa chỉ được sửa khi hạn chót đang mở.",
+    "moveError": "Chưa xác nhận được kết quả chuyển. Hãy tải lại thành viên trước khi thử lại.",
+    "locked": "Nhóm đang khóa. Nhóm chờ duyệt phải được trả về trước khi sửa; nhóm đã duyệt cần GV phụ trách hoặc Admin mở khóa."
+  },  "terms": {
     "profileGlobal": "Hồ sơ cá nhân không phụ thuộc học kỳ đang chọn.",
     "studentScopeNotice": "Màn hình này chưa lọc theo học kỳ đang chọn. Thông tin sinh viên và liên kết hạn chót theo lớp thực tế được phân công.",
     "deadlineScopeNotice": "Hạn chót hiện bao gồm các học kỳ bạn có quyền truy cập. Bộ lọc học kỳ chưa áp dụng cho màn hình này.",
@@ -1123,9 +1142,9 @@
     "allAssignedDesc": "Không còn sinh viên tự do trong lớp.",
     "quickAddTo": "Thêm vào {{name}}",
     "quickAdd": "Thêm nhanh vào nhóm",
-    "quickDropActive": "Thả vào đây để tạo nhóm mới với sinh viên này!",
-    "quickDropIdle": "Kéo thả sinh viên vào đây để tạo nhóm mới ngay lập tức",
-    "quickDropHint": "Hoặc bấm vào đây để mở hộp thoại tạo nhóm nâng cao",
+    "quickDropActive": "Thả để chọn sẵn sinh viên trong hộp thoại tạo nhóm",
+    "quickDropIdle": "Kéo thả sinh viên vào đây để tạo nhóm mới",
+    "quickDropHint": "Xác nhận tên và thành viên trong hộp thoại, hoặc bấm vào đây để mở",
     "emptyGroupsTitle": "Chưa có nhóm nào trong lớp học này",
     "emptyGroupsDesc": "Kéo sinh viên từ khay bên trái vào ô phía trên để tạo nhóm đầu tiên, hoặc bấm nút Tạo nhóm mới.",
     "createFirstGroup": "Tạo Nhóm Đầu Tiên",

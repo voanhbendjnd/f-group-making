@@ -19,6 +19,19 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'sessionAlreadyExists':
+    case 'error.sessionAlreadyExists':
+      return i18n.t('deadlineLifecycle.sessionExists');
+    case 'confirmClassesRequired':
+    case 'error.confirmClassesRequired':
+      return i18n.t('deadlineLifecycle.scopeRequired');
+    case 'ERR_GROUP_STATE_CONFLICT':
+    case 'error.ERR_GROUP_STATE_CONFLICT':
+      return i18n.t('groupLifecycle.locked');
+    case 'ERR_HARD_RULE_VIOLATED':
+    case 'error.ERR_HARD_RULE_VIOLATED':
+      return i18n.t('groupLifecycle.rulesRequired');
+
     case 'error.lecturerAssignmentConflict':
     case 'lecturerAssignmentConflict':
       return i18n.t('classAssignment.conflict');
@@ -130,9 +143,6 @@ export function translateErrorMessage(error: any): string {
     case 'ERR_GROUP_NAME_EXISTS':
       return i18n.t('groupFormation.errors.nameExists', 'Tên nhóm này đã tồn tại trong lớp học.');
 
-    case 'error.ERR_GROUP_STATE_CONFLICT':
-    case 'ERR_GROUP_STATE_CONFLICT':
-      return i18n.t('groupFormation.errors.stateConflict', 'Thao tác không hợp lệ với trạng thái nhóm hiện tại.');
 
     case 'error.ERR_DEADLINE_CANCELLED':
     case 'ERR_DEADLINE_CANCELLED':
@@ -152,9 +162,6 @@ export function translateErrorMessage(error: any): string {
     case 'ERR_FORBIDDEN_NOT_IN_CLASS':
       return i18n.t('groupFormation.errors.notInClass', 'Bạn không thuộc danh sách lớp học này.');
 
-    case 'error.ERR_HARD_RULE_VIOLATED':
-    case 'ERR_HARD_RULE_VIOLATED':
-      return detail || i18n.t('groupFormation.errors.hardRuleViolated', 'Nhóm chưa thỏa mãn toàn bộ các quy tắc bắt buộc của lớp.');
 
     case 'error.ERR_SOFT_RULE_NOT_SATISFIED':
     case 'ERR_SOFT_RULE_NOT_SATISFIED':

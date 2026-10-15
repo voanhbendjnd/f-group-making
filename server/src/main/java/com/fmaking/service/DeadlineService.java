@@ -78,7 +78,13 @@ public class DeadlineService {
         }
 
         List<Integer> classIds = dto.getSchoolClassIds().stream().distinct().toList();
-        List<SchoolClass> classes = schoolClassRepository.findAllById(classIds);
+        List<SchoolClass> classes = classIds.stream().sorted().map(id -> schoolClassRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new BadRequestResourceException("Class not found", "deadline", "classNotFound"))).toList();
+        for (Integer classId : classIds) {
+            if (!deadlineRepository.findAllBySchoolClassId(classId).isEmpty()) {
+                throw new BadRequestResourceException("This class already has a group formation session. Extend or reopen that session.", "deadline", "sessionAlreadyExists");
+            }
+        }
         if (classes.size() != classIds.size()) {
             throw new BadRequestResourceException("One or more school classes not found", "deadline", "classNotFound");
         }
@@ -137,6 +143,13 @@ public class DeadlineService {
 
         policy.requireNotCancelled(existing);
         DeadlineStatus currentStatus = policy.status(existing);
+        Set<Integer> scope = existing.getSchoolClasses().stream().map(SchoolClass::getId).collect(Collectors.toSet());
+        if (dto.getSchoolClassIds() != null && !scope.equals(new HashSet<>(dto.getSchoolClassIds()))) {
+            throw new BadRequestResourceException("Session classes cannot be changed", "deadline", "immutableClasses");
+        }
+        if (scope.size() > 1 && (dto.getConfirmedClassIds() == null || !scope.equals(new HashSet<>(dto.getConfirmedClassIds())))) {
+            throw new BadRequestResourceException("Confirm every affected class", "deadline", "confirmClassesRequired");
+        }
 
         if (currentStatus == DeadlineStatus.ACTIVE) {
             // Immutable startTime
@@ -171,7 +184,10 @@ public class DeadlineService {
             }
             existing.setStartTime(dto.getStartTime());
         } else { // EXPIRED
-            throw new BadRequestResourceException("Expired deadline cannot be edited directly.", "deadline", "deadlineExpired");
+            if (!dto.getEndTime().isAfter(now) || !dto.getEndTime().isAfter(existing.getEndTime())) {
+                throw new BadRequestResourceException("Reopened deadline must end in the future", "deadline", "invalidEndTime");
+            }
+            dto.setStartTime(existing.getStartTime());
         }
 
         existing.setName(dto.getName().trim());
@@ -179,7 +195,7 @@ public class DeadlineService {
         existing.setEndTime(dto.getEndTime());
 
         Deadline saved = deadlineRepository.saveAndFlush(existing);
-        deadlineEvents.publish(currentStatus == DeadlineStatus.ACTIVE ? "DEADLINE_EXTENDED" : "DEADLINE_UPDATED", saved, previousClasses);
+        deadlineEvents.publish(currentStatus == DeadlineStatus.EXPIRED ? "DEADLINE_REOPENED" : currentStatus == DeadlineStatus.ACTIVE ? "DEADLINE_EXTENDED" : "DEADLINE_UPDATED", saved, previousClasses);
         return toDTO(saved);
     }
 
@@ -408,7 +424,7 @@ public class DeadlineService {
         dto.setCancelledBy(deadline.getCancelledBy());
         boolean manages = canManage(deadline);
         dto.setCanCancel(manages && dto.getStatus() != DeadlineStatus.CANCELLED);
-        dto.setCanEdit(manages && (dto.getStatus() == DeadlineStatus.ACTIVE || dto.getStatus() == DeadlineStatus.UPCOMING));
+        dto.setCanEdit(manages && (dto.getStatus() == DeadlineStatus.ACTIVE || dto.getStatus() == DeadlineStatus.UPCOMING || dto.getStatus() == DeadlineStatus.EXPIRED));
         dto.setCreatedDate(deadline.getCreatedDate());
         dto.setCreatedBy(deadline.getCreatedBy());
         dto.setLastModifiedDate(deadline.getLastModifiedDate());

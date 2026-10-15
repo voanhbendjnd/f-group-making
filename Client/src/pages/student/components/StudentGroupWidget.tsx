@@ -546,7 +546,7 @@ export const StudentGroupWidget: React.FC = () => {
                   )}
                   {activeActivity.groupStatus === 'REVOKED' && (
                     <span className="badge badge-danger" style={{ fontSize: '0.75rem' }}>
-                      {t('studentWidget.statusRejected', 'Cần chỉnh sửa lại')}
+                      {t('groupLifecycle.revoked')}
                     </span>
                   )}
                 </div>

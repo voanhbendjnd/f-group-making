@@ -225,7 +225,7 @@ public class GroupService {
 
         // Check unique group name
         String cleanName = req.getName().trim();
-        if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCase(classId, deadlineId, cleanName)) {
+        if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(classId, deadlineId, cleanName, GroupStatus.DISBANDED)) {
             throw new ConflictAlertException("Tên nhóm này đã tồn tại trong lớp học.", "group", "ERR_GROUP_NAME_EXISTS");
         }
 
@@ -251,7 +251,7 @@ public class GroupService {
         // Audit logs
         String actor = getCurrentUserLogin();
         saveMemberHistory(savedGroup.getId(), studentId, deadlineId, GroupMemberAction.JOINED, actor, "Tạo nhóm và làm Leader");
-        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Sinh viên tạo nhóm mới");
+        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Lecturer created draft for allocation");
 
         eventPublisher.publish("GROUP_CREATED", savedGroup.getId(), deadlineId, classId, actor, null);
 
@@ -273,7 +273,7 @@ public class GroupService {
         }
 
         // 2. Check group status must be OPEN
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (!isDraft(group)) {
             throw new ConflictAlertException("Nhóm hiện không ở trạng thái mở để tham gia.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -315,7 +315,7 @@ public class GroupService {
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
         deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (!isDraft(group)) {
             throw new ConflictAlertException("Không thể rời nhóm khi nhóm không ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -330,12 +330,13 @@ public class GroupService {
             } else {
                 // If leader is the only member, leaving disbands the group
                 groupMemberRepository.deleteByGroupIdAndStudentId(groupId, studentId);
+                GroupStatus previousStatus = group.getStatus();
                 group.setStatus(GroupStatus.DISBANDED);
                 groupRepository.save(group);
 
                 String actor = getCurrentUserLogin();
                 saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.LEFT, actor, "Rời nhóm (nhóm bị giải tán)");
-                saveStatusHistory(groupId, GroupStatus.OPEN, GroupStatus.DISBANDED, actor, "Nhóm giải tán do Leader rời nhóm");
+                saveStatusHistory(groupId, previousStatus, GroupStatus.DISBANDED, actor, "Nhóm giải tán do Leader rời nhóm");
                 eventPublisher.publish("GROUP_DISBANDED", groupId, deadlineId, classId, actor, null);
                 return;
             }
@@ -356,7 +357,7 @@ public class GroupService {
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
         deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (!isDraft(group)) {
             throw new ConflictAlertException("Chỉ có thể chuyển quyền Leader khi nhóm ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -399,7 +400,7 @@ public class GroupService {
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
         deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (!isDraft(group)) {
             throw new ConflictAlertException("Chỉ có thể nộp nhóm khi đang ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -429,6 +430,8 @@ public class GroupService {
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
 
+        requireCompleteGroup(group);
+        GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.PENDING);
         group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
         group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
@@ -436,7 +439,7 @@ public class GroupService {
         groupRepository.save(group);
 
         String actor = getCurrentUserLogin();
-        saveStatusHistory(groupId, GroupStatus.OPEN, GroupStatus.PENDING, actor, "Leader nộp danh sách nhóm lên Giảng viên");
+        saveStatusHistory(groupId, previousStatus, GroupStatus.PENDING, actor, "Leader nộp danh sách nhóm lên Giảng viên");
 
         eventPublisher.publish("GROUP_SUBMITTED", groupId, deadlineId, classId, actor, null);
 
@@ -459,11 +462,12 @@ public class GroupService {
             throw new ForbiddenAlertException("Chỉ trưởng nhóm mới có quyền hủy nộp nhóm.", "group", "ERR_FORBIDDEN_NOT_LEADER");
         }
 
-        group.setStatus(GroupStatus.OPEN);
+        GroupStatus draftStatus = wasApprovalRevoked(group) ? GroupStatus.REVOKED : GroupStatus.OPEN;
+        group.setStatus(draftStatus);
         groupRepository.save(group);
 
         String actor = getCurrentUserLogin();
-        saveStatusHistory(groupId, GroupStatus.PENDING, GroupStatus.OPEN, actor, "Leader hủy nộp nhóm");
+        saveStatusHistory(groupId, GroupStatus.PENDING, draftStatus, actor, "Leader hủy nộp nhóm");
 
         eventPublisher.publish("GROUP_CANCEL_SUBMIT", groupId, deadlineId, classId, actor, null);
 
@@ -478,7 +482,7 @@ public class GroupService {
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
         deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (!isDraft(group)) {
             throw new ConflictAlertException("Chỉ có thể giải tán nhóm khi ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -492,12 +496,13 @@ public class GroupService {
         }
 
         groupMemberRepository.deleteByGroupId(groupId);
-        group.setStatus(GroupStatus.DISBANDED);
+        GroupStatus previousStatus = group.getStatus();
+                group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
 
         String actor = getCurrentUserLogin();
         saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.LEFT, actor, "Leader giải tán nhóm");
-        saveStatusHistory(groupId, GroupStatus.OPEN, GroupStatus.DISBANDED, actor, "Leader giải tán nhóm");
+        saveStatusHistory(groupId, previousStatus, GroupStatus.DISBANDED, actor, "Leader giải tán nhóm");
 
         eventPublisher.publish("GROUP_DISBANDED", groupId, deadlineId, classId, actor, null);
     }
@@ -512,7 +517,7 @@ public class GroupService {
         accessService.requireWriteAccess(schoolClass);
 
         String cleanName = req.getName().trim();
-        if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCase(classId, deadlineId, cleanName)) {
+        if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(classId, deadlineId, cleanName, GroupStatus.DISBANDED)) {
             throw new ConflictAlertException("Tên nhóm này đã tồn tại trong lớp học.", "group", "ERR_GROUP_NAME_EXISTS");
         }
 
@@ -540,28 +545,21 @@ public class GroupService {
             .toList();
 
         List<GroupRuleEvaluationDTO> evaluations = ruleValidationService.evaluateGroup(classId, proposedMembers);
-        boolean hasHardViolations = ruleValidationService.hasHardRuleViolations(evaluations);
-        if (hasHardViolations) {
-            List<String> hardErrors = ruleValidationService.getHardRuleViolations(evaluations).stream()
-                .map(GroupRuleEvaluationDTO::getMessage).toList();
-            throw new UnprocessableAlertException("Không thể tạo nhóm vi phạm Hard Rules: " + String.join(", ", hardErrors),
-                "group", "ERR_HARD_RULE_VIOLATED");
+        if (new HashSet<>(studentIds).size() != studentIds.size()) {
+            throw new BadRequestAlertException("Duplicate students", "group", "ERR_ALREADY_IN_GROUP");
+        }
+        if (studentIds.size() > ruleValidationService.getMaxMembers(classId)) {
+            throw new ConflictAlertException("Group is full", "group", "ERR_GROUP_FULL");
         }
 
-        boolean hasSoftViolations = !ruleValidationService.getSoftRuleViolations(evaluations).isEmpty();
-        if (hasSoftViolations && (req.getOverrideReason() == null || req.getOverrideReason().isBlank())) {
-            throw new UnprocessableAlertException("Nhóm chưa đạt Soft Rules. Giảng viên bắt buộc phải nhập lý do ngoại lệ (Override Reason).",
-                "group", "ERR_SOFT_RULE_NOT_SATISFIED");
-        }
-
-        // Create group with ACCEPTED status
+        // Create a draft; complete rules are checked at submission and approval.
         Long leaderId = studentIds.get(0);
         Group group = new Group();
         group.setDeadlineId(deadlineId);
         group.setSchoolClassId(classId);
         group.setName(cleanName);
         group.setLeaderId(leaderId);
-        group.setStatus(GroupStatus.ACCEPTED);
+        group.setStatus(GroupStatus.OPEN);
         group.setIsLecturerCreated(true);
         group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
         group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
@@ -584,21 +582,10 @@ public class GroupService {
         }
 
         String actor = getCurrentUserLogin();
-        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.ACCEPTED, actor, "Giảng viên tạo và duyệt nhóm trực tiếp");
-
-        // Save rule override if soft rules were skipped
-        if (hasSoftViolations) {
-            GroupRuleOverride override = new GroupRuleOverride();
-            override.setGroupId(savedGroup.getId());
-            override.setLecturerUsername(actor);
-            override.setViolatedRules(ruleValidationService.serializeSnapshot(ruleValidationService.getSoftRuleViolations(evaluations)));
-            override.setOverrideReason(req.getOverrideReason().trim());
-            override.setCreatedAt(Instant.now());
-            groupRuleOverrideRepository.save(override);
-        }
+        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Lecturer created draft for allocation");
 
         eventPublisher.publish("GROUP_CREATED", savedGroup.getId(), deadlineId, classId, actor, null);
-        eventPublisher.publish("GROUP_ACCEPTED", savedGroup.getId(), deadlineId, classId, actor, null);
+
 
         return getGroupDetail(savedGroup.getId(), classId, deadlineId);
     }
@@ -615,6 +602,8 @@ public class GroupService {
             throw new ConflictAlertException("Chỉ có thể phê duyệt nhóm đang ở trạng thái PENDING.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
+        requireCompleteGroup(group);
+        group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
         group.setStatus(GroupStatus.ACCEPTED);
         group.setRejectReason(null);
         groupRepository.save(group);
@@ -640,12 +629,13 @@ public class GroupService {
         }
 
         String reason = req.getReason().trim();
-        group.setStatus(GroupStatus.OPEN);
+        GroupStatus draftStatus = wasApprovalRevoked(group) ? GroupStatus.REVOKED : GroupStatus.OPEN;
+        group.setStatus(draftStatus);
         group.setRejectReason(reason);
         groupRepository.save(group);
 
         String actor = getCurrentUserLogin();
-        saveStatusHistory(groupId, GroupStatus.PENDING, GroupStatus.OPEN, actor, "Giảng viên từ chối: " + reason);
+        saveStatusHistory(groupId, GroupStatus.PENDING, draftStatus, actor, "Giảng viên từ chối: " + reason);
 
         eventPublisher.publish("GROUP_REJECTED", groupId, deadlineId, classId, actor, reason);
 
@@ -656,7 +646,7 @@ public class GroupService {
         validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
-        accessService.requireWriteAccess(schoolClass);
+        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) accessService.requireAssignedLecturer(schoolClass);
 
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
@@ -682,6 +672,7 @@ public class GroupService {
         accessService.requireWriteAccess(schoolClass);
 
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        requireStaffEditable(group);
 
         if (group.getStatus() == GroupStatus.DISBANDED) {
             throw new ConflictAlertException("Nhóm đã bị giải tán.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -699,6 +690,9 @@ public class GroupService {
             throw new ConflictAlertException("Sinh viên " + student.getFullName() + " đã thuộc nhóm khác.", "group", "ERR_ALREADY_IN_GROUP");
         });
 
+        if (groupMemberRepository.countByGroupId(groupId) >= ruleValidationService.getMaxMembers(classId)) {
+            throw new ConflictAlertException("Group is full", "group", "ERR_GROUP_FULL");
+        }
         // Add member
         GroupMember member = new GroupMember();
         member.setGroupId(groupId);
@@ -723,10 +717,14 @@ public class GroupService {
         accessService.requireWriteAccess(schoolClass);
 
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        requireStaffEditable(group);
 
         GroupMember member = groupMemberRepository.findByGroupIdAndStudentId(groupId, studentId)
             .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
 
+        if (groupMemberRepository.countByGroupId(groupId) <= 1) {
+            throw new ConflictAlertException("Disband the group to remove its final member", "group", "ERR_DISBAND_REQUIRED");
+        }
         groupMemberRepository.deleteByGroupIdAndStudentId(groupId, studentId);
 
         String actor = getCurrentUserLogin();
@@ -756,6 +754,7 @@ public class GroupService {
         accessService.requireWriteAccess(schoolClass);
 
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        requireStaffEditable(group);
 
         GroupMember newLeader = groupMemberRepository.findByGroupIdAndStudentId(groupId, newLeaderId)
             .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
@@ -786,6 +785,7 @@ public class GroupService {
         accessService.requireWriteAccess(schoolClass);
 
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        requireStaffEditable(group);
 
         List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
         String actor = getCurrentUserLogin();
@@ -794,16 +794,94 @@ public class GroupService {
         }
 
         groupMemberRepository.deleteByGroupId(groupId);
+        GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
 
-        saveStatusHistory(groupId, group.getStatus(), GroupStatus.DISBANDED, actor, "Giảng viên giải tán nhóm");
+        saveStatusHistory(groupId, previousStatus, GroupStatus.DISBANDED, actor, "Giảng viên giải tán nhóm");
         eventPublisher.publish("GROUP_DISBANDED", groupId, deadlineId, classId, actor, null);
     }
 
     // ==========================================
     // 4. HELPER METHODS
     // ==========================================
+
+    private boolean wasApprovalRevoked(Group group) {
+        return groupStatusHistoryRepository.existsByGroupIdAndToStatus(group.getId(), GroupStatus.REVOKED);
+    }
+
+    private boolean isDraft(Group group) {
+        return group.getStatus() == GroupStatus.OPEN || group.getStatus() == GroupStatus.REVOKED;
+    }
+
+    private void requireStaffEditable(Group group) {
+        if (!isDraft(group)) {
+            throw new ConflictAlertException("Only draft groups can be edited. Unlock approved groups or reject pending groups first.", "group", "ERR_GROUP_STATE_CONFLICT");
+        }
+        if (group.getStatus() == GroupStatus.REVOKED) {
+            deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(group.getDeadlineId()));
+        }
+    }
+
+    private void requireCompleteGroup(Group group) {
+        List<StudentRow> rows = studentRepository.findStudentsBySchoolClassId(group.getSchoolClassId());
+        Map<Long, StudentRow> students = rows.stream().collect(Collectors.toMap(StudentRow::userId, Function.identity()));
+        List<GroupMember> storedMembers = groupMemberRepository.findByGroupId(group.getId());
+        if (storedMembers.isEmpty() || storedMembers.stream().anyMatch(member -> !students.containsKey(member.getStudentId()))
+                || storedMembers.stream().filter(member -> member.getRole() == GroupMemberRole.LEADER).count() != 1
+                || storedMembers.stream().noneMatch(member -> member.getRole() == GroupMemberRole.LEADER && Objects.equals(member.getStudentId(), group.getLeaderId()))) {
+            throw new ConflictAlertException("Invalid group membership or leader", "group", "ERR_GROUP_STATE_CONFLICT");
+        }
+        List<GroupMemberDTO> members = storedMembers.stream()
+            .map(member -> toMemberDTO(member, students.get(member.getStudentId()))).toList();
+        var evaluations = ruleValidationService.evaluateGroup(group.getSchoolClassId(), members);
+        if (!ruleValidationService.areAllRulesPassed(evaluations)) {
+            throw new UnprocessableAlertException("Group rules must pass before submission or approval", "group", "ERR_HARD_RULE_VIOLATED");
+        }
+        long groupCount = groupRepository.findBySchoolClassIdAndDeadlineId(group.getSchoolClassId(), group.getDeadlineId()).stream()
+            .filter(value -> value.getStatus() != GroupStatus.DISBANDED).count();
+        for (GroupingRuleDTO rule : ruleValidationService.getClassRules(group.getSchoolClassId())) {
+            if (rule.status() && ((rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS && groupCount < rule.value())
+                    || (rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS && groupCount > rule.value()))) {
+                throw new UnprocessableAlertException("Class group count violates active rules", "group", "ERR_HARD_RULE_VIOLATED");
+            }
+        }
+        group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
+    }
+
+    public GroupDTO lecturerSubmitGroup(Integer deadlineId, Integer classId, Long groupId) {
+        validateManagementDeadline(deadlineId, classId);
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        requireStaffEditable(group);
+        requireCompleteGroup(group);
+        GroupStatus previous = group.getStatus();
+        group.setStatus(GroupStatus.PENDING);
+        group.setSubmittedRulesVersion(schoolClassRepository.findById(classId).orElseThrow().getRulesVersion());
+        group.setRejectReason(null);
+        groupRepository.save(group);
+        saveStatusHistory(groupId, previous, GroupStatus.PENDING, getCurrentUserLogin(), "Submitted for review by lecturer");
+        eventPublisher.publish("GROUP_SUBMITTED", groupId, deadlineId, classId, getCurrentUserLogin(), null);
+        return getGroupDetail(groupId, classId, deadlineId);
+    }
+
+    public GroupDTO lecturerMoveMember(Integer deadlineId, Integer classId, Long sourceId, Long targetId, Long studentId) {
+        validateManagementDeadline(deadlineId, classId);
+        if (Objects.equals(sourceId, targetId)) return getGroupDetail(sourceId, classId, deadlineId);
+        Group source = findScopedGroupForUpdate(sourceId, deadlineId, classId);
+        Group target = findScopedGroupForUpdate(targetId, deadlineId, classId);
+        requireStaffEditable(source);
+        requireStaffEditable(target);
+        if (groupMemberRepository.countByGroupId(sourceId) == 1) {
+            groupMemberRepository.findByGroupIdAndStudentId(sourceId, studentId)
+                .orElseThrow(() -> new ConflictAlertException("Not a member", "group", "ERR_MEMBER_NOT_IN_GROUP"));
+            lecturerDisbandGroup(deadlineId, classId, sourceId);
+        } else {
+            lecturerRemoveMember(deadlineId, classId, sourceId, studentId);
+        }
+        groupMemberRepository.flush();
+        return lecturerAddMember(deadlineId, classId, targetId, studentId);
+    }
+
     private Deadline validateDeadlineExists(Integer deadlineId, Integer classId) {
         Deadline deadline = deadlineRepository.findById(deadlineId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy đợt hạn này", "deadline", "ERR_DEADLINE_NOT_FOUND"));
@@ -834,6 +912,8 @@ public class GroupService {
     }
 
     private Deadline validateDeadlineActive(Integer deadlineId, Integer classId) {
+        schoolClassRepository.findByIdForUpdate(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
         getCurrentStudent(classId);
         Deadline deadline = lockDeadlineForMutation(deadlineId, classId);
         deadlinePolicy.requireStudentWrite(deadline);
@@ -841,6 +921,8 @@ public class GroupService {
     }
 
     private Deadline validateManagementDeadline(Integer deadlineId, Integer classId) {
+        schoolClassRepository.findByIdForUpdate(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);

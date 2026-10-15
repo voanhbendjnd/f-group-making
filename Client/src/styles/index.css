@@ -650,8 +650,10 @@ select.form-control {
 /* Toast Notifications */
 .toast-container {
   position: fixed;
-  bottom: 1.5rem;
+  top: calc(var(--header-height) + 0.75rem + env(safe-area-inset-top, 0px));
   right: 1.5rem;
+  max-height: calc(100dvh - var(--header-height) - 2rem);
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
@@ -659,6 +661,10 @@ select.form-control {
   max-width: 420px;
   width: calc(100% - 3rem);
   pointer-events: none;
+}
+
+@media (max-width: 600px) {
+  .toast-container { right: 0.75rem; width: calc(100% - 1.5rem); }
 }
 
 .toast {

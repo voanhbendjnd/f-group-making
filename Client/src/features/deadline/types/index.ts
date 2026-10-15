@@ -35,6 +35,7 @@ export interface UpdateDeadlineRequest {
   startTime?: string;
   endTime: string;
   schoolClassIds?: number[];
+  confirmedClassIds?: number[];
 }
 
 export interface DeadlineValidateResult {

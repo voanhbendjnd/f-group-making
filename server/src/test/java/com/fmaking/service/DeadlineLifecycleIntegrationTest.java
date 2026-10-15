@@ -185,6 +185,18 @@ class DeadlineLifecycleIntegrationTest {
         assertThat(members.findByStudentIdAndDeadlineId(studentUser.getId(), deadline.getId())).isPresent();
     }
 
+    @Test void reopeningPublishesTheSameSessionWithNewVersionAfterCommit() {
+        deadline.setEndTime(Instant.now().minusSeconds(1)); deadlines.saveAndFlush(deadline);
+        long previousVersion = deadline.getVersion();
+        UpdateDeadlineDTO update = new UpdateDeadlineDTO(); update.setId(deadline.getId()); update.setName(deadline.getName());
+        update.setEndTime(Instant.now().plusSeconds(3600));
+        service.updateDeadline(update);
+        verify(messaging).convertAndSend(eq("/topic/admin/deadlines"), argThat((Object value) ->
+            value instanceof DeadlineRealtimeEvent event && event.eventType().equals("DEADLINE_REOPENED")
+                && event.deadlineId().equals(deadline.getId()) && event.version() > previousVersion
+                && event.status() == DeadlineStatus.ACTIVE));
+    }
+
     @Test void managerCanReviewExpiredRoundButNotCancelledRound() {
         deadline.setEndTime(Instant.now().minusSeconds(1)); deadlines.saveAndFlush(deadline);
         assertThat(groupService.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isTrue();

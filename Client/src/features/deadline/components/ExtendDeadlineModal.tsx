@@ -40,24 +40,29 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   const [description, setDescription] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [confirmed, setConfirmed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (deadline) {
+      setConfirmed(false);
       setName(deadline.name);
       setDescription(deadline.description || '');
       setStartTime(toDateTimeLocalString(deadline.startTime));
       setEndTime(toDateTimeLocalString(deadline.endTime));
     }
-  }, [deadline]);
+  }, [deadline, open]);
 
   if (!deadline) return null;
 
-  const isActive = deadline.status === 'ACTIVE';
+  const isReopening = deadline.status === 'EXPIRED';
+  const isActive = deadline.status === 'ACTIVE' || isReopening;
+  const shared = deadline.schoolClassIds.length > 1;
   const isUpcoming = deadline.status === 'UPCOMING';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting || (shared && !confirmed)) return;
     if (!name.trim()) {
       toast.error(t('deadline.modal.nameRequired'));
       return;
@@ -92,12 +97,13 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
     try {
       await deadlineApi.updateDeadline(deadline.id, {
         id: deadline.id,
+        confirmedClassIds: shared && confirmed ? deadline.schoolClassIds : undefined,
         name: name.trim(),
         description: description.trim(),
         startTime: isActive ? undefined : new Date(startTime).toISOString(),
         endTime: new Date(endTime).toISOString(),
       });
-      toast.success(isActive ? t('deadline.messages.extendSuccess') : t('deadline.messages.updateSuccess'));
+      toast.success(isReopening ? t('deadlineLifecycle.reopened') : isActive ? t('deadline.messages.extendSuccess') : t('deadline.messages.updateSuccess'));
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -110,8 +116,8 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
   return (
     <Modal
       open={open}
-      onClose={onClose}
-      title={isActive ? t('deadline.modal.extendTitle') : t('deadline.modal.editTitle')}
+      onClose={() => { if (!isSubmitting) onClose(); }}
+      title={isReopening ? t('deadlineLifecycle.reopen') : isActive ? t('deadline.modal.extendTitle') : t('deadline.modal.editTitle')}
       maxWidth="560px"
     >
       <form onSubmit={handleSubmit}>
@@ -211,6 +217,10 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
           </div>
         </div>
 
+        {shared && <label className="alert alert-warning" style={{ display: 'flex', gap: '0.5rem' }}>
+          <input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} />
+          {t('deadlineLifecycle.confirmScope')}
+        </label>}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
           <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
             {t('deadline.modal.cancelBtn')}
@@ -219,9 +229,10 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({
             type="submit"
             variant="primary"
             loading={isSubmitting}
+            disabled={shared && !confirmed}
             icon={isActive ? <Clock size={16} /> : <Save size={16} />}
           >
-            {isActive ? t('deadline.modal.submitExtend') : t('deadline.modal.submitSave')}
+            {isReopening ? t('deadlineLifecycle.reopen') : isActive ? t('deadline.modal.submitExtend') : t('deadline.modal.submitSave')}
           </Button>
         </div>
       </form>

@@ -9,6 +9,7 @@ interface GroupCardProps {
   canJoin: boolean;
   isMyGroup: boolean;
   isLecturer: boolean;
+  canUnlock?: boolean;
   isDeadlineExpired: boolean;
   onJoin: (groupId: number) => void;
   onAccept?: (groupId: number) => void;
@@ -22,6 +23,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   canJoin,
   isMyGroup,
   isLecturer,
+  canUnlock = false,
   isDeadlineExpired,
   onJoin,
   onAccept,
@@ -32,7 +34,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   const { t } = useTranslation();
 
   const isFull = group.memberCount >= group.maxMembers;
-  const isOpen = group.status === 'OPEN';
+  const isOpen = group.status === 'OPEN' || group.status === 'REVOKED';
   const isPending = group.status === 'PENDING';
   const isAccepted = group.status === 'ACCEPTED';
 
@@ -49,7 +51,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
       case 'ACCEPTED':
         return <Tag color="green">{t('studentGroup.card.acceptedStatus')}</Tag>;
       case 'REVOKED':
-        return <Tag color="red">{t('studentGroup.card.revokedStatus')}</Tag>;
+        return <Tag color="red">{t('groupLifecycle.revoked')}</Tag>;
       default:
         return <Tag>{group.status}</Tag>;
     }
@@ -167,7 +169,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
               </>
             )}
 
-            {isAccepted && (
+            {isAccepted && canUnlock && (
               <Popconfirm
                 title={t('studentGroup.card.revokeConfirmTitle')}
                 description={t('studentGroup.card.revokeConfirmDesc')}

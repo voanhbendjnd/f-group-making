@@ -40,7 +40,7 @@ public class DeadlineScheduleService {
     @TransactionalEventListener
     public void changed(DeadlineLifecycleEvent event) {
         var message = event.message();
-        if (Set.of("DEADLINE_CREATED", "DEADLINE_UPDATED", "DEADLINE_EXTENDED", "DEADLINE_CANCELLED").contains(message.eventType())) {
+        if (Set.of("DEADLINE_CREATED", "DEADLINE_UPDATED", "DEADLINE_EXTENDED", "DEADLINE_REOPENED", "DEADLINE_CANCELLED").contains(message.eventType())) {
             schedule(message.deadlineId(), message.version(), message.startTime(), message.endTime(), message.status());
         }
     }
