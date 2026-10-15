@@ -37,6 +37,7 @@ Sinh viên chưa có nhóm trong hoạt động hiện tại được phép tham
 Toàn bộ thao tác ghi nghiệp vụ phải đi qua REST API và được xử lý bằng transaction cùng cơ chế kiểm soát đồng thời phù hợp.
 Các thao tác bao gồm `Create`, `Join`, `Leave`, `Transfer Leader`, `Submit`, `Cancel Submit`, `Accept`, `Reject`, `Revoke` và các thao tác quản trị khác được State Machine cho phép.
 - WebSocket/STOMP chỉ truyền sự kiện đồng bộ giao diện, không thay thế REST API.
+- Cập nhật 16/10/2026 theo [kế hoạch 14](14-ke-hoach-dong-bo-deadline-va-realtime.md): deadline đã `CANCELLED` khóa mọi thao tác ghi nhóm của cả SV và GV/Admin, vẫn cho xem nhóm/lịch sử. Deadline `EXPIRED` bình thường vẫn cho GV hậu kiểm. Dashboard, validate, workspace và danh sách quản lý cùng nhận sự kiện deadline sau commit và tải lại REST.
 - Chỉ phát sự kiện tương ứng sau khi transaction thành công.
 - Client phải tải lại trạng thái chuẩn từ REST API khi kết nối lại hoặc phát hiện dữ liệu không đồng bộ.
 - Cân nhắc Transactional Outbox nếu cần bảo đảm sự kiện không bị mất sau khi dữ liệu nghiệp vụ đã commit.
