@@ -9,6 +9,8 @@ export interface ModalProps {
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidth?: string;
+  description?: string;
+  headerIcon?: React.ReactNode;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -18,6 +20,8 @@ export const Modal: React.FC<ModalProps> = ({
   children,
   footer,
   maxWidth = '560px',
+  description,
+  headerIcon,
 }) => {
   const { t } = useTranslation();
   useEffect(() => {
@@ -52,9 +56,13 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div className="modal-card" style={{ maxWidth }}>
         <div className="modal-header">
+          {headerIcon}
+          {description ? <div>
           <h3 id="modal-title" className="card-title">
             {title}
           </h3>
+          <p className="modal-description">{description}</p>
+          </div> : <h3 id="modal-title" className="card-title">{title}</h3>}
           <button
             type="button"
             onClick={onClose}

@@ -28,6 +28,7 @@ import { ClassDetailPage } from '@/pages/admin/ClassDetailPage';
 import { AdminDeadlinePage } from '@/pages/admin/AdminDeadlinePage';
 import { LecturerDeadlinePage } from '@/pages/lecturer/LecturerDeadlinePage';
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
+import { StudentProfilePage } from '@/pages/student/StudentProfilePage';
 import { SelectGroupPage } from '@/pages/student/SelectGroupPage';
 import { UnauthorizedPage } from '@/pages/errors/UnauthorizedPage';
 import { NotFoundPage } from '@/pages/errors/NotFoundPage';
@@ -178,6 +179,7 @@ export const router = createBrowserRouter([
         path: 'dashboard',
         element: <StudentDashboardPage />,
       },
+      { path: 'profile', element: <StudentProfilePage /> },
       {
         path: 'groups/select',
         element: <SelectGroupPage />,
