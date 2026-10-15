@@ -6,6 +6,7 @@ import { StudentLayout } from '@/components/layout/StudentLayout';
 import { LecturerLayout } from '@/components/layout/LecturerLayout';
 import { LecturerClassListPage } from '@/pages/lecturer/LecturerClassListPage';
 import { LecturerClassDetailPage } from '@/pages/lecturer/LecturerClassDetailPage';
+import { LecturerProfilePage } from '@/pages/lecturer/LecturerProfilePage';
 import { getHomeRoute } from '@/features/auth/utils/roleRouting';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RoleRoute } from './RoleRoute';
@@ -158,6 +159,7 @@ export const router = createBrowserRouter([
       { path: 'classes', element: <LecturerClassListPage /> },
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
       { path: 'deadlines', element: <LecturerDeadlinePage /> },
+      { path: 'profile', element: <LecturerProfilePage /> },
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],

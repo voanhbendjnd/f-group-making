@@ -8,6 +8,7 @@ export interface PaginationProps {
   currentPage?: number;
   onPageChange: (newPage: number) => void;
   onPageSizeChange?: (newSize: number) => void;
+  showingKey?: string;
 }
 
 export const Pagination: React.FC<PaginationProps> = ({
@@ -15,6 +16,7 @@ export const Pagination: React.FC<PaginationProps> = ({
   currentPage,
   onPageChange,
   onPageSizeChange,
+  showingKey = 'pagination.showing',
 }) => {
   const { t } = useTranslation();
   const sizeId = useId();
@@ -64,7 +66,7 @@ export const Pagination: React.FC<PaginationProps> = ({
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.75rem', minWidth: 0 }}>
         <span>
           <Trans
-            i18nKey="pagination.showing"
+            i18nKey={showingKey}
             values={{ start: startRecord, end: endRecord, total }}
             components={{ strong: <strong /> }}
           />

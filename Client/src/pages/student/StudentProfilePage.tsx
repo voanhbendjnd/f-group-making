@@ -1,4 +1,5 @@
-import { CalendarDays, CheckCircle2, GraduationCap, IdCard, Layers, Mail, Users, CircleAlert } from 'lucide-react';
+import { CalendarDays, GraduationCap, IdCard, Layers, Mail, Users } from 'lucide-react';
+import { ProfileHeader } from '@/components/common/ProfileHeader';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/common/PageHeader';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -35,14 +36,8 @@ export function StudentProfilePage() {
   return <div className="student-profile-page">
     {header}
     <section className="card student-profile-card" aria-label={t('studentProfile.details')}>
-      <div className="student-profile-header">
-        <div className="student-profile-avatar" aria-hidden="true">{profile.fullName?.trim().charAt(0).toUpperCase() || <Users size={26} />}</div>
-        <div className="student-profile-identity"><h2>{name}</h2><p>{t('sidebar.studentRole')}</p></div>
-        <span className={`badge ${profile.activated ? 'badge-success' : 'badge-warning'}`}>
-          {profile.activated ? <CheckCircle2 size={14} aria-hidden="true" /> : <CircleAlert size={14} aria-hidden="true" />}
-          {t(profile.activated ? 'studentProfile.active' : 'studentProfile.inactive')}
-        </span>
-      </div>
+      <ProfileHeader name={name} role={t('sidebar.studentRole')} activated={profile.activated}
+        initials={profile.fullName?.trim().charAt(0).toUpperCase()} fallback={<Users size={26} />} />
       <dl className="student-profile-fields">
         {fields.map(({ label, text, icon: Icon }) => <div key={label} className="student-profile-field">
           <div className="student-profile-field-icon" aria-hidden="true"><Icon size={20} /></div>

@@ -135,12 +135,12 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     fireEvent.click(button); fireEvent.click(button);
     await waitFor(() => expect(classApi.assignLecturer).toHaveBeenCalledTimes(1));
     expect(classApi.assignLecturer).toHaveBeenCalledWith(7, 100, null);
-    expect(screen.getByRole('combobox', { name: 'Academic Term' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: i18n.t('terms.label') })).toBeDisabled();
     await act(async () => pending.resolve(assigned));
     expect(await screen.findByText('Đã cập nhật giảng viên phụ trách cho lớp.')).toBeInTheDocument();
     expect(screen.getByText('GV100')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Lưu giảng viên' })).toBeDisabled();
-    expect(screen.getByRole('combobox', { name: 'Academic Term' })).not.toBeDisabled();
+    expect(screen.getByRole('combobox', { name: i18n.t('terms.label') })).not.toBeDisabled();
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['school-classes'] });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['my-school-classes'] });
     expect(ruleApi.saveRules).not.toHaveBeenCalled();

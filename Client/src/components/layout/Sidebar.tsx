@@ -34,7 +34,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAdmin = area ? area === 'admin' : hasAdminRole;
   const isLecturer = area === 'lecturer';
   const isStudentArea = !isAdmin && !isLecturer;
-  const FooterProfile = isStudentArea ? 'button' : 'div';
+  const lecturerProfile = isLecturer && Boolean(user?.authorities?.some(role => role === 'ROLE_LECTURE' || role === 'ROLE_LECTURE_MASTER'));
+  const profilePath = isStudentArea ? '/student/profile' : lecturerProfile ? '/lecturer/profile' : null;
+  const FooterProfile = profilePath ? 'button' : 'div';
   const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
   const allClasses = canViewAllClasses(user?.authorities || []);
 
@@ -102,6 +104,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
 
   if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
+  if (lecturerProfile) navItems.push({ to: '/lecturer/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
 
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
@@ -142,7 +145,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {isAdmin && showTermFilter && (
+      {showTermFilter && (
         <div style={{ padding: '1rem 0.75rem', borderBottom: '1px solid var(--color-border)' }}>
           <TermSelect compact />
         </div>
@@ -224,10 +227,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           justifyContent: 'space-between',
         }}
       >
-        <FooterProfile className={isStudentArea ? 'sidebar-profile-link' : undefined}
-          type={isStudentArea ? 'button' : undefined}
-          aria-label={isStudentArea ? t('studentProfile.open') : undefined}
-          onClick={isStudentArea ? () => { navigate('/student/profile'); onClose?.(); } : undefined}
+        <FooterProfile className={profilePath ? 'sidebar-profile-link' : undefined}
+          type={profilePath ? 'button' : undefined}
+          aria-label={profilePath ? t('studentProfile.open') : undefined}
+          onClick={profilePath ? () => { navigate(profilePath); onClose?.(); } : undefined}
           style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', minWidth: 0 }}>
           <div
             style={{

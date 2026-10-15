@@ -1,5 +1,8 @@
 {
   "terms": {
+    "profileGlobal": "Your personal profile is independent of the selected academic term.",
+    "studentScopeNotice": "This screen is not filtered by the selected term. Student information and deadline links follow your actual assigned class.",
+    "deadlineScopeNotice": "Deadlines currently cover all terms you are authorized to access. The academic term filter does not apply to this screen.",
     "label": "Academic Term",
     "current": "Current",
     "invalid": "This academic term is no longer available. Reload the term list and select an available term.",
@@ -655,6 +658,25 @@
     "account": "Account",
     "accountDetails": "Account information",
     "open": "View my profile"
+  },
+  "lecturerProfile": {
+    "description": "Your lecturer account information.",
+    "details": "Lecturer profile details",
+    "loading": "Loading your lecturer profile...",
+    "error": "Unable to load your profile. Please try again.",
+    "forbidden": "This profile is available to lecturers and lecturer masters only.",
+    "code": "Lecturer Code",
+    "incomplete": "Your lecturer profile is incomplete. Your account information is shown; please contact an administrator to complete the lecturer record.",
+    "classes": "My assigned classes",
+    "showing": "Showing <strong>{{start}} – {{end}}</strong> of <strong>{{total}}</strong> classes",
+    "classesDescription": "Only classes assigned to you are listed, across all academic terms.",
+    "total_one": "{{count}} assigned class",
+    "total_other": "{{count}} assigned classes",
+    "total": "{{count}} assigned classes",
+    "classesLoading": "Loading your assigned classes...",
+    "classesError": "Unable to load your assigned classes. Please try again.",
+    "noClasses": "No assigned classes yet",
+    "noClassesDescription": "You have not been assigned any classes. Contact an administrator if you need an assignment."
   },
   "addLecturer": {
     "listTitle": "Lecturer / Mentor Management",

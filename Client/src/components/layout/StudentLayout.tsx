@@ -2,8 +2,12 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopNavbar } from './TopNavbar';
+import { TermProvider } from '@/app/providers/TermContext';
+import { useAuth } from '@/app/providers/AuthContext';
+import { TermFilterNotice } from '@/features/terms/components/TermFilterNotice';
 
 export const StudentLayout: React.FC = () => {
+  const { user } = useAuth();
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -30,6 +34,7 @@ export const StudentLayout: React.FC = () => {
   };
 
   return (
+    <TermProvider key={user?.id}>
     <div className={`app-layout ${isCollapsed ? 'sidebar-collapsed' : ''}`}>
       {mobileOpen && (
         <div
@@ -38,7 +43,7 @@ export const StudentLayout: React.FC = () => {
         />
       )}
 
-      <Sidebar area="student" isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
+      <Sidebar showTermFilter area="student" isOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
 
       <div className="main-content">
         <TopNavbar
@@ -47,9 +52,11 @@ export const StudentLayout: React.FC = () => {
           onToggleSidebar={handleToggleSidebar}
         />
         <main className="page-container">
+          <TermFilterNotice area="student" />
           <Outlet />
         </main>
       </div>
     </div>
+    </TermProvider>
   );
 };

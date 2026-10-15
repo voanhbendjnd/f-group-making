@@ -1,3 +1,6 @@
+import { StudentLayout } from '@/components/layout/StudentLayout';
+import { LecturerLayout } from '@/components/layout/LecturerLayout';
+import { TermFilterNotice } from '@/features/terms/components/TermFilterNotice';
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -86,6 +89,27 @@ function chooseFile() {
 }
 
 describe('Academic Term filter', () => {
+  it.each(['student', 'lecturer'])('reuses the Admin selector in the %s layout and persists choice across refresh', async area => {
+    const content = area === 'student' ? <StudentLayout /> : <LecturerLayout />;
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const view = render(<MemoryRouter><QueryClientProvider client={client}>{content}</QueryClientProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveTextContent('FALL26'));
+    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByRole('option', { name: 'SP26' }));
+    await waitFor(() => expect(localStorage.getItem(storageKey)).toBe('1'));
+    view.unmount();
+    render(<MemoryRouter><QueryClientProvider client={client}>{content}</QueryClientProvider></MemoryRouter>);
+    await waitFor(() => expect(screen.getByRole('combobox')).toHaveTextContent('SP26'));
+    await act(async () => { await i18n.changeLanguage('vi'); });
+    expect(screen.getByRole('combobox', { name: i18n.t('terms.label') })).toHaveTextContent('SP26');
+    expect(i18n.t('terms.label')).not.toBe('Academic Term');
+  });
+
+  it('explains unsupported deadline filtering without sending term parameters', () => {
+    renderPage(<TermFilterNotice area="lecturer" />, '/lecturer/deadlines');
+    expect(screen.getByText(i18n.t('terms.deadlineScopeNotice'))).toBeInTheDocument();
+  });
+
   beforeEach(async () => {
     vi.resetAllMocks();
     localStorage.clear();

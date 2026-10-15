@@ -4,6 +4,7 @@ import { User, Mail, IdCard, Layers, CalendarDays, Users, CheckCircle2, CircleAl
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useStudentProfile } from '@/features/students/hooks/useStudentProfile';
+import { useLecturerProfile } from '@/features/lecturers/hooks/useLecturerProfile';
 import type { ProfileInfo } from '@/features/students/api/profileApi';
 import { getApiError } from '@/services/api/types';
 
@@ -56,15 +57,21 @@ export function AccountPopover() {
     ? 'lecturer.masterRole' : roles.includes('ROLE_LECTURE') ? 'lecturer.role' : roles.includes('ROLE_STUDENT')
     ? 'sidebar.studentRole' : 'studentProfile.account';
   const isStudent = role === 'sidebar.studentRole';
+  const isLecturer = role === 'lecturer.role' || role === 'lecturer.masterRole';
   const query = useStudentProfile(hasOpened && isStudent);
+  const lecturerQuery = useLecturerProfile(hasOpened && isLecturer);
+  const lecturerProfile = isLecturer ? lecturerQuery.data : undefined;
+  const activeQuery = isStudent ? query : lecturerQuery;
   const profile = isStudent ? query.data : undefined;
-  const name = profile?.fullName?.trim() || user?.name?.trim() || t('studentProfile.missingName');
-  const initials = (profile?.fullName || user?.name || user?.email || '').trim().split(/\s+/)
+  const name = profile?.fullName?.trim() || lecturerProfile?.name?.trim() || user?.name?.trim() || t('studentProfile.missingName');
+  const accountProfile = profile || lecturerProfile;
+  const initials = (profile?.fullName || lecturerProfile?.name || user?.name || user?.email || '').trim().split(/\s+/)
     .filter(Boolean).slice(-2).map((part) => part.charAt(0).toUpperCase()).join('');
   const value = (info: ProfileInfo, emptyKey: string) => info.state === 'AVAILABLE' && info.name?.trim()
     ? info.name : t(info.state === 'UNASSIGNED' ? emptyKey : 'studentProfile.invalidLink');
   const fields = [
-    { key: 'email', label: 'studentProfile.email', text: profile?.email?.trim() || user?.email || t('studentProfile.unavailable'), icon: Mail },
+    { key: 'email', label: 'studentProfile.email', text: accountProfile?.email?.trim() || user?.email || t('studentProfile.unavailable'), icon: Mail },
+    ...(lecturerProfile ? [{ key: 'code', label: 'lecturerProfile.code', text: lecturerProfile.code?.trim() || t('studentProfile.unavailable'), icon: IdCard }] : []),
     ...(profile ? [
       { key: 'studentId', label: 'studentProfile.studentId', text: profile.rollNumber?.trim() || t('studentProfile.unavailable'), icon: IdCard },
       { key: 'class', label: 'studentProfile.class', text: value(profile.schoolClass, 'studentProfile.noClass'), icon: Layers },
@@ -87,9 +94,9 @@ export function AccountPopover() {
         <div className="account-preview-identity">
           <strong>{name}</strong>
           <span className="account-preview-role">{t(role)}</span>
-          {profile && <span className={`account-preview-status ${profile.activated ? 'is-active' : 'is-pending'}`}>
-            {profile.activated ? <CheckCircle2 size={14} aria-hidden="true" /> : <CircleAlert size={14} aria-hidden="true" />}
-            {t(profile.activated ? 'studentProfile.active' : 'studentProfile.inactive')}
+          {accountProfile && <span className={`account-preview-status ${accountProfile.activated ? 'is-active' : 'is-pending'}`}>
+            {accountProfile.activated ? <CheckCircle2 size={14} aria-hidden="true" /> : <CircleAlert size={14} aria-hidden="true" />}
+            {t(accountProfile.activated ? 'studentProfile.active' : 'studentProfile.inactive')}
           </span>}
         </div>
       </div>
@@ -99,10 +106,11 @@ export function AccountPopover() {
           <div><dt>{t(label)}</dt><dd>{text}</dd></div>
         </div>)}
       </dl>
-      {isStudent && !profile && <p className="account-preview-note" role="status">
-        {t(query.isError ? getApiError(query.error).status === 404 ? 'accountPreview.noProfile' : 'accountPreview.loadError' : 'accountPreview.loading')}
+      {(isStudent || isLecturer) && !accountProfile && <p className="account-preview-note" role="status">
+        {t(activeQuery.isError ? getApiError(activeQuery.error).status === 404 ? 'accountPreview.noProfile' : 'accountPreview.loadError' : 'accountPreview.loading')}
       </p>}
-      {profile && query.isError && <p className="account-preview-note" role="status">{t('accountPreview.refreshError')}</p>}
+      {accountProfile && activeQuery.isError && <p className="account-preview-note" role="status">{t('accountPreview.refreshError')}</p>}
+      {lecturerProfile && !lecturerProfile.profileComplete && <p className="account-preview-note" role="status">{t('lecturerProfile.incomplete')}</p>}
     </div>, document.body)}
   </>;
 }
