@@ -55,9 +55,10 @@ public class DeadlineResource {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Page<DeadlineDTO>> getDeadlines(Pageable pageable) {
+    public ResponseEntity<Page<DeadlineDTO>> getDeadlines(Pageable pageable,
+            @RequestParam(name = "termId", required = false) Integer termId) {
         log.debug("REST request to get a page of Deadlines");
-        Page<DeadlineDTO> page = deadlineService.getDeadlines(pageable);
+        Page<DeadlineDTO> page = deadlineService.getDeadlines(pageable, termId);
         return ResponseEntity.ok(page);
     }
 

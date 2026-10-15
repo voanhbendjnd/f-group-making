@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.InitBinder;
 
 /** Prevent an explicitly empty term filter from becoming an unfiltered request. */
-@ControllerAdvice(assignableTypes = {StudentResource.class, LecturerResource.class, SchoolClassResource.class, AccountResource.class})
+@ControllerAdvice(assignableTypes = {StudentResource.class, LecturerResource.class, SchoolClassResource.class, AccountResource.class, DeadlineResource.class})
 public class TermRequestAdvice {
 
     @InitBinder("termId")

@@ -8,7 +8,8 @@ public record StudentProfileDTO(
         ProfileInfo major,
         ProfileInfo schoolClass,
         ProfileInfo term,
-        ProfileInfo group
+        ProfileInfo group,
+        Integer schoolClassId
 ) {
     public record ProfileInfo(String name, String state) {
     }

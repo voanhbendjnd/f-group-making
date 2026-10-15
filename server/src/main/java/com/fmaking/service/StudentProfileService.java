@@ -55,7 +55,7 @@ public class StudentProfileService {
                 .filter(value -> schoolClass != null && Objects.equals(value.getSchoolClassId(), schoolClass.getId()))
                 .map(value -> available(value.getName())).orElseGet(StudentProfileService::missing);
         return new StudentProfileDTO(student.getFullName(), student.getRollNumber(), user.getEmail(),
-                Boolean.TRUE.equals(user.getActivated()), major, classInfo, termInfo, groupInfo);
+                Boolean.TRUE.equals(user.getActivated()), major, classInfo, termInfo, groupInfo, student.getSchoolClassId());
     }
 
     private static ProfileInfo available(String name) {

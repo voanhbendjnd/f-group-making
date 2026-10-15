@@ -38,6 +38,19 @@ public class Deadline extends AbstractAuditingEntity<Integer> {
     @Column(name = "status", length = 20, nullable = false)
     private String status = "ACTIVE";
 
+    @Version
+    @Column(nullable = false, columnDefinition = "bigint default 0")
+    private long version;
+
+    private Instant cancelledAt;
+    private String cancelledBy;
+
+    public long getVersion() { return version; }
+    public Instant getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(Instant cancelledAt) { this.cancelledAt = cancelledAt; }
+    public String getCancelledBy() { return cancelledBy; }
+    public void setCancelledBy(String cancelledBy) { this.cancelledBy = cancelledBy; }
+
     @JsonIgnore
     @ManyToMany
     @JoinTable(

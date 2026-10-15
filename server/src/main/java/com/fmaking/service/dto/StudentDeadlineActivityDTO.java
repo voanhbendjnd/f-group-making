@@ -31,4 +31,7 @@ public class StudentDeadlineActivityDTO {
     private Integer memberCount;
     private Integer maxMembers;
     private boolean isLeader;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isLeader")
+    public boolean isLeader() { return isLeader; }
 }

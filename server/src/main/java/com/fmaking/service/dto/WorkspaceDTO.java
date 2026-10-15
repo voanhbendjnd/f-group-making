@@ -21,6 +21,8 @@ public class WorkspaceDTO {
     private Instant deadlineStartTime;
     private Instant deadlineEndTime;
     private boolean deadlineExpired;
+    private String readOnlyReason;
+    private boolean canManageGroups;
 
     private Integer schoolClassId;
     private String schoolClassName;
@@ -42,4 +44,10 @@ public class WorkspaceDTO {
     private boolean canCreateGroup;
     private boolean canJoinGroup;
     private boolean isLecturer;
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isLeader")
+    public boolean isLeader() { return isLeader; }
+
+    @com.fasterxml.jackson.annotation.JsonProperty("isLecturer")
+    public boolean isLecturer() { return isLecturer; }
 }
