@@ -5,5 +5,6 @@ public enum GroupMemberAction {
     LEFT,
     KICKED,
     TRANSFERRED_LEADER,
-    ASSIGNED_BY_LECTURER
+    ASSIGNED_BY_LECTURER,
+    REMOVED_BY_LECTURER
 }

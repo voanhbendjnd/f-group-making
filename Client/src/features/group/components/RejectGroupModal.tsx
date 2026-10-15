@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button } from 'antd';
 import { AlertCircle } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface RejectGroupModalProps {
   open: boolean;
@@ -17,6 +18,7 @@ export const RejectGroupModal: React.FC<RejectGroupModalProps> = ({
   onSubmit,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
@@ -37,7 +39,7 @@ export const RejectGroupModal: React.FC<RejectGroupModalProps> = ({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.125rem', color: '#dc2626' }}>
           <AlertCircle size={20} />
-          <span>Từ Chối Phê Duyệt Nhóm</span>
+          <span>{t('groupWorkspace.rejectModal.title')}</span>
         </div>
       }
       open={open}
@@ -46,33 +48,34 @@ export const RejectGroupModal: React.FC<RejectGroupModalProps> = ({
       destroyOnClose
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-        Vui lòng nhập lý do từ chối để sinh viên hiểu rõ và tiến hành điều chỉnh nhóm:
+        {t('groupWorkspace.rejectModal.description')}
       </p>
 
       <Form form={form} layout="vertical" onFinish={handleFinish}>
         <Form.Item
           name="reason"
-          label="Lý do từ chối (Bắt buộc)"
+          label={t('groupWorkspace.rejectModal.reasonLabel')}
           rules={[
-            { required: true, message: 'Vui lòng nhập lý do từ chối' },
-            { min: 5, message: 'Lý do phải có ít nhất 5 ký tự' },
+            { required: true, message: t('groupWorkspace.rejectModal.reasonRequired') },
+            { min: 5, message: t('groupWorkspace.rejectModal.reasonMin') },
           ]}
         >
           <Input.TextArea
             rows={4}
-            placeholder="Ví dụ: Nhóm chưa đủ sinh viên chuyên ngành SE; Cần thêm 1 thành viên nữa theo quy chế..."
+            placeholder={t('groupWorkspace.rejectModal.reasonPlaceholder')}
           />
         </Form.Item>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1.5rem' }}>
           <Button onClick={onClose} disabled={submitting || isLoading}>
-            Hủy
+            {t('groupWorkspace.rejectModal.cancel')}
           </Button>
           <Button danger type="primary" htmlType="submit" loading={submitting || isLoading}>
-            Xác Nhận Từ Chối
+            {t('groupWorkspace.rejectModal.confirm')}
           </Button>
         </div>
       </Form>
     </Modal>
   );
 };
+

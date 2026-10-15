@@ -22,6 +22,17 @@ export const RuleChecklistCard: React.FC<RuleChecklistCardProps> = ({
 
   const allPassed = evaluations.every((e) => e.passed);
 
+  const getRuleMessage = (evalItem: GroupRuleEvaluationDTO) => {
+    if (evalItem.code) {
+      const key = `studentGroup.rules.${evalItem.code}_${evalItem.passed ? 'passed' : 'failed'}`;
+      const translated = t(key, { actual: evalItem.actualValue, target: evalItem.targetValue });
+      if (translated && translated !== key) {
+        return translated;
+      }
+    }
+    return evalItem.message;
+  };
+
   return (
     <div
       style={{
@@ -35,7 +46,7 @@ export const RuleChecklistCard: React.FC<RuleChecklistCardProps> = ({
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
         <div>
           <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main, #0f172a)' }}>
-            {title || t('groupFormation.rules.title', 'Quy tắc chia nhóm của lớp')}
+            {title || t('studentGroup.rules.title', t('groupFormation.rules.title', 'Quy tắc chia nhóm của lớp'))}
           </h4>
           {subtitle && (
             <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: 'var(--color-text-muted, #64748b)' }}>
@@ -58,8 +69,8 @@ export const RuleChecklistCard: React.FC<RuleChecklistCardProps> = ({
         >
           {allPassed ? <ShieldCheck size={14} /> : <AlertCircle size={14} />}
           {allPassed
-            ? t('groupFormation.rules.allMet', 'Đủ điều kiện nộp')
-            : t('groupFormation.rules.notMet', 'Chưa đạt yêu cầu')}
+            ? t('studentGroup.rules.allMet', t('groupFormation.rules.allMet', 'Đủ điều kiện nộp'))
+            : t('studentGroup.rules.notMet', t('groupFormation.rules.notMet', 'Chưa đạt yêu cầu'))}
         </span>
       </div>
 
@@ -106,7 +117,7 @@ export const RuleChecklistCard: React.FC<RuleChecklistCardProps> = ({
                           : '#92400e',
                       }}
                     >
-                      {evalItem.message}
+                      {getRuleMessage(evalItem)}
                     </span>
                     <span
                       style={{

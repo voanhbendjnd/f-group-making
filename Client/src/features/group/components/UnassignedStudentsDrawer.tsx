@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Drawer, Input, Tag, Empty, Button } from 'antd';
 import { Search, Users, UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { GroupMemberDTO } from '../types/groupTypes';
 
 interface UnassignedStudentsDrawerProps {
@@ -18,6 +19,7 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
   isLecturer,
   onOpenLecturerCreate,
 }) => {
+  const { t } = useTranslation();
   const [keyword, setKeyword] = useState('');
 
   const filtered = students.filter((s) => {
@@ -35,11 +37,11 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Users size={18} color="var(--color-primary, #2563eb)" />
-          <span>Sinh Viên Chưa Có Nhóm ({students.length})</span>
+          <span>{t('studentGroup.unassignedDrawer.title', { count: students.length })}</span>
         </div>
       }
       placement="right"
-      width={400}
+      width="min(100vw, 400px)"
       onClose={onClose}
       open={open}
       extra={
@@ -53,7 +55,7 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
               onOpenLecturerCreate();
             }}
           >
-            Tạo nhóm cho SV
+            {t('studentGroup.unassignedDrawer.createForStudents')}
           </Button>
         ) : null
       }
@@ -61,7 +63,7 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
       <div style={{ marginBottom: '1rem' }}>
         <Input
           prefix={<Search size={16} color="#94a3b8" />}
-          placeholder="Tìm theo tên, MSSV, chuyên ngành..."
+          placeholder={t('studentGroup.unassignedDrawer.searchPlaceholder')}
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           allowClear
@@ -69,7 +71,7 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
       </div>
 
       {filtered.length === 0 ? (
-        <Empty description="Không tìm thấy sinh viên phù hợp" />
+        <Empty description={t('studentGroup.unassignedDrawer.empty')} />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map((s) => (

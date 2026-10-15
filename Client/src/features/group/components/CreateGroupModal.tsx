@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button } from 'antd';
 import { Users } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -15,6 +16,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
   onSubmit,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,40 +36,42 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.125rem' }}>
           <Users size={20} color="var(--color-primary, #2563eb)" />
-          <span>Tạo Nhóm Mới</span>
+          <span>{t('studentGroup.createModal.title')}</span>
         </div>
       }
       open={open}
       onCancel={onClose}
       footer={null}
       destroyOnClose
+      width="min(92vw, 520px)"
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-        Sau khi tạo, bạn sẽ tự động trở thành <strong>Trưởng nhóm (Leader)</strong>. Bạn có thể mời hoặc để các bạn khác tự tham gia.
+        {t('studentGroup.createModal.description')}
       </p>
 
       <Form form={form} layout="vertical" onFinish={handleFinish}>
         <Form.Item
           name="name"
-          label="Tên Nhóm"
+          label={t('studentGroup.createModal.nameLabel')}
           rules={[
-            { required: true, message: 'Vui lòng nhập tên nhóm' },
-            { min: 2, message: 'Tên nhóm phải có ít nhất 2 ký tự' },
-            { max: 100, message: 'Tên nhóm không được vượt quá 100 ký tự' },
+            { required: true, message: t('studentGroup.createModal.nameRequired') },
+            { min: 2, message: t('studentGroup.createModal.nameMin') },
+            { max: 100, message: t('studentGroup.createModal.nameMax') },
           ]}
         >
-          <Input placeholder="Ví dụ: Nhóm Chiến Binh, Group Awesome, Team 01..." size="large" autoFocus />
+          <Input placeholder={t('studentGroup.createModal.namePlaceholder')} size="large" autoFocus />
         </Form.Item>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1.5rem' }}>
           <Button onClick={onClose} disabled={submitting || isLoading}>
-            Hủy
+            {t('studentGroup.createModal.cancel')}
           </Button>
           <Button type="primary" htmlType="submit" loading={submitting || isLoading} size="large">
-            Xác Nhận Tạo
+            {t('studentGroup.createModal.submit')}
           </Button>
         </div>
       </Form>
     </Modal>
   );
 };
+

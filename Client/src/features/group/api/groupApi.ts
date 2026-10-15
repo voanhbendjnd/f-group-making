@@ -109,4 +109,51 @@ export const groupApi = {
     );
     return data;
   },
+
+  async lecturerAddMember(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    studentId: number
+  ): Promise<GroupDTO> {
+    const data = await apiClient.post<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/members/${studentId}`
+    );
+    return data;
+  },
+
+  async lecturerRemoveMember(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    studentId: number
+  ): Promise<GroupDTO> {
+    const data = await apiClient.delete<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/members/${studentId}`
+    );
+    return data;
+  },
+
+  async lecturerSetLeader(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    studentId: number
+  ): Promise<GroupDTO> {
+    const data = await apiClient.post<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/members/${studentId}/set-leader`
+    );
+    return data;
+  },
+
+  async lecturerDisbandGroup(
+    deadlineId: number,
+    classId: number,
+    groupId: number
+  ): Promise<void> {
+    await apiClient.delete(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/lecturer-disband`
+    );
+  },
 };
+

@@ -153,11 +153,11 @@ export const SelectGroupPage: React.FC = () => {
   const createGroupMutation = useMutation({
     mutationFn: (name: string) => groupApi.createGroup(deadlineId!, classId!, { name }),
     onSuccess: () => {
-      message.success('Tạo nhóm mới thành công!');
+      message.success(t('studentGroup.messages.createSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Tạo nhóm thất bại');
+      message.error(err.message || t('studentGroup.messages.createError'));
     },
   });
 
@@ -167,11 +167,11 @@ export const SelectGroupPage: React.FC = () => {
       return groupApi.joinGroup(deadlineId!, classId!, groupId);
     },
     onSuccess: () => {
-      message.success('Tham gia nhóm thành công!');
+      message.success(t('studentGroup.messages.joinSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể tham gia nhóm');
+      message.error(err.message || t('studentGroup.messages.joinError'));
     },
     onSettled: () => setActionLoadingGroupId(null),
   });
@@ -179,11 +179,11 @@ export const SelectGroupPage: React.FC = () => {
   const leaveGroupMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.leaveGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.success('Đã rời khỏi nhóm');
+      message.success(t('studentGroup.messages.leaveSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể rời nhóm');
+      message.error(err.message || t('studentGroup.messages.leaveError'));
     },
   });
 
@@ -191,55 +191,55 @@ export const SelectGroupPage: React.FC = () => {
     mutationFn: (newLeaderId: number) =>
       groupApi.transferLeader(deadlineId!, classId!, workspace!.myGroup!.id, { newLeaderId }),
     onSuccess: () => {
-      message.success('Chuyển quyền Trưởng nhóm thành công!');
+      message.success(t('studentGroup.messages.transferSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể chuyển quyền');
+      message.error(err.message || t('studentGroup.messages.transferError'));
     },
   });
 
   const submitGroupMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.submitGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.success('Nộp danh sách nhóm lên Giảng viên thành công!');
+      message.success(t('studentGroup.messages.submitSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể nộp nhóm');
+      message.error(err.message || t('studentGroup.messages.submitError'));
     },
   });
 
   const cancelSubmitMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.cancelSubmitGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.info('Đã hủy nộp nhóm. Nhóm chuyển về trạng thái OPEN.');
+      message.info(t('studentGroup.messages.cancelSubmitSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể hủy nộp');
+      message.error(err.message || t('studentGroup.messages.cancelSubmitError'));
     },
   });
 
   const disbandGroupMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.disbandGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.success('Đã giải tán nhóm');
+      message.success(t('studentGroup.messages.disbandSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể giải tán nhóm');
+      message.error(err.message || t('studentGroup.messages.disbandError'));
     },
   });
 
   const acceptGroupMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.acceptGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.success('Phê duyệt nhóm thành công!');
+      message.success(t('studentGroup.messages.approveSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể duyệt nhóm');
+      message.error(err.message || t('studentGroup.messages.approveError'));
     },
   });
 
@@ -247,22 +247,22 @@ export const SelectGroupPage: React.FC = () => {
     mutationFn: ({ groupId, reason }: { groupId: number; reason: string }) =>
       groupApi.rejectGroup(deadlineId!, classId!, groupId, { reason }),
     onSuccess: () => {
-      message.info('Đã từ chối duyệt nhóm');
+      message.info(t('studentGroup.messages.rejectSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể từ chối nhóm');
+      message.error(err.message || t('studentGroup.messages.rejectError'));
     },
   });
 
   const revokeGroupMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.revokeGroup(deadlineId!, classId!, groupId),
     onSuccess: () => {
-      message.info('Đã thu hồi phê duyệt nhóm');
+      message.info(t('studentGroup.messages.revokeSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể thu hồi');
+      message.error(err.message || t('studentGroup.messages.revokeError'));
     },
   });
 
@@ -270,11 +270,11 @@ export const SelectGroupPage: React.FC = () => {
     mutationFn: (data: { name: string; studentIds: number[]; overrideReason?: string }) =>
       groupApi.lecturerCreateGroup(deadlineId!, classId!, data),
     onSuccess: () => {
-      message.success('Giảng viên tạo và duyệt nhóm thành công!');
+      message.success(t('studentGroup.messages.lecturerCreateSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
     },
     onError: (err: any) => {
-      message.error(err.message || 'Không thể tạo nhóm');
+      message.error(err.message || t('studentGroup.messages.lecturerCreateError'));
     },
   });
 
@@ -362,7 +362,7 @@ export const SelectGroupPage: React.FC = () => {
           </p>
           <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
             <Button variant="ghost" icon={<RefreshCw size={16} />} onClick={() => refetchWorkspace()}>
-              Thử lại
+              {t('common.retry', 'Thử lại')}
             </Button>
             <Button variant="primary" icon={<ArrowLeft size={16} />} onClick={() => navigate('/student/dashboard')}>
               {t('deadline.student.backToDashboard', 'Quay lại Trang Chủ')}
@@ -425,30 +425,13 @@ export const SelectGroupPage: React.FC = () => {
   );
 
   return (
-    <div style={{ maxWidth: '1200px', margin: '1.5rem auto', padding: '0 1.25rem' }}>
+    <div className="student-group-container">
       {/* Top Header Card */}
-      <div
-        className="card"
-        style={{
-          padding: '1.5rem 2rem',
-          borderRadius: '16px',
-          marginBottom: '1.5rem',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-          border: '1px solid var(--color-border, #e2e8f0)',
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1rem',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span className="badge badge-success">Đang Diễn Ra</span>
+      <div className="card student-group-header-card">
+        <div className="student-group-header-content">
+          <div className="student-group-header-info">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
+              <span className="badge badge-success">{t('studentGroup.inProgress')}</span>
               {/* WebSocket live status badge */}
               <span
                 style={{
@@ -472,35 +455,24 @@ export const SelectGroupPage: React.FC = () => {
                     display: 'inline-block',
                   }}
                 />
-                {wsStatus === 'connected' ? 'Đồng bộ thời gian thực' : 'Đang kết nối lại...'}
+                {wsStatus === 'connected' ? t('studentGroup.realtimeSync') : t('studentGroup.reconnecting')}
               </span>
             </div>
-            <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--color-text-main)', margin: '0 0 4px' }}>
+            <h1 className="student-group-header-title">
               {workspace?.deadlineName || validateResult?.name}
             </h1>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-text-muted)', fontSize: '0.875rem' }}>
+            <div className="student-group-header-meta">
               <Users size={16} />
               <span>
-                Lớp học: <strong style={{ color: 'var(--color-text-main)' }}>{workspace?.schoolClassName || validateResult?.className}</strong>
+                {t('studentGroup.classLabel')} <strong style={{ color: 'var(--color-text-main)' }}>{workspace?.schoolClassName || validateResult?.className}</strong>
               </span>
               <span>•</span>
-              <span>Hạn chót: {formatDateTime(workspace?.deadlineEndTime || validateResult?.endTime)}</span>
+              <span>{t('studentGroup.deadlineLabel')} {formatDateTime(workspace?.deadlineEndTime || validateResult?.endTime)}</span>
             </div>
           </div>
 
           {/* Countdown block */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              backgroundColor: '#ffffff',
-              padding: '8px 14px',
-              borderRadius: '12px',
-              border: '1px solid #e2e8f0',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-            }}
-          >
+          <div className="student-group-countdown-box">
             <Clock size={18} color="var(--color-primary, #2563eb)" />
             <div style={{ display: 'flex', gap: '6px', fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
               <span>{timeLeft.days}d</span>:
@@ -513,32 +485,23 @@ export const SelectGroupPage: React.FC = () => {
       </div>
 
       {/* Main Workspace Actions Bar */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          marginBottom: '1.5rem',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+      <div className="student-group-actions-bar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--color-text-main)' }}>
-            Không Gian Chọn Nhóm
+            {t('studentGroup.title')}
           </h2>
           <span style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
-            ({workspace?.groups?.length || 0} nhóm đã tạo)
+            {t('studentGroup.groupCount', { count: workspace?.groups?.length || 0 })}
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="student-group-actions-buttons">
           <Button
             variant="outline"
             icon={<Users size={16} />}
             onClick={() => setUnassignedDrawerOpen(true)}
           >
-            Chưa có nhóm ({workspace?.unassignedStudents?.length || 0})
+            {t('studentGroup.unassignedCount', { count: workspace?.unassignedStudents?.length || 0 })}
           </Button>
 
           {workspace?.canCreateGroup && (
@@ -547,7 +510,7 @@ export const SelectGroupPage: React.FC = () => {
               icon={<Plus size={16} />}
               onClick={() => setCreateModalOpen(true)}
             >
-              Tạo Nhóm Mới
+              {t('studentGroup.createNewGroup')}
             </Button>
           )}
 
@@ -557,12 +520,12 @@ export const SelectGroupPage: React.FC = () => {
               icon={<UserPlus size={16} />}
               onClick={() => setLecturerModalOpen(true)}
             >
-              Giảng Viên Tạo & Gán Nhóm
+              {t('studentGroup.lecturerCreate')}
             </Button>
           )}
 
           <Button variant="ghost" icon={<RefreshCw size={15} />} onClick={() => refetchWorkspace()}>
-            Tải lại
+            {t('studentGroup.reload')}
           </Button>
         </div>
       </div>
@@ -584,9 +547,9 @@ export const SelectGroupPage: React.FC = () => {
 
       {/* 2. AVAILABLE GROUPS GRID */}
       <div style={{ marginBottom: '2.5rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--color-text-main)' }}>
-            {workspace?.myGroup ? 'Các Nhóm Khác Trong Lớp' : 'Danh Sách Nhóm Đang Mở'}
+            {workspace?.myGroup ? t('studentGroup.otherGroups') : t('studentGroup.availableGroups')}
           </h3>
         </div>
 
@@ -602,25 +565,19 @@ export const SelectGroupPage: React.FC = () => {
           >
             <Users size={36} color="#94a3b8" style={{ marginBottom: '8px' }} />
             <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
-              Chưa có nhóm nào được tạo trong lớp
+              {t('studentGroup.emptyGroupsTitle')}
             </div>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', margin: '4px 0 1rem' }}>
-              Hãy là người tiên phong tạo nhóm đầu tiên để mời các bạn khác cùng tham gia!
+              {t('studentGroup.emptyGroupsDesc')}
             </p>
             {workspace?.canCreateGroup && (
               <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
-                Tạo Nhóm Ngay
+                {t('studentGroup.createFirstGroup')}
               </Button>
             )}
           </div>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '1.25rem',
-            }}
-          >
+          <div className="student-group-grid">
             {otherGroups.map((group) => (
               <GroupCard
                 key={group.id}

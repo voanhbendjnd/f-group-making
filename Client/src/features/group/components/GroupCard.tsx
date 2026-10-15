@@ -1,6 +1,7 @@
 import React from 'react';
 import { Crown, LogIn, Check, X, Undo } from 'lucide-react';
 import { Button, Tag, Popconfirm } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { GroupDTO } from '../types/groupTypes';
 
 interface GroupCardProps {
@@ -28,6 +29,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   onRevoke,
   isActionLoading,
 }) => {
+  const { t } = useTranslation();
 
   const isFull = group.memberCount >= group.maxMembers;
   const isOpen = group.status === 'OPEN';
@@ -37,13 +39,17 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   const getStatusBadge = () => {
     switch (group.status) {
       case 'OPEN':
-        return <Tag color="blue">Đang Mở ({group.memberCount}/{group.maxMembers})</Tag>;
+        return (
+          <Tag color="blue">
+            {t('studentGroup.card.openStatus', { current: group.memberCount, max: group.maxMembers })}
+          </Tag>
+        );
       case 'PENDING':
-        return <Tag color="orange">Chờ Duyệt</Tag>;
+        return <Tag color="orange">{t('studentGroup.card.pendingStatus')}</Tag>;
       case 'ACCEPTED':
-        return <Tag color="green">Đã Duyệt</Tag>;
+        return <Tag color="green">{t('studentGroup.card.acceptedStatus')}</Tag>;
       case 'REVOKED':
-        return <Tag color="red">Thu Hồi</Tag>;
+        return <Tag color="red">{t('studentGroup.card.revokedStatus')}</Tag>;
       default:
         return <Tag>{group.status}</Tag>;
     }
@@ -63,20 +69,23 @@ export const GroupCard: React.FC<GroupCardProps> = ({
         flexDirection: 'column',
         justifyContent: 'space-between',
         transition: 'all 0.2s ease',
+        minWidth: 0,
       }}
     >
       <div>
         {/* Top Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
-          <div>
-            <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-text-main, #0f172a)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h3 style={{ margin: 0, fontSize: '1.125rem', fontWeight: 700, color: 'var(--color-text-main, #0f172a)', wordBreak: 'break-word' }}>
               {group.name}
             </h3>
             <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted, #64748b)', marginTop: '2px' }}>
-              Trưởng nhóm: <strong style={{ color: 'var(--color-text-main)' }}>{group.leaderName}</strong>
+              {t('studentGroup.card.leader')} <strong style={{ color: 'var(--color-text-main)' }}>{group.leaderName}</strong>
             </div>
           </div>
-          {getStatusBadge()}
+          <div style={{ flexShrink: 0 }}>
+            {getStatusBadge()}
+          </div>
         </div>
 
         {/* Member tags preview */}
@@ -104,9 +113,13 @@ export const GroupCard: React.FC<GroupCardProps> = ({
       >
         <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
           {isFull ? (
-            <span style={{ color: '#dc2626', fontWeight: 600 }}>Đã đủ người ({group.maxMembers})</span>
+            <span style={{ color: '#dc2626', fontWeight: 600 }}>
+              {t('studentGroup.card.full', { max: group.maxMembers })}
+            </span>
           ) : (
-            <span>Còn trống <strong>{group.maxMembers - group.memberCount}</strong> chỗ</span>
+            <span>
+              {t('studentGroup.card.spotsLeft', { count: group.maxMembers - group.memberCount })}
+            </span>
           )}
         </div>
 
@@ -114,7 +127,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
         {!isLecturer && (
           <div>
             {isMyGroup ? (
-              <Tag color="cyan">Nhóm của bạn</Tag>
+              <Tag color="cyan">{t('studentGroup.card.yourGroupBadge')}</Tag>
             ) : (
               <Button
                 type="primary"
@@ -123,7 +136,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
                 loading={isActionLoading}
                 onClick={() => onJoin(group.id)}
               >
-                Tham gia
+                {t('studentGroup.card.joinButton')}
               </Button>
             )}
           </div>
@@ -131,7 +144,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
 
         {/* Lecturer Action Buttons */}
         {isLecturer && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             {isPending && (
               <>
                 <Button
@@ -141,7 +154,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
                   style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
                   onClick={() => onAccept && onAccept(group.id)}
                 >
-                  Duyệt
+                  {t('studentGroup.card.approveButton')}
                 </Button>
                 <Button
                   danger
@@ -149,21 +162,21 @@ export const GroupCard: React.FC<GroupCardProps> = ({
                   icon={<X size={14} />}
                   onClick={() => onOpenRejectModal && onOpenRejectModal(group.id)}
                 >
-                  Từ chối
+                  {t('studentGroup.card.rejectButton')}
                 </Button>
               </>
             )}
 
             {isAccepted && (
               <Popconfirm
-                title="Thu hồi phê duyệt nhóm?"
-                description="Nhóm sẽ chuyển sang trạng thái REVOKED. Bạn có chắc muốn thu hồi không?"
+                title={t('studentGroup.card.revokeConfirmTitle')}
+                description={t('studentGroup.card.revokeConfirmDesc')}
                 onConfirm={() => onRevoke && onRevoke(group.id)}
-                okText="Thu hồi"
-                cancelText="Hủy"
+                okText={t('studentGroup.card.revokeConfirmOk')}
+                cancelText={t('common.cancel')}
               >
                 <Button size="small" icon={<Undo size={14} />}>
-                  Thu hồi duyệt
+                  {t('studentGroup.card.revokeButton')}
                 </Button>
               </Popconfirm>
             )}
@@ -173,3 +186,4 @@ export const GroupCard: React.FC<GroupCardProps> = ({
     </div>
   );
 };
+

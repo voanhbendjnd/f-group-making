@@ -671,6 +671,136 @@ public class GroupService {
         return getGroupDetail(groupId, classId, deadlineId);
     }
 
+    public GroupDTO lecturerAddMember(Integer deadlineId, Integer classId, Long groupId, Long studentId) {
+        validateDeadlineExists(deadlineId, classId);
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+        accessService.requireWriteAccess(schoolClass);
+
+        Group group = groupRepository.findById(groupId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+
+        if (group.getStatus() == GroupStatus.DISBANDED) {
+            throw new ConflictAlertException("Nhóm đã bị giải tán.", "group", "ERR_GROUP_STATE_CONFLICT");
+        }
+
+        Student student = studentRepository.findById(studentId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy sinh viên", "student", "ERR_STUDENT_NOT_FOUND"));
+
+        if (!Objects.equals(student.getSchoolClassId(), classId)) {
+            throw new BadRequestAlertException("Sinh viên không thuộc lớp học này", "student", "ERR_STUDENT_NOT_IN_CLASS");
+        }
+
+        // Check if student already in any group in this deadline
+        groupMemberRepository.findByStudentIdAndDeadlineId(studentId, deadlineId).ifPresent(gm -> {
+            throw new ConflictAlertException("Sinh viên " + student.getFullName() + " đã thuộc nhóm khác.", "group", "ERR_ALREADY_IN_GROUP");
+        });
+
+        // Add member
+        GroupMember member = new GroupMember();
+        member.setGroupId(groupId);
+        member.setStudentId(studentId);
+        member.setDeadlineId(deadlineId);
+        member.setSchoolClassId(classId);
+        member.setRole(GroupMemberRole.MEMBER);
+        member.setJoinedAt(Instant.now());
+        groupMemberRepository.save(member);
+
+        String actor = getCurrentUserLogin();
+        saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.ASSIGNED_BY_LECTURER, actor, "Giảng viên thêm vào nhóm");
+
+        eventPublisher.publish("GROUP_UPDATED", groupId, deadlineId, classId, actor, null);
+        return getGroupDetail(groupId, classId, deadlineId);
+    }
+
+    public GroupDTO lecturerRemoveMember(Integer deadlineId, Integer classId, Long groupId, Long studentId) {
+        validateDeadlineExists(deadlineId, classId);
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+        accessService.requireWriteAccess(schoolClass);
+
+        Group group = groupRepository.findById(groupId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+
+        GroupMember member = groupMemberRepository.findByGroupIdAndStudentId(groupId, studentId)
+            .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
+
+        groupMemberRepository.deleteByGroupIdAndStudentId(groupId, studentId);
+
+        String actor = getCurrentUserLogin();
+        saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.REMOVED_BY_LECTURER, actor, "Giảng viên xóa khỏi nhóm");
+
+        // If removed member was Leader, assign a remaining member as new leader
+        if (member.getRole() == GroupMemberRole.LEADER) {
+            List<GroupMember> remaining = groupMemberRepository.findByGroupId(groupId);
+            if (!remaining.isEmpty()) {
+                GroupMember newLeader = remaining.get(0);
+                newLeader.setRole(GroupMemberRole.LEADER);
+                groupMemberRepository.save(newLeader);
+                group.setLeaderId(newLeader.getStudentId());
+                groupRepository.save(group);
+                saveMemberHistory(groupId, newLeader.getStudentId(), deadlineId, GroupMemberAction.TRANSFERRED_LEADER, actor, "Tự động đổi Trưởng nhóm mới");
+            }
+        }
+
+        eventPublisher.publish("GROUP_UPDATED", groupId, deadlineId, classId, actor, null);
+        return getGroupDetail(groupId, classId, deadlineId);
+    }
+
+    public GroupDTO lecturerSetLeader(Integer deadlineId, Integer classId, Long groupId, Long newLeaderId) {
+        validateDeadlineExists(deadlineId, classId);
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+        accessService.requireWriteAccess(schoolClass);
+
+        Group group = groupRepository.findById(groupId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+
+        GroupMember newLeader = groupMemberRepository.findByGroupIdAndStudentId(groupId, newLeaderId)
+            .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
+
+        // Demote old leader
+        groupMemberRepository.findByGroupIdAndRole(groupId, GroupMemberRole.LEADER).ifPresent(old -> {
+            old.setRole(GroupMemberRole.MEMBER);
+            groupMemberRepository.save(old);
+        });
+
+        newLeader.setRole(GroupMemberRole.LEADER);
+        groupMemberRepository.save(newLeader);
+
+        group.setLeaderId(newLeaderId);
+        groupRepository.save(group);
+
+        String actor = getCurrentUserLogin();
+        saveMemberHistory(groupId, newLeaderId, deadlineId, GroupMemberAction.TRANSFERRED_LEADER, actor, "Giảng viên chỉ định làm Trưởng nhóm");
+
+        eventPublisher.publish("GROUP_UPDATED", groupId, deadlineId, classId, actor, null);
+        return getGroupDetail(groupId, classId, deadlineId);
+    }
+
+    public void lecturerDisbandGroup(Integer deadlineId, Integer classId, Long groupId) {
+        validateDeadlineExists(deadlineId, classId);
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+        accessService.requireWriteAccess(schoolClass);
+
+        Group group = groupRepository.findById(groupId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+
+        List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
+        String actor = getCurrentUserLogin();
+        for (GroupMember m : members) {
+            saveMemberHistory(groupId, m.getStudentId(), deadlineId, GroupMemberAction.LEFT, actor, "Giảng viên giải tán nhóm");
+        }
+
+        groupMemberRepository.deleteByGroupId(groupId);
+        group.setStatus(GroupStatus.DISBANDED);
+        groupRepository.save(group);
+
+        saveStatusHistory(groupId, group.getStatus(), GroupStatus.DISBANDED, actor, "Giảng viên giải tán nhóm");
+        eventPublisher.publish("GROUP_DISBANDED", groupId, deadlineId, classId, actor, null);
+    }
+
     // ==========================================
     // 4. HELPER METHODS
     // ==========================================

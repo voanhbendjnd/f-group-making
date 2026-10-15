@@ -135,4 +135,49 @@ public class GroupResource {
             @PathVariable("groupId") Long groupId) {
         return ResponseEntity.ok(groupService.revokeGroup(deadlineId, classId, groupId));
     }
+
+    @PostMapping("/{groupId}/members/{studentId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Giảng viên thêm sinh viên vào nhóm thành công")
+    public ResponseEntity<GroupDTO> lecturerAddMember(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId,
+            @PathVariable("studentId") Long studentId) {
+        return ResponseEntity.ok(groupService.lecturerAddMember(deadlineId, classId, groupId, studentId));
+    }
+
+    @DeleteMapping("/{groupId}/members/{studentId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Giảng viên xóa sinh viên khỏi nhóm thành công")
+    public ResponseEntity<GroupDTO> lecturerRemoveMember(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId,
+            @PathVariable("studentId") Long studentId) {
+        return ResponseEntity.ok(groupService.lecturerRemoveMember(deadlineId, classId, groupId, studentId));
+    }
+
+    @PostMapping("/{groupId}/members/{studentId}/set-leader")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Giảng viên chỉ định trưởng nhóm thành công")
+    public ResponseEntity<GroupDTO> lecturerSetLeader(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId,
+            @PathVariable("studentId") Long studentId) {
+        return ResponseEntity.ok(groupService.lecturerSetLeader(deadlineId, classId, groupId, studentId));
+    }
+
+    @DeleteMapping("/{groupId}/lecturer-disband")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Giảng viên giải tán nhóm thành công")
+    public ResponseEntity<Void> lecturerDisbandGroup(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId) {
+        groupService.lecturerDisbandGroup(deadlineId, classId, groupId);
+        return ResponseEntity.noContent().build();
+    }
 }
+

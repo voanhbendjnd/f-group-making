@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Modal, Form, Input, Select, Button, Alert } from 'antd';
 import { UserPlus } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import type { GroupMemberDTO, GroupingRuleDTO } from '../types/groupTypes';
 
 interface LecturerGroupModalProps {
@@ -21,6 +22,7 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   onSubmit,
   isLoading,
 }) => {
+  const { t } = useTranslation();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const selectedStudentIds = Form.useWatch('studentIds', form) || [];
@@ -42,10 +44,15 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   const warnings = useMemo(() => {
     const list: string[] = [];
     if (selectedStudents.length > 0 && selectedStudents.length > maxMembers) {
-      list.push(`Số lượng chọn (${selectedStudents.length}) vượt quá mức tối đa (${maxMembers}).`);
+      list.push(
+        t('groupWorkspace.createModal.warningExceed', {
+          count: selectedStudents.length,
+          max: maxMembers,
+        })
+      );
     }
     return list;
-  }, [selectedStudents, maxMembers]);
+  }, [selectedStudents, maxMembers, t]);
 
   const handleFinish = async (values: { name: string; studentIds: number[]; overrideReason?: string }) => {
     try {
@@ -67,7 +74,7 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.125rem' }}>
           <UserPlus size={20} color="var(--color-primary, #2563eb)" />
-          <span>Giảng Viên Tạo & Phân Công Nhóm Trực Tiếp</span>
+          <span>{t('groupWorkspace.createModal.title')}</span>
         </div>
       }
       open={open}
@@ -77,30 +84,33 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
       destroyOnClose
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-        Nhóm do Giảng viên tạo sẽ được duyệt thẳng sang trạng thái <strong>ACCEPTED</strong>. Sinh viên đầu tiên trong danh sách được chọn sẽ mặc định là Trưởng nhóm.
+        {t('groupWorkspace.createModal.description')}
       </p>
 
       <Form form={form} layout="vertical" onFinish={handleFinish}>
         <Form.Item
           name="name"
-          label="Tên Nhóm"
+          label={t('groupWorkspace.createModal.nameLabel')}
           rules={[
-            { required: true, message: 'Vui lòng nhập tên nhóm' },
-            { min: 2, message: 'Tên nhóm phải có ít nhất 2 ký tự' },
-            { max: 100, message: 'Tên nhóm tối đa 100 ký tự' },
+            { required: true, message: t('groupWorkspace.createModal.nameRequired') },
+            { min: 2, message: t('groupWorkspace.createModal.nameMin') },
+            { max: 100, message: t('groupWorkspace.createModal.nameMax') },
           ]}
         >
-          <Input placeholder="Ví dụ: Nhóm Xếp Bởi GV 01..." />
+          <Input placeholder={t('groupWorkspace.createModal.namePlaceholder')} />
         </Form.Item>
 
         <Form.Item
           name="studentIds"
-          label={`Chọn sinh viên chưa có nhóm (${selectedStudents.length}/${maxMembers})`}
-          rules={[{ required: true, message: 'Vui lòng chọn ít nhất 1 sinh viên' }]}
+          label={t('groupWorkspace.createModal.studentsLabel', {
+            count: selectedStudents.length,
+            max: maxMembers,
+          })}
+          rules={[{ required: true, message: t('groupWorkspace.createModal.studentsRequired') }]}
         >
           <Select
             mode="multiple"
-            placeholder="Chọn các sinh viên từ danh sách chưa có nhóm..."
+            placeholder={t('groupWorkspace.createModal.studentsPlaceholder')}
             style={{ width: '100%' }}
             optionFilterProp="label"
             options={unassignedStudents.map((s) => ({
@@ -123,15 +133,16 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
             }}
           >
             <div>
-              <strong>Thành viên:</strong> {selectedStudents.length} • <strong>Chuyên ngành:</strong>{' '}
-              {distinctMajorsCount} • <strong>Sinh viên SE:</strong> {seCount}
+              <strong>{t('groupWorkspace.createModal.members')}:</strong> {selectedStudents.length} •{' '}
+              <strong>{t('groupWorkspace.createModal.majors')}:</strong> {distinctMajorsCount} •{' '}
+              <strong>{t('groupWorkspace.createModal.seStudents')}:</strong> {seCount}
             </div>
           </div>
         )}
 
         {warnings.length > 0 && (
           <Alert
-            message="Cảnh báo điều kiện nhóm"
+            message={t('groupWorkspace.createModal.warningTitle')}
             description={warnings.join(' ')}
             type="warning"
             showIcon
@@ -141,24 +152,25 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
 
         <Form.Item
           name="overrideReason"
-          label="Lý do ngoại lệ / Bỏ qua quy tắc (Nếu có)"
-          tooltip="Nếu nhóm không thỏa mãn một số Soft Rules của lớp, giảng viên cần ghi rõ lý do để lưu vết audit."
+          label={t('groupWorkspace.createModal.overrideLabel')}
+          tooltip={t('groupWorkspace.createModal.overrideTooltip')}
         >
           <Input.TextArea
             rows={3}
-            placeholder="Ghi rõ lý do đặc cách phân công hoặc lý do bỏ qua điều kiện chuyên ngành..."
+            placeholder={t('groupWorkspace.createModal.overridePlaceholder')}
           />
         </Form.Item>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1.5rem' }}>
           <Button onClick={onClose} disabled={submitting || isLoading}>
-            Hủy
+            {t('groupWorkspace.createModal.cancel')}
           </Button>
           <Button type="primary" htmlType="submit" loading={submitting || isLoading} size="large">
-            Tạo & Phê Duyệt Nhóm
+            {t('groupWorkspace.createModal.submit')}
           </Button>
         </div>
       </Form>
     </Modal>
   );
 };
+

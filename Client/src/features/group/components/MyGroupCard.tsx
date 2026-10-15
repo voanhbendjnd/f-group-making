@@ -12,6 +12,7 @@ import {
   ShieldCheck,
 } from 'lucide-react';
 import { Button, Tag, Tooltip, Popconfirm } from 'antd';
+import { useTranslation } from 'react-i18next';
 import type { GroupDTO } from '../types/groupTypes';
 import { RuleChecklistCard } from './RuleChecklistCard';
 
@@ -38,19 +39,20 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
   onOpenTransferModal,
   isSubmitting,
 }) => {
+  const { t } = useTranslation();
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'OPEN':
-        return <Tag color="blue" icon={<Clock size={12} style={{ marginRight: 4 }} />}>Đang Mở (OPEN)</Tag>;
+        return <Tag color="blue" icon={<Clock size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.open')}</Tag>;
       case 'PENDING':
-        return <Tag color="orange" icon={<Clock size={12} style={{ marginRight: 4 }} />}>Đang Chờ Duyệt (PENDING)</Tag>;
+        return <Tag color="orange" icon={<Clock size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.pending')}</Tag>;
       case 'ACCEPTED':
-        return <Tag color="green" icon={<ShieldCheck size={12} style={{ marginRight: 4 }} />}>Đã Phê Duyệt (ACCEPTED)</Tag>;
+        return <Tag color="green" icon={<ShieldCheck size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.accepted')}</Tag>;
       case 'REVOKED':
-        return <Tag color="red" icon={<AlertTriangle size={12} style={{ marginRight: 4 }} />}>Bị Thu Hồi (REVOKED)</Tag>;
+        return <Tag color="red" icon={<AlertTriangle size={12} style={{ marginRight: 4 }} />}>{t('studentGroup.status.revoked')}</Tag>;
       case 'DISBANDED':
-        return <Tag color="default">Đã Giải Tán</Tag>;
+        return <Tag color="default">{t('studentGroup.status.disbanded')}</Tag>;
       default:
         return <Tag>{status}</Tag>;
     }
@@ -62,31 +64,11 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
   const canModify = isOpen && !isDeadlineExpired;
 
   return (
-    <div
-      style={{
-        backgroundColor: 'var(--color-surface, #ffffff)',
-        borderRadius: '16px',
-        border: '1px solid var(--color-border, #e2e8f0)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-        padding: '1.75rem',
-        marginBottom: '2rem',
-      }}
-    >
+    <div className="my-group-container">
       {/* Header */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          borderBottom: '1px solid var(--color-border, #f1f5f9)',
-          paddingBottom: '1.25rem',
-          marginBottom: '1.5rem',
-        }}
-      >
+      <div className="my-group-header">
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', flexWrap: 'wrap' }}>
             <span
               style={{
                 fontSize: '0.75rem',
@@ -99,21 +81,23 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
                 borderRadius: '6px',
               }}
             >
-              Nhóm Của Bạn
+              {t('studentGroup.myGroup.badge')}
             </span>
             {getStatusBadge(group.status)}
           </div>
-          <h2 style={{ margin: 0, fontSize: '1.625rem', fontWeight: 800, color: 'var(--color-text-main, #0f172a)' }}>
+          <h2 style={{ margin: 0, fontSize: '1.625rem', fontWeight: 800, color: 'var(--color-text-main, #0f172a)', wordBreak: 'break-word' }}>
             {group.name}
           </h2>
           <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted, #64748b)', marginTop: '4px' }}>
-            Trưởng nhóm: <strong style={{ color: 'var(--color-text-main)' }}>{group.leaderName}</strong>
+            {t('studentGroup.myGroup.leader')} <strong style={{ color: 'var(--color-text-main)' }}>{group.leaderName}</strong>
           </div>
         </div>
 
         {/* Member count tag */}
-        <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>Số lượng thành viên</div>
+        <div className="my-group-count-tag" style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+            {t('studentGroup.myGroup.memberCountLabel')}
+          </div>
           <div style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-primary, #2563eb)' }}>
             {group.memberCount} <span style={{ fontSize: '1rem', fontWeight: 500, color: '#94a3b8' }}>/ {group.maxMembers}</span>
           </div>
@@ -137,31 +121,24 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
           <AlertTriangle size={20} color="#dc2626" style={{ marginTop: '2px', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: '#991b1b' }}>
-              Nhóm bị Giảng viên từ chối phê duyệt
+              {t('studentGroup.myGroup.rejectedTitle')}
             </div>
             <div style={{ fontSize: '0.875rem', color: '#b91c1c', marginTop: '2px' }}>
-              Lý do: {group.rejectReason}
+              {t('studentGroup.myGroup.rejectionReason', { reason: group.rejectReason })}
             </div>
             <div style={{ fontSize: '0.8125rem', color: '#7f1d1d', marginTop: '4px' }}>
-              Vui lòng điều chỉnh cơ cấu nhóm để đáp ứng yêu cầu và nộp lại trước hạn chót.
+              {t('studentGroup.myGroup.rejectionTip')}
             </div>
           </div>
         </div>
       )}
 
       {/* Grid: Members list & Rules evaluation */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '1.5rem',
-          marginBottom: '1.75rem',
-        }}
-      >
+      <div className="my-group-members-grid">
         {/* Members List */}
         <div>
           <h4 style={{ margin: '0 0 0.875rem', fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-            Danh sách thành viên ({group.members.length})
+            {t('studentGroup.myGroup.membersListTitle', { count: group.members.length })}
           </h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
             {group.members.map((member) => {
@@ -177,9 +154,11 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
                     borderRadius: '10px',
                     backgroundColor: isMemLeader ? 'rgba(37, 99, 235, 0.04)' : '#f8fafc',
                     border: `1px solid ${isMemLeader ? 'rgba(37, 99, 235, 0.2)' : '#e2e8f0'}`,
+                    gap: '8px',
+                    flexWrap: 'wrap',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
                     <div
                       style={{
                         width: '38px',
@@ -192,12 +171,13 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
                         justifyContent: 'center',
                         fontWeight: 700,
                         fontSize: '0.875rem',
+                        flexShrink: 0,
                       }}
                     >
                       {member.fullName.charAt(0).toUpperCase()}
                     </div>
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
                           {member.fullName}
                         </span>
@@ -208,12 +188,12 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
                         )}
                       </div>
                       <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-                        MSSV: {member.rollNumber} • {member.memberCode}
+                        {t('studentGroup.myGroup.studentCode')} {member.rollNumber} • {member.memberCode}
                       </div>
                     </div>
                   </div>
 
-                  <Tag color={member.majorCode === 'SE' ? 'geekblue' : 'purple'}>
+                  <Tag color={member.majorCode === 'SE' ? 'geekblue' : 'purple'} style={{ margin: 0 }}>
                     {member.majorCode || member.majorName || 'N/A'}
                   </Tag>
                 </div>
@@ -226,36 +206,26 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
         <div>
           <RuleChecklistCard
             evaluations={group.ruleEvaluations}
-            title="Đánh giá tiêu chuẩn của nhóm"
-            subtitle="Toàn bộ quy tắc phải đạt trước khi Leader có thể Submit"
+            title={t('studentGroup.rules.title')}
+            subtitle={t('studentGroup.rules.subtitle')}
           />
         </div>
       </div>
 
       {/* Action Buttons Bar */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          borderTop: '1px solid var(--color-border, #f1f5f9)',
-          paddingTop: '1.25rem',
-        }}
-      >
+      <div className="my-group-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Member Actions */}
           {canModify && !isLeader && (
             <Popconfirm
-              title="Rời khỏi nhóm này?"
-              description="Bạn có chắc chắn muốn rời nhóm hiện tại?"
+              title={t('studentGroup.myGroup.leaveConfirmTitle')}
+              description={t('studentGroup.myGroup.leaveConfirmDesc')}
               onConfirm={onLeave}
-              okText="Đồng ý rời"
-              cancelText="Hủy"
+              okText={t('studentGroup.myGroup.leaveConfirmOk')}
+              cancelText={t('common.cancel')}
             >
               <Button danger icon={<UserMinus size={16} />}>
-                Rời nhóm
+                {t('studentGroup.myGroup.leaveButton')}
               </Button>
             </Popconfirm>
           )}
@@ -263,14 +233,14 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
           {/* Leader Disband when alone */}
           {canModify && isLeader && group.memberCount === 1 && (
             <Popconfirm
-              title="Giải tán nhóm?"
-              description="Nhóm chỉ còn một mình bạn. Bạn có muốn giải tán nhóm này không?"
+              title={t('studentGroup.myGroup.disbandConfirmTitle')}
+              description={t('studentGroup.myGroup.disbandConfirmDesc')}
               onConfirm={onDisband}
-              okText="Giải tán"
-              cancelText="Hủy"
+              okText={t('studentGroup.myGroup.disbandConfirmOk')}
+              cancelText={t('common.cancel')}
             >
               <Button danger icon={<Trash2 size={16} />}>
-                Giải tán nhóm
+                {t('studentGroup.myGroup.disbandButton')}
               </Button>
             </Popconfirm>
           )}
@@ -278,23 +248,23 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
           {/* Leader Transfer Role */}
           {canModify && isLeader && group.memberCount > 1 && (
             <Button icon={<Share2 size={16} />} onClick={onOpenTransferModal}>
-              Chuyển quyền Leader
+              {t('studentGroup.myGroup.transferLeaderButton')}
             </Button>
           )}
         </div>
 
         {/* Submission Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {isPending && isLeader && !isDeadlineExpired && (
             <Popconfirm
-              title="Hủy nộp nhóm?"
-              description="Bạn có chắc chắn muốn rút lại danh sách nhóm để tiếp tục chỉnh sửa?"
+              title={t('studentGroup.myGroup.cancelSubmitConfirmTitle')}
+              description={t('studentGroup.myGroup.cancelSubmitConfirmDesc')}
               onConfirm={onCancelSubmit}
-              okText="Hủy nộp"
-              cancelText="Đóng"
+              okText={t('studentGroup.myGroup.cancelSubmitConfirmOk')}
+              cancelText={t('common.close')}
             >
               <Button icon={<RotateCcw size={16} />} loading={isSubmitting}>
-                Hủy nộp (Cancel Submit)
+                {t('studentGroup.myGroup.cancelSubmitButton')}
               </Button>
             </Popconfirm>
           )}
@@ -303,8 +273,8 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
             <Tooltip
               title={
                 !group.allRulesPassed
-                  ? 'Nhóm chưa đạt đủ các điều kiện bắt buộc của lớp để có thể nộp.'
-                  : 'Nộp danh sách nhóm lên Giảng viên phê duyệt'
+                  ? t('studentGroup.myGroup.tooltipNotReady')
+                  : t('studentGroup.myGroup.tooltipSubmit')
               }
             >
               <Button
@@ -315,7 +285,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
                 loading={isSubmitting}
                 onClick={onSubmit}
               >
-                Nộp nhóm (Submit)
+                {t('studentGroup.myGroup.submitButton')}
               </Button>
             </Tooltip>
           )}
@@ -323,7 +293,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
           {isAccepted && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#16a34a', fontWeight: 600 }}>
               <CheckCircle size={18} />
-              <span>Nhóm đã được Giảng viên phê duyệt chính thức</span>
+              <span>{t('studentGroup.myGroup.approvedNotice')}</span>
             </div>
           )}
         </div>
@@ -331,3 +301,4 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
     </div>
   );
 };
+
