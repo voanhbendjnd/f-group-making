@@ -4,6 +4,8 @@
 
 > [Add Student thủ công](13-add-student.md): Modal, API, transaction và kiểm thử.
 
+> [Add Lecturer thủ công](14-add-lecturer.md): Modal, duplicate, transaction và activation.
+
 > **Cập nhật 12/10/2026:** Đã triển khai Academic Term Filter ([11 — Academic Term Filter](11-academic-term-filter.md)) và khu vực giảng viên, quản lý lớp/Rule cùng kiểm tra quyền theo lớp ([11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md)). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
 
 

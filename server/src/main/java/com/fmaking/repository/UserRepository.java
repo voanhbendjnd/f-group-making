@@ -53,4 +53,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByEmailIn(List<String> emails);
 
+    @Query("select u from User u where lower(u.email) in :emails")
+    List<User> findByEmailIgnoreCaseIn(@Param("emails") List<String> emails);
+
 }

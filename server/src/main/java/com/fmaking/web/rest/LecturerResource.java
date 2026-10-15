@@ -1,6 +1,13 @@
 package com.fmaking.web.rest;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import com.fmaking.service.dto.CreateLecturerDTO;
+import com.fmaking.service.dto.LecturerDTO;
+import org.zalando.problem.Status;
+import org.zalando.problem.violations.ConstraintViolationProblem;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -30,6 +37,19 @@ public class LecturerResource {
 
     public LecturerResource(LecturerService lecturerService) {
         this.lecturerService = lecturerService;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @ApiMessage("Create lecturer successfully")
+    public ResponseEntity<LecturerDTO> createLecturer(@Valid @RequestBody CreateLecturerDTO request) {
+        try {
+            return ResponseEntity.status(HttpStatus.CREATED).body(lecturerService.createLecturer(request));
+        } catch (DataIntegrityViolationException ex) {
+            var conflicts = lecturerService.findCreationConflicts(request);
+            if (!conflicts.isEmpty()) throw new ConstraintViolationProblem(Status.CONFLICT, conflicts);
+            throw ex;
+        }
     }
 
     /**

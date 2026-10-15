@@ -1,3 +1,8 @@
+export interface CreateLecturerValues {
+  code: string;
+  email: string;
+}
+
 export interface Lecturer {
   userId: number;
   code: string;

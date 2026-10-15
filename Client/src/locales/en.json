@@ -654,6 +654,35 @@
     "accountDetails": "Account information",
     "open": "View my profile"
   },
+  "addLecturer": {
+    "listTitle": "Lecturer / Mentor Management",
+    "listDescription": "Manage lecturers, mentors and account activation.",
+    "breadcrumb": "Lecturers",
+    "import": "Import Lecturers",
+    "button": "Add Lecturer",
+    "title": "Add Lecturer",
+    "description": "Create a lecturer account in the system catalog.",
+    "code": "Lecturer Code",
+    "codePlaceholder": "Enter lecturer code",
+    "codeHint": "The code is also used as the account display name.",
+    "email": "Email",
+    "emailPlaceholder": "Enter lecturer email",
+    "submit": "Create lecturer",
+    "creating": "Creating lecturer...",
+    "required": "This field is required.",
+    "invalid": {
+      "code": "Lecturer code must contain 2–50 characters.",
+      "email": "Enter a valid email of at most 254 characters."
+    },
+    "duplicateCode": "This lecturer code already exists (including different letter casing).",
+    "duplicateEmail": "This email is already used by another account.",
+    "conflict": "The lecturer was not created. Review the fields below; an existing record conflicts with this request.",
+    "failed": "The lecturer was not created. Review the form and try again.",
+    "forbidden": "Only an administrator can create lecturers.",
+    "unknown": "The creation result could not be confirmed. Your form is preserved; close this window and check All lecturers before trying again.",
+    "hint": "The account starts inactive, without a password. No class or term is assigned and no activation email is sent automatically.",
+    "success": "Lecturer created. Use All lecturers to find an unassigned lecturer, then send activation separately. Your current filters are unchanged."
+  },
   "addStudent": {
     "description": "Create a student account and assign an existing class.",
     "studentInformation": "Student information",
