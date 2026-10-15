@@ -1,4 +1,5 @@
-import { Eye, Pencil, Trash2 } from 'lucide-react';
+import { Eye, Pencil } from 'lucide-react';
+import { DeleteOutlined } from '@ant-design/icons';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
 import type { Major } from '../types';
@@ -39,7 +40,7 @@ export function MajorTable({ majors, isLoading, onView, onEdit, onDelete }: Majo
                     aria-label={t('majors.editAria', { code: major.code })} onClick={() => onEdit(major)}>
                     {t('majors.edit')}
                   </Button>
-                  <Button variant="danger" size="sm" icon={<Trash2 size={16} />} disabled={isLoading}
+                  <Button variant="danger" size="sm" icon={<DeleteOutlined style={{ fontSize: '15px' }} />} disabled={isLoading}
                     aria-label={t('majors.deleteAria', { code: major.code })} onClick={() => onDelete(major)}>
                     {t('majors.delete')}
                   </Button>

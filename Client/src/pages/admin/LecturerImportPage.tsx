@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Send, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import confetti from 'canvas-confetti';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -80,11 +79,6 @@ export const LecturerImportPage: React.FC = () => {
         setIsSuccessModalOpen(true);
         success(`Import thành công ${result.totalImported} giảng viên!`);
         void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
-        try {
-          confetti({ particleCount: 70, spread: 60 });
-        } catch {
-          // ignore
-        }
       }
     } catch (err: any) {
       setGenericError(err.message || 'Có lỗi xảy ra khi gửi dữ liệu lên máy chủ.');

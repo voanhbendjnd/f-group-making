@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle2, AlertCircle, Send } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
@@ -56,11 +55,6 @@ export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
       }
 
       setResult(res);
-      try {
-        confetti({ particleCount: 75, spread: 60 });
-      } catch {
-        // ignore
-      }
       onSuccess();
     } catch (err: any) {
       setErrorMsg(err.message || t('errors.generalFailure'));
