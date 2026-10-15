@@ -3,7 +3,7 @@ import { TermScope } from '@/features/terms/components/TermScope';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Users } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -32,6 +32,16 @@ function LecturerClassDetailPageContent() {
     retry: (count, error) => count < 1 && ![401, 403, 404].includes(getApiError(error).status),
   });
   const back = <Link to="/lecturer/classes" className="btn btn-secondary"><ArrowLeft size={18} aria-hidden="true" />{t('lecturer.back')}</Link>;
+  const actionButtons = (
+    <div style={{ display: 'flex', gap: '8px' }}>
+      {back}
+      <Link to={`/lecturer/groups?classId=${classId}`} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+        <Users size={18} aria-hidden="true" />
+        Xếp nhóm lớp này
+      </Link>
+    </div>
+  );
+
   if (!validId || query.isError) {
     const error = getApiError(query.error);
     return <div className="space-y-6"><PageHeader title={t('lecturer.detailTitle')} action={back} />
@@ -46,7 +56,7 @@ function LecturerClassDetailPageContent() {
   const readOnly = !canManageClassRules(user, schoolClass.lecturerId);
   return <div className="space-y-6 lecturer-page">
     <PageHeader title={t('lecturer.classTitle', { name: schoolClass.name })}
-      description={t(readOnly ? 'lecturer.readOnlyDetailDescription' : 'lecturer.detailDescription')} action={back} />
+      description={t(readOnly ? 'lecturer.readOnlyDetailDescription' : 'lecturer.detailDescription')} action={actionButtons} />
     <dl className="card lecturer-card lecturer-overview">
       <div><dt>{t('lecturer.term')}</dt><dd>{schoolClass.termName || t('lecturer.noTerm')}</dd></div>
       <div><dt>{t('lecturer.studentCount')}</dt><dd>{t('lecturer.students', { count: schoolClass.studentCount })}</dd></div>

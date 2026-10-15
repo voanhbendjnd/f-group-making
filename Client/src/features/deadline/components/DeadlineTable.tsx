@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Calendar, Users, Edit3, Trash2 } from 'lucide-react';
 import type { Deadline } from '../types';
@@ -100,7 +101,18 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
               </td>
               {canManage && (
                 <td style={{ textAlign: 'right' }}>
-                  <div style={{ display: 'inline-flex', gap: '8px' }}>
+                  <div style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                    <Link
+                      to={`/lecturer/groups?deadlineId=${deadline.id}${
+                        deadline.schoolClassIds && deadline.schoolClassIds[0] ? `&classId=${deadline.schoolClassIds[0]}` : ''
+                      }`}
+                      className="btn btn-secondary btn-sm"
+                      title="Quản lý & Xếp nhóm sinh viên"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <Users size={14} /> Xếp nhóm
+                    </Link>
+
                     {onEdit && (
                       <Button
                         size="sm"
