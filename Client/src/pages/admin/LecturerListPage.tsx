@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
-import { Upload, Users, Mail, Trash2, Clock } from 'lucide-react';
+import { Upload, Users, Mail, Trash2, Clock, UserPlus } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { Select } from '@/components/common/Select';
 import { LecturerFilterBar } from '@/features/lecturers/components/LecturerFilterBar';
 import { LecturerTable } from '@/features/lecturers/components/LecturerTable';
+import { CreateLecturerModal } from '@/features/lecturers/components/CreateLecturerModal';
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
 import { useToast } from '@/app/providers/ToastContext';
 import type { Lecturer, LecturerFilterParams } from '@/features/lecturers/types';
@@ -24,8 +25,23 @@ export const LecturerListPage: React.FC = () => {
   const { isLocked } = useTerm();
   const [searchParams, setSearchParams] = useSearchParams();
   const global = searchParams.get('scope') === 'all';
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const { success } = useToast();
 
   return <div>
+    <PageHeader title={t('addLecturer.listTitle')} description={t('addLecturer.listDescription')}
+      breadcrumbs={[{ label: 'Admin', href: '/admin/dashboard' }, { label: t('addLecturer.breadcrumb') }]}
+      action={<div className="lecturer-create-actions">
+        <Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setIsCreateOpen(true)}>{t('addLecturer.button')}</Button>
+        <Button variant="secondary" icon={<Upload size={16} />} onClick={() => navigate('/admin/lecturers/import')}>{t('addLecturer.import')}</Button>
+      </div>} />
+    {isCreateOpen && <CreateLecturerModal onClose={() => setIsCreateOpen(false)} onSuccess={() => {
+      setIsCreateOpen(false);
+      for (const key of ['lecturers', 'admin-dashboard']) void queryClient.invalidateQueries({ queryKey: [key] });
+      success(t('addLecturer.success'));
+    }} />}
     <div className="card" style={{ padding: '1rem', marginBottom: '1rem' }}>
       <Select id="lecturer-scope" label={t('terms.lecturerScope')} value={global ? 'all' : 'term'} disabled={isLocked}
         options={[
@@ -244,26 +260,6 @@ const LecturerListContent: React.FC<{ global: boolean }> = ({ global }) => {
 
   return (
     <div>
-      <PageHeader
-        title="Quản lý Giảng viên / Mentor"
-        description="Danh sách giảng viên, mentor và công cụ kích hoạt tài khoản."
-        breadcrumbs={[
-          { label: 'Admin', href: '/admin/dashboard' },
-          { label: 'Giảng viên' },
-        ]}
-        action={
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <Button
-              variant="primary"
-              icon={<Upload size={16} />}
-              onClick={() => navigate('/admin/lecturers/import')}
-            >
-              Import Giảng viên
-            </Button>
-          </div>
-        }
-      />
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
         {/* Search & Filter Bar */}
         <LecturerFilterBar

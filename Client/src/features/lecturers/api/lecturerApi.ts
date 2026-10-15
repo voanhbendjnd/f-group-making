@@ -1,9 +1,12 @@
 import { apiClient } from '@/services/api/client';
-import type { PaginatedLecturers, LecturerFilterParams } from '../types';
+import type { PaginatedLecturers, LecturerFilterParams, CreateLecturerValues, Lecturer } from '../types';
 import type { ImportResult } from '@/features/import/types';
 import type { BatchActivationResult } from '@/features/students/types';
 
 export const lecturerApi = {
+  async createLecturer(values: CreateLecturerValues): Promise<Lecturer> {
+    return apiClient.post<unknown, Lecturer>('/api/lecturers', values);
+  },
   async getLecturers(params: LecturerFilterParams = {}): Promise<PaginatedLecturers> {
     const queryParams: Record<string, any> = {};
     if (params.termId !== undefined) queryParams.termId = params.termId;

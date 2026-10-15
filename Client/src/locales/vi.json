@@ -654,6 +654,35 @@
     "accountDetails": "Thông tin tài khoản",
     "open": "Xem hồ sơ của tôi"
   },
+  "addLecturer": {
+    "listTitle": "Quản lý Giảng viên / Mentor",
+    "listDescription": "Danh sách giảng viên, mentor và công cụ kích hoạt tài khoản.",
+    "breadcrumb": "Giảng viên",
+    "import": "Import Giảng viên",
+    "button": "Thêm giảng viên",
+    "title": "Thêm giảng viên",
+    "description": "Tạo tài khoản giảng viên trong danh mục toàn hệ thống.",
+    "code": "Mã giảng viên",
+    "codePlaceholder": "Nhập mã giảng viên",
+    "codeHint": "Mã này cũng được dùng làm tên hiển thị của tài khoản.",
+    "email": "Email",
+    "emailPlaceholder": "Nhập email giảng viên",
+    "submit": "Tạo giảng viên",
+    "creating": "Đang tạo giảng viên...",
+    "required": "Vui lòng nhập trường này.",
+    "invalid": {
+      "code": "Mã giảng viên phải có từ 2–50 ký tự.",
+      "email": "Nhập email hợp lệ, tối đa 254 ký tự."
+    },
+    "duplicateCode": "Mã giảng viên đã tồn tại (không phân biệt chữ hoa/thường).",
+    "duplicateEmail": "Email đã được sử dụng bởi tài khoản khác.",
+    "conflict": "Chưa tạo giảng viên. Vui lòng kiểm tra các trường bên dưới; dữ liệu bị trùng hoặc xung đột với bản ghi hiện có.",
+    "failed": "Chưa tạo giảng viên. Vui lòng kiểm tra thông tin và thử lại.",
+    "forbidden": "Chỉ quản trị viên được thêm giảng viên.",
+    "unknown": "Chưa xác nhận được kết quả tạo. Thông tin đã nhập được giữ nguyên; hãy đóng cửa sổ và kiểm tra danh sách Toàn hệ thống trước khi thử lại.",
+    "hint": "Tài khoản chưa kích hoạt, chưa có mật khẩu. Hệ thống không gán lớp, học kỳ hoặc tự gửi email kích hoạt.",
+    "success": "Đã tạo giảng viên. Chọn phạm vi Toàn hệ thống để xem giảng viên chưa có lớp, rồi gửi kích hoạt riêng. Bộ lọc hiện tại được giữ nguyên."
+  },
   "addStudent": {
     "description": "Tạo tài khoản sinh viên và gán vào lớp đã có.",
     "studentInformation": "Thông tin sinh viên",

@@ -378,6 +378,10 @@ select.form-control {
 }
 
 .student-create-modal .modal-card { max-height: min(90dvh, 860px); }
+.lecturer-create-fields { display: grid; gap: 1rem; border: 0; padding: 0; margin: 0; min-width: 0; }
+.lecturer-create-fields .form-group { margin: 0; min-width: 0; }
+.lecturer-create-fields .form-control { min-height: 44px; }
+.lecturer-create-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
 .student-create-modal .modal-header { gap: 0.875rem; flex-shrink: 0; }
 .student-create-modal .modal-header > div { flex: 1; min-width: 0; }
 .student-create-modal .modal-description { margin: 0.25rem 0 0; color: var(--color-text-muted); font-size: 0.8125rem; line-height: 1.5; }

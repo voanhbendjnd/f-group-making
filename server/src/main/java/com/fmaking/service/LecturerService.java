@@ -21,6 +21,9 @@ import com.fmaking.security.AuthoritiesConstants;
 import com.fmaking.service.dto.*;
 import com.fmaking.service.errors.ExcelImportException;
 import com.fmaking.service.projection.LecturerRow;
+import org.zalando.problem.Status;
+import org.zalando.problem.violations.ConstraintViolationProblem;
+import org.zalando.problem.violations.Violation;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -90,6 +93,41 @@ public class LecturerService {
                     .build();
         }
 
+        saveLecturers(rows);
+
+        log.info("Lecturer import completed successfully: {} lecturer(s) saved", rows.size());
+        return ImportResultDTO.builder().success(true).totalImported(rows.size()).errors(List.of()).build();
+    }
+
+    public LecturerDTO createLecturer(CreateLecturerDTO request) {
+        var row = LecturerImportRowDTO.builder().rowIndex(1).code(request.code()).email(request.email()).build();
+        List<ImportRowErrorDTO> errors = validateRows(List.of(row));
+        if (!errors.isEmpty()) {
+            Map<String, String> conflicts = findCreationConflicts(request).stream()
+                    .collect(Collectors.toMap(Violation::getField, Violation::getMessage));
+            List<Violation> violations = errors.stream().map(error -> new Violation(error.getField(),
+                    conflicts.getOrDefault(error.getField(), "lecturerCreate.invalid." + error.getField()))).toList();
+            boolean duplicatesOnly = violations.stream().allMatch(value -> value.getMessage().startsWith("lecturerCreate.duplicate"));
+            throw new ConstraintViolationProblem(duplicatesOnly ? Status.CONFLICT : Status.BAD_REQUEST, violations);
+        }
+        return saveLecturers(List.of(row)).getFirst();
+    }
+
+    // Called only after the failed create transaction has rolled back, so a fresh
+    // transaction can see the winning request instead of querying a failed session.
+    @Transactional(readOnly = true)
+    public List<Violation> findCreationConflicts(CreateLecturerDTO request) {
+        List<Violation> violations = new ArrayList<>();
+        if (lecturerRepository.existsByCodeIgnoreCase(request.code())) {
+            violations.add(new Violation("code", "lecturerCreate.duplicateCode"));
+        }
+        if (!userRepository.findByEmailIgnoreCaseIn(List.of(request.email())).isEmpty()) {
+            violations.add(new Violation("email", "lecturerCreate.duplicateEmail"));
+        }
+        return violations;
+    }
+
+    private List<LecturerDTO> saveLecturers(List<LecturerImportRowDTO> rows) {
         Authority lecturerAuthority = authorityRepository.findById(AuthoritiesConstants.LECTURE)
                 .orElseGet(() -> {
                     Authority auth = new Authority();
@@ -122,13 +160,10 @@ public class LecturerService {
         lecturerRepository.saveAll(lecturersToSave);
         lecturerRepository.flush();
 
-        log.info("Lecturer import completed successfully: {} lecturer(s) saved", lecturersToSave.size());
-
-        return ImportResultDTO.builder()
-                .success(true)
-                .totalImported(lecturersToSave.size())
-                .errors(List.of())
-                .build();
+        return savedUsers.stream().map(user -> LecturerDTO.builder()
+                .userId(user.getId()).code(user.getName()).name(user.getName()).email(user.getEmail())
+                .activated(false).hasActivationKey(false).isKeyExpired(false)
+                .createdDate(user.getCreatedDate()).lastModifiedDate(user.getLastModifiedDate()).build()).toList();
     }
 
     @Transactional(readOnly = true)
@@ -331,9 +366,9 @@ public class LecturerService {
                 .map(l -> l.getCode().toLowerCase(Locale.ROOT))
                 .collect(Collectors.toSet());
 
-        Set<String> existingEmails = userRepository.findByEmailIn(emailsInFile)
+        Set<String> existingEmails = userRepository.findByEmailIgnoreCaseIn(emailsInFile)
                 .stream()
-                .map(User::getEmail)
+                .map(user -> user.getEmail().toLowerCase(Locale.ENGLISH))
                 .collect(Collectors.toSet());
 
         Map<String, Integer> seenCodes = new HashMap<>();

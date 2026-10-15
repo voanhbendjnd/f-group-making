@@ -18,7 +18,11 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(properties = "spring.datasource.url=jdbc:h2:mem:student-create-concurrency;DB_CLOSE_DELAY=-1;MODE=MySQL")
+@SpringBootTest(properties = {
+        "spring.datasource.url=jdbc:h2:mem:student-create-concurrency;DB_CLOSE_DELAY=-1;MODE=MySQL",
+        "spring.jpa.properties.hibernate.cache.use_second_level_cache=false",
+        "spring.jpa.properties.hibernate.cache.use_query_cache=false"
+})
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class StudentCreateConcurrencyTest {
     @Autowired private StudentService service;
