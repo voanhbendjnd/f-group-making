@@ -5,6 +5,7 @@ import com.fmaking.service.DeadlineService;
 import com.fmaking.service.dto.CreateDeadlineDTO;
 import com.fmaking.service.dto.DeadlineDTO;
 import com.fmaking.service.dto.DeadlineValidateDTO;
+import com.fmaking.service.dto.StudentDeadlineActivityDTO;
 import com.fmaking.service.dto.UpdateDeadlineDTO;
 import com.fmaking.util.anotation.ApiMessage;
 import jakarta.validation.Valid;
@@ -15,6 +16,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Slf4j
 @RestController
@@ -76,6 +79,15 @@ public class DeadlineResource {
         log.debug("REST request to validate Deadline : {} for class : {}", id, classId);
         DeadlineValidateDTO result = deadlineService.validateDeadlineForStudent(id, classId);
         return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/my-activities")
+    @PreAuthorize("hasAuthority('" + AuthoritiesConstants.STUDENT + "')")
+    @ApiMessage("Get student deadline activities successfully")
+    public ResponseEntity<List<StudentDeadlineActivityDTO>> getMyActivities() {
+        log.debug("REST request to get deadline activities for current student");
+        List<StudentDeadlineActivityDTO> activities = deadlineService.getMyActivities();
+        return ResponseEntity.ok(activities);
     }
 
     @DeleteMapping("/{id}")

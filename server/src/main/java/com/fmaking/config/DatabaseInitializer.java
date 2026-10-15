@@ -11,8 +11,10 @@ import org.springframework.stereotype.Component;
 import com.fmaking.domain.Authority;
 import com.fmaking.domain.Major;
 import com.fmaking.domain.User;
+import com.fmaking.domain.Term;
 import com.fmaking.repository.AuthorityRepository;
 import com.fmaking.repository.MajorRepository;
+import com.fmaking.repository.TermRepository;
 import com.fmaking.repository.UserRepository;
 import com.fmaking.security.AuthoritiesConstants;
 
@@ -29,6 +31,7 @@ public class DatabaseInitializer implements CommandLineRunner {
     UserRepository userRepository;
     AuthorityRepository authorityRepository;
     MajorRepository majorRepository;
+    TermRepository termRepository;
     PasswordEncoder passwordEncoder;
 
     @Override
@@ -82,6 +85,9 @@ public class DatabaseInitializer implements CommandLineRunner {
         // Seed Major data — chỉ insert nếu chưa có dữ liệu
         initMajors();
 
+        // Seed Term data — chỉ insert nếu chưa có dữ liệu
+        initTerms();
+
         if (totalUsers > 0 || totalAuthority > 0) {
             log.info("Skip processing initialize...");
         } else {
@@ -122,5 +128,26 @@ public class DatabaseInitializer implements CommandLineRunner {
         major.setCode(code);
         major.setName(name);
         return major;
+    }
+
+    private void initTerms() {
+        if (termRepository.count() > 0) {
+            log.info("Terms already initialized, skipping...");
+            return;
+        }
+        log.info("Start seeding Term data...");
+        List<Term> terms = List.of(
+            buildTerm("FALL26"),
+            buildTerm("SP26"),
+            buildTerm("SU26")
+        );
+        termRepository.saveAll(terms);
+        log.info("Seeded {} term(s) successfully.", terms.size());
+    }
+
+    private Term buildTerm(String name) {
+        Term term = new Term();
+        term.setName(name);
+        return term;
     }
 }
