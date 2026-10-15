@@ -5,6 +5,7 @@ import type {
   UpdateDeadlineRequest,
   DeadlineValidateResult,
   PaginatedDeadlines,
+  StudentDeadlineActivity,
 } from '../types';
 
 export const deadlineApi = {
@@ -64,5 +65,16 @@ export const deadlineApi = {
       signal,
     });
     return data;
+  },
+
+  async getMyActivities(signal?: AbortSignal): Promise<StudentDeadlineActivity[]> {
+    const data = await apiClient.get<unknown, any>('/api/deadlines/my-activities', { signal });
+    if (data?.data && Array.isArray(data.data)) {
+      return data.data;
+    }
+    if (Array.isArray(data)) {
+      return data;
+    }
+    return [];
   },
 };
