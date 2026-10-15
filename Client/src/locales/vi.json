@@ -778,7 +778,8 @@
     "status": {
       "active": "Đang diễn ra",
       "upcoming": "Sắp tới",
-      "expired": "Đã kết thúc"
+      "expired": "Đã kết thúc",
+      "cancelled": "Đã hủy"
     },
     "table": {
       "name": "Tên đợt hạn",
@@ -792,7 +793,9 @@
       "editTitle": "Chỉnh sửa",
       "extendTitle": "Gia hạn deadline",
       "cancelTitle": "Hủy deadline",
-      "classesCount": "{{count}} lớp"
+      "classesCount": "{{count}} lớp",
+      "viewGroups": "Xem nhóm",
+      "manageGroups": "Xếp nhóm"
     },
     "confirmCancel": {
       "title": "Xác nhận hủy deadline",
@@ -881,6 +884,20 @@
       "placeholderDesc": "Tài khoản và lớp học của bạn đã được xác thực hợp lệ với đợt hạn này. Tính năng lập nhóm và chọn thành viên chi tiết hiện đang được hoàn thiện và sẽ sớm mở cho sinh viên thao tác.",
       "backToDashboard": "Về trang chủ sinh viên",
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
+    },
+    "closed": {
+      "CANCELLED": {
+        "title": "Đợt chọn nhóm đã bị hủy",
+        "description": "Đợt này đã ngừng nhận đăng ký. Nhóm và lịch sử hiện có được giữ lại để xem; mọi thao tác thay đổi trong đợt đã bị khóa."
+      },
+      "UPCOMING": {
+        "title": "Đợt chọn nhóm chưa bắt đầu",
+        "description": "Bạn có thể xem thông tin đợt và nhóm hiện có. Các thao tác chọn nhóm sẽ mở khi đến thời gian bắt đầu."
+      },
+      "EXPIRED": {
+        "title": "Hạn chót chọn nhóm đã kết thúc",
+        "description": "Thời gian đăng ký đã kết thúc. Bạn có thể xem lại nhóm hiện có; các thao tác thay đổi nhóm của sinh viên đã bị khóa."
+      }
     }
   },
   "groupFormation": {

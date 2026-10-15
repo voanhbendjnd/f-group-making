@@ -14,6 +14,9 @@ import {
   Layers,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useDeadlineBoundary, effectiveDeadlineStatus } from '@/features/deadline/hooks/useDeadlineBoundary';
+import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStateNotice';
+import { DeadlineStatusBadge } from '@/features/deadline/components/DeadlineStatusBadge';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { Button } from '@/components/common/Button';
 
@@ -23,19 +26,23 @@ export const StudentGroupWidget: React.FC = () => {
   const currentLocale = i18n.language || 'vi';
 
   const {
-    data: activities = [],
+    data: rawActivities = [],
     isLoading,
     isError,
     refetch,
     isFetching,
   } = useQuery({
     queryKey: ['student-deadline-activities'],
-    queryFn: () => deadlineApi.getMyActivities(),
+    queryFn: ({ signal }) => deadlineApi.getMyActivities(signal),
     refetchOnWindowFocus: true,
     staleTime: 1000 * 30, // 30 seconds
   });
 
   // Tìm đợt ưu tiên hiển thị: đợt ACTIVE trước, sau đó UPCOMING, hoặc đợt mới nhất
+  const now = useDeadlineBoundary(rawActivities);
+  const activities = rawActivities.map(activity => ({ ...activity,
+    status: effectiveDeadlineStatus(activity.status, activity.startTime, activity.endTime, now),
+  }));
   const activeActivity =
     activities.find((a) => a.status === 'ACTIVE') ||
     activities.find((a) => a.status === 'UPCOMING') ||
@@ -213,9 +220,20 @@ export const StudentGroupWidget: React.FC = () => {
     );
   }
 
+  if (activeActivity.status === 'CANCELLED' || activeActivity.status === 'EXPIRED') {
+    return <div style={{ marginBottom: '2rem' }}>
+      <DeadlineStateNotice status={activeActivity.status} />
+      {activities.map(activity => <div className="card" key={activity.deadlineId} style={{ padding: '1rem', marginTop: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <strong>{activity.deadlineName}</strong><DeadlineStatusBadge status={activity.status} />
+        <span>{activity.schoolClassName}</span>
+        {activity.hasGroup && <Button variant="secondary" onClick={() => handleNavigateToGroup(activity.deadlineId, activity.schoolClassId)}>{t('deadline.table.viewGroups')}</Button>}
+      </div>)}
+    </div>;
+  }
+
   const isActive = activeActivity.status === 'ACTIVE' && !timeLeft.isOver;
   const isUpcoming = activeActivity.status === 'UPCOMING';
-  const isExpired = activeActivity.status === 'EXPIRED' || timeLeft.isOver;
+  const isExpired = timeLeft.isOver;
 
   return (
     <div style={{ marginBottom: '2.5rem' }}>
@@ -511,12 +529,12 @@ export const StudentGroupWidget: React.FC = () => {
                   )}
 
                   {/* Group status badge */}
-                  {activeActivity.groupStatus === 'APPROVED' && (
+                  {activeActivity.groupStatus === 'ACCEPTED' && (
                     <span className="badge badge-success" style={{ fontSize: '0.75rem' }}>
                       {t('studentWidget.statusApproved', 'Đã duyệt')}
                     </span>
                   )}
-                  {activeActivity.groupStatus === 'SUBMITTED' && (
+                  {activeActivity.groupStatus === 'PENDING' && (
                     <span className="badge badge-info" style={{ fontSize: '0.75rem' }}>
                       {t('studentWidget.statusSubmitted', 'Chờ GV duyệt')}
                     </span>
@@ -526,7 +544,7 @@ export const StudentGroupWidget: React.FC = () => {
                       {t('studentWidget.statusOpen', 'Đang mở (chưa nộp)')}
                     </span>
                   )}
-                  {activeActivity.groupStatus === 'REJECTED' && (
+                  {activeActivity.groupStatus === 'REVOKED' && (
                     <span className="badge badge-danger" style={{ fontSize: '0.75rem' }}>
                       {t('studentWidget.statusRejected', 'Cần chỉnh sửa lại')}
                     </span>
@@ -577,7 +595,7 @@ export const StudentGroupWidget: React.FC = () => {
                   {t('studentWidget.unassignedTitle', 'Bạn chưa tham gia nhóm nào')}
                 </div>
                 <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-                  {t(
+                  {!isActive ? t('deadline.closed.UPCOMING.description') : t(
                     'studentWidget.unassignedDesc',
                     'Hãy vào không gian chọn nhóm ngay để tạo nhóm mới hoặc xin gia nhập nhóm của các bạn trong lớp!'
                   )}
@@ -601,7 +619,7 @@ export const StudentGroupWidget: React.FC = () => {
             >
               {activeActivity.hasGroup
                 ? t('studentWidget.enterWorkspaceBtn', 'Vào Không Gian Nhóm')
-                : t('studentWidget.joinNowBtn', 'Tham Gia Chọn Nhóm Ngay')}
+                : !isActive ? t('deadline.table.viewGroups') : t('studentWidget.joinNowBtn', 'Tham Gia Chọn Nhóm Ngay')}
             </Button>
           </div>
         </div>
@@ -661,7 +679,8 @@ export const StudentGroupWidget: React.FC = () => {
                     {act.deadlineName}
                   </div>
                   <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
-                    {act.status === 'EXPIRED' ? 'Đã hết hạn' : 'Sắp diễn ra'} • {formatDateTime(act.endTime)}
+                    {t(`deadline.status.${act.status.toLowerCase()}`)}
+                    {act.status !== 'CANCELLED' && <> • {formatDateTime(act.endTime)}</>}
                   </div>
                 </div>
 

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Calendar, Users, Edit3, Trash2 } from 'lucide-react';
 import type { Deadline } from '../types';
 import { DeadlineStatusBadge } from './DeadlineStatusBadge';
+import { useDeadlineBoundary, effectiveDeadlineStatus } from '../hooks/useDeadlineBoundary';
 import { Button } from '@/components/common/Button';
 
 interface DeadlineTableProps {
@@ -36,6 +37,7 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
   canManage = true,
 }) => {
   const { t, i18n } = useTranslation();
+  const now = useDeadlineBoundary(deadlines);
   const currentLocale = i18n.language === 'en' ? 'en-US' : 'vi-VN';
 
   return (
@@ -52,7 +54,9 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
           </tr>
         </thead>
         <tbody>
-          {deadlines.map((deadline) => (
+          {deadlines.map((item) => {
+            const deadline = { ...item, status: effectiveDeadlineStatus(item.status, item.startTime, item.endTime, now) };
+            return (
             <tr key={deadline.id}>
               <td>
                 <div style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>
@@ -107,13 +111,13 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
                         deadline.schoolClassIds && deadline.schoolClassIds[0] ? `&classId=${deadline.schoolClassIds[0]}` : ''
                       }`}
                       className="btn btn-secondary btn-sm"
-                      title="Quản lý & Xếp nhóm sinh viên"
+                      title={t('deadline.table.viewGroups')}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                     >
-                      <Users size={14} /> Xếp nhóm
+                      <Users size={14} /> {t(deadline.status === 'CANCELLED' ? 'deadline.table.viewGroups' : 'deadline.table.manageGroups')}
                     </Link>
 
-                    {onEdit && (
+                    {onEdit && deadline.canEdit !== false && ['ACTIVE', 'UPCOMING'].includes(deadline.status) && (
                       <Button
                         size="sm"
                         variant="secondary"
@@ -124,7 +128,7 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
                         {deadline.status === 'ACTIVE' ? t('deadline.table.extend') : t('deadline.table.edit')}
                       </Button>
                     )}
-                    {onCancel && (
+                    {onCancel && deadline.canCancel !== false && deadline.status !== 'CANCELLED' && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -138,7 +142,7 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
                 </td>
               )}
             </tr>
-          ))}
+          ); })}
         </tbody>
       </table>
     </div>

@@ -6,6 +6,7 @@ import type { DeadlineStatus } from '../types';
 export const DeadlineStatusBadge: React.FC<{ status: DeadlineStatus }> = ({ status }) => {
   const { t } = useTranslation();
 
+  if (status === 'CANCELLED') return <span className="badge badge-neutral">{t('deadline.status.cancelled')}</span>;
   if (status === 'ACTIVE') {
     return (
       <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

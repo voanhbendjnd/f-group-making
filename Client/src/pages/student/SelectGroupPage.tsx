@@ -12,6 +12,9 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { message } from 'antd';
+import { useDeadlineBoundary, effectiveDeadlineStatus } from '@/features/deadline/hooks/useDeadlineBoundary';
+import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStateNotice';
+import { DeadlineStatusBadge } from '@/features/deadline/components/DeadlineStatusBadge';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { groupApi } from '@/features/group/api/groupApi';
 import { useGroupWebSocket } from '@/features/group/hooks/useGroupWebSocket';
@@ -41,7 +44,7 @@ export const SelectGroupPage: React.FC = () => {
   // Auto-resolve deadlineId and classId if accessed directly without query params
   const { data: myActivities, isLoading: isActivitiesLoading } = useQuery({
     queryKey: ['student-deadline-activities'],
-    queryFn: () => deadlineApi.getMyActivities(),
+    queryFn: ({ signal }) => deadlineApi.getMyActivities(signal),
     enabled: !deadlineId || !classId,
     retry: false,
   });
@@ -65,10 +68,16 @@ export const SelectGroupPage: React.FC = () => {
     error: validateError,
   } = useQuery({
     queryKey: ['validate-deadline', deadlineId, classId],
-    queryFn: () => deadlineApi.validateDeadline(deadlineId!, classId!),
+    queryFn: ({ signal }) => deadlineApi.validateDeadline(deadlineId!, classId!, signal),
     enabled: !!deadlineId && !!classId,
     retry: false,
   });
+
+  const boundaryNow = useDeadlineBoundary(validateResult ? [validateResult] : []);
+  const deadlineState = validateResult
+    ? effectiveDeadlineStatus(validateResult.status, validateResult.startTime, validateResult.endTime, boundaryNow)
+    : 'UPCOMING';
+  const isExpired = deadlineState !== 'ACTIVE';
 
   // Fetch full group workspace
   const {
@@ -79,8 +88,8 @@ export const SelectGroupPage: React.FC = () => {
     refetch: refetchWorkspace,
   } = useQuery({
     queryKey: ['group-workspace', deadlineId, classId],
-    queryFn: () => groupApi.getWorkspace(deadlineId!, classId!),
-    enabled: !!deadlineId && !!classId && !!validateResult?.valid,
+    queryFn: ({ signal }) => groupApi.getWorkspace(deadlineId!, classId!, signal),
+    enabled: !!deadlineId && !!classId && !!validateResult,
     retry: false,
   });
 
@@ -88,6 +97,11 @@ export const SelectGroupPage: React.FC = () => {
   const { status: wsStatus } = useGroupWebSocket({
     deadlineId,
     classId,
+    onEvent: event => {
+      if (event.eventType !== 'DEADLINE_CANCELLED') return;
+      setCreateModalOpen(false); setTransferModalOpen(false); setRejectModalOpen(false);
+      setLecturerModalOpen(false); setUnassignedDrawerOpen(false);
+    },
   });
 
   // Modal states
@@ -98,6 +112,8 @@ export const SelectGroupPage: React.FC = () => {
   const [lecturerModalOpen, setLecturerModalOpen] = useState(false);
   const [unassignedDrawerOpen, setUnassignedDrawerOpen] = useState(false);
   const [actionLoadingGroupId, setActionLoadingGroupId] = useState<number | null>(null);
+
+
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<{
@@ -373,65 +389,19 @@ export const SelectGroupPage: React.FC = () => {
     );
   }
 
-  const isExpired = !validateResult?.valid || validateResult?.status === 'EXPIRED' || timeLeft.isOver;
-
-  if (isExpired) {
-    return (
-      <div style={{ maxWidth: '720px', margin: '2rem auto', padding: '0 1rem' }}>
-        <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
-          <div
-            style={{
-              width: '64px',
-              height: '64px',
-              borderRadius: '50%',
-              backgroundColor: 'var(--color-error-bg, #fee2e2)',
-              color: 'var(--color-error, #ef4444)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '1.25rem',
-            }}
-          >
-            <Clock size={32} />
-          </div>
-          <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-            {t('deadline.student.expiredTitle')}
-          </h2>
-          <p
-            style={{
-              color: 'var(--color-text-muted)',
-              fontSize: '0.9375rem',
-              margin: '0.75rem 0 1.5rem',
-              lineHeight: 1.6,
-              whiteSpace: 'pre-line',
-            }}
-          >
-            {t('deadline.student.expiredDesc', {
-              name: validateResult?.name,
-              className: validateResult?.className,
-              endTime: formatDateTime(validateResult?.endTime),
-            })}
-          </p>
-          <Button variant="primary" icon={<ArrowLeft size={16} />} onClick={() => navigate('/student/dashboard')}>
-            {t('deadline.student.backToDashboard')}
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
   const otherGroups = (workspace?.groups || []).filter(
     (g) => !workspace?.myGroup || g.id !== workspace.myGroup.id
   );
 
   return (
     <div className="student-group-container">
+      <DeadlineStateNotice status={deadlineState} />
       {/* Top Header Card */}
       <div className="card student-group-header-card">
         <div className="student-group-header-content">
           <div className="student-group-header-info">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', flexWrap: 'wrap' }}>
-              <span className="badge badge-success">{t('studentGroup.inProgress')}</span>
+              <DeadlineStatusBadge status={deadlineState} />
               {/* WebSocket live status badge */}
               <span
                 style={{
@@ -466,13 +436,12 @@ export const SelectGroupPage: React.FC = () => {
               <span>
                 {t('studentGroup.classLabel')} <strong style={{ color: 'var(--color-text-main)' }}>{workspace?.schoolClassName || validateResult?.className}</strong>
               </span>
-              <span>•</span>
-              <span>{t('studentGroup.deadlineLabel')} {formatDateTime(workspace?.deadlineEndTime || validateResult?.endTime)}</span>
+              {deadlineState !== 'CANCELLED' && <><span>•</span><span>{t('studentGroup.deadlineLabel')} {formatDateTime(workspace?.deadlineEndTime || validateResult?.endTime)}</span></>}
             </div>
           </div>
 
           {/* Countdown block */}
-          <div className="student-group-countdown-box">
+          {deadlineState === 'ACTIVE' && <div className="student-group-countdown-box">
             <Clock size={18} color="var(--color-primary, #2563eb)" />
             <div style={{ display: 'flex', gap: '6px', fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
               <span>{timeLeft.days}d</span>:
@@ -480,7 +449,7 @@ export const SelectGroupPage: React.FC = () => {
               <span>{timeLeft.minutes}m</span>:
               <span style={{ color: 'var(--color-primary, #2563eb)' }}>{timeLeft.seconds}s</span>
             </div>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -504,7 +473,7 @@ export const SelectGroupPage: React.FC = () => {
             {t('studentGroup.unassignedCount', { count: workspace?.unassignedStudents?.length || 0 })}
           </Button>
 
-          {workspace?.canCreateGroup && (
+          {workspace?.canCreateGroup && !isExpired && (
             <Button
               variant="primary"
               icon={<Plus size={16} />}
@@ -570,7 +539,7 @@ export const SelectGroupPage: React.FC = () => {
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', margin: '4px 0 1rem' }}>
               {t('studentGroup.emptyGroupsDesc')}
             </p>
-            {workspace?.canCreateGroup && (
+            {workspace?.canCreateGroup && !isExpired && (
               <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
                 {t('studentGroup.createFirstGroup')}
               </Button>
@@ -582,7 +551,7 @@ export const SelectGroupPage: React.FC = () => {
               <GroupCard
                 key={group.id}
                 group={group}
-                canJoin={!!workspace?.canJoinGroup}
+                canJoin={!!workspace?.canJoinGroup && !isExpired}
                 isMyGroup={false}
                 isLecturer={!!workspace?.isLecturer}
                 isDeadlineExpired={isExpired}
@@ -602,7 +571,7 @@ export const SelectGroupPage: React.FC = () => {
 
       {/* MODALS */}
       <CreateGroupModal
-        open={createModalOpen}
+        open={createModalOpen && !isExpired}
         onClose={() => setCreateModalOpen(false)}
         onSubmit={async (name) => {
           await createGroupMutation.mutateAsync(name);
@@ -612,7 +581,7 @@ export const SelectGroupPage: React.FC = () => {
 
       {workspace?.myGroup && (
         <TransferLeaderModal
-          open={transferModalOpen}
+          open={transferModalOpen && !isExpired}
           members={workspace.myGroup.members}
           currentLeaderId={workspace.myGroup.leaderId}
           onClose={() => setTransferModalOpen(false)}
@@ -624,7 +593,7 @@ export const SelectGroupPage: React.FC = () => {
       )}
 
       <RejectGroupModal
-        open={rejectModalOpen}
+        open={rejectModalOpen && !isExpired}
         groupId={rejectGroupId}
         onClose={() => {
           setRejectModalOpen(false);
@@ -637,7 +606,7 @@ export const SelectGroupPage: React.FC = () => {
       />
 
       <LecturerGroupModal
-        open={lecturerModalOpen}
+        open={lecturerModalOpen && !isExpired}
         unassignedStudents={workspace?.unassignedStudents || []}
         rules={workspace?.rules || []}
         maxMembers={workspace?.groups?.[0]?.maxMembers || 6}
@@ -649,7 +618,7 @@ export const SelectGroupPage: React.FC = () => {
       />
 
       <UnassignedStudentsDrawer
-        open={unassignedDrawerOpen}
+        open={unassignedDrawerOpen && !isExpired}
         students={workspace?.unassignedStudents || []}
         onClose={() => setUnassignedDrawerOpen(false)}
         isLecturer={workspace?.isLecturer}
