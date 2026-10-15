@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { CheckCircle2, AlertTriangle, KeyRound, ArrowRight, ShieldCheck, Check } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useTranslation, Trans } from 'react-i18next';
 import { activationApi } from '@/features/activation/api/activationApi';
 import type { ActivationKeyVerifyResult } from '@/features/activation/types';
@@ -77,16 +76,6 @@ export const ActivateAccountPage: React.FC = () => {
       });
 
       setIsActivatedSuccess(true);
-      // Trigger festive celebration
-      try {
-        confetti({
-          particleCount: 100,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-      } catch {
-        // Ignore confetti if not supported
-      }
     } catch (err: any) {
       setSubmitError(err.message || t('activation.submitErrorDefault'));
     } finally {

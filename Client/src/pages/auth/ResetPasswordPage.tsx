@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { KeyRound, CheckCircle2, ShieldAlert, ArrowRight, ShieldCheck, Check, RotateCcw } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import { useTranslation } from 'react-i18next';
 import { authApi } from '@/features/auth/api/authApi';
 import type { ResetKeyVerifyResult } from '@/features/auth/types';
@@ -73,15 +72,6 @@ export const ResetPasswordPage: React.FC = () => {
       });
 
       setIsSuccess(true);
-      try {
-        confetti({
-          particleCount: 80,
-          spread: 70,
-          origin: { y: 0.6 },
-        });
-      } catch {
-        // ignore confetti errors
-      }
     } catch (err: any) {
       setErrorMessage(
         err.message || t('resetPassword.submitErrorDefault')

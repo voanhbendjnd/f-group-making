@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Send, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import confetti from 'canvas-confetti';
 import { useTranslation } from 'react-i18next';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
@@ -83,11 +82,6 @@ const StudentImportContent: React.FC = () => {
         void queryClient.invalidateQueries({ queryKey: ['school-class-students'] });
         void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
         void queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
-        try {
-          confetti({ particleCount: 90, spread: 70 });
-        } catch {
-          // ignore
-        }
       }
     } catch (err: any) {
       setGenericError(err.message || t('import.errorOccurred'));
