@@ -19,6 +19,8 @@ import {
 } from 'lucide-react';
 import { Modal, Tooltip, message, Dropdown, type MenuProps } from 'antd';
 import { classApi } from '@/features/classes/api/classApi';
+import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStateNotice';
+import type { DeadlineStatus } from '@/features/deadline/types';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { groupApi } from '@/features/group/api/groupApi';
 import { useGroupWebSocket } from '@/features/group/hooks/useGroupWebSocket';
@@ -83,7 +85,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
   // 2. Fetch lecturer's deadlines
   const { data: deadlinesData, isLoading: isLoadingDeadlines } = useQuery({
     queryKey: ['lecturer-deadlines-for-workspace'],
-    queryFn: () => deadlineApi.getDeadlines({ page: 1, size: 100 }),
+    queryFn: ({ signal }) => deadlineApi.getDeadlines({ page: 1, size: 100 }, signal),
   });
 
   const availableDeadlines = useMemo(() => deadlinesData?.result || [], [deadlinesData]);
@@ -119,15 +121,22 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
     refetch: refetchWorkspace,
   } = useQuery({
     queryKey: ['group-workspace', selectedDeadlineId, selectedClassId],
-    queryFn: () => groupApi.getWorkspace(selectedDeadlineId!, selectedClassId!),
+    queryFn: ({ signal }) => groupApi.getWorkspace(selectedDeadlineId!, selectedClassId!, signal),
     enabled: !!selectedDeadlineId && !!selectedClassId,
     retry: false,
   });
+
+  const canManage = !!workspace?.canManageGroups;
+
 
   // 4. Realtime WebSocket
   const { status: wsStatus } = useGroupWebSocket({
     deadlineId: selectedDeadlineId,
     classId: selectedClassId,
+    onEvent: event => {
+      if (event.eventType !== 'DEADLINE_CANCELLED') return;
+      setIsCreateModalOpen(false); setRejectingGroupId(null); Modal.destroyAll();
+    },
   });
 
   // Invalidate query helper
@@ -266,6 +275,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
   // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, student: GroupMemberDTO, fromGroupId: number | null) => {
+    if (!canManage) { e.preventDefault(); return; }
     const payload: DragPayload = {
       studentId: student.studentId,
       studentName: student.fullName,
@@ -283,6 +293,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
   const handleDropOnGroup = async (e: React.DragEvent, targetGroupId: number) => {
     e.preventDefault();
+    if (!canManage) return;
     setDragOverGroupId(null);
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -306,6 +317,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
   const handleDropOnQuickCreate = async (e: React.DragEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     setIsDragOverQuickCreate(false);
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -331,6 +343,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
   const handleDropOnUnassigned = async (e: React.DragEvent) => {
     e.preventDefault();
+    if (!canManage) return;
     setIsDragOverUnassigned(false);
     try {
       const raw = e.dataTransfer.getData('application/json');
@@ -604,6 +617,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             size="sm"
             variant="primary"
             icon={<Plus size={15} />}
+            disabled={!canManage}
             onClick={() => setIsCreateModalOpen(true)}
           >
             {t('groupWorkspace.createNewGroup')}
@@ -611,6 +625,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
         </div>
       </div>
 
+      {workspace?.deadlineStatus === 'CANCELLED' && <DeadlineStateNotice status={workspace.deadlineStatus as DeadlineStatus} />}
       {/* Main Workspace Layout (2 Columns: Unassigned Pool Left, Groups Canvas Right) */}
       {isLoadingWorkspace || isLoadingClasses || isLoadingDeadlines ? (
         <div className="card" style={{ padding: '4rem 2rem', textAlign: 'center' }}>
@@ -630,6 +645,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
           </Button>
         </div>
       ) : (
+        <fieldset disabled={!canManage} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
         <div
           style={{
             display: 'grid',
@@ -799,7 +815,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                   return (
                     <div
                       key={student.studentId}
-                      draggable
+                      draggable={canManage}
                       onDragStart={(e) => handleDragStart(e, student, null)}
                       onDragEnd={handleDragEnd}
                       style={{
@@ -919,7 +935,8 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                 justifyContent: 'center',
                 gap: '12px',
               }}
-              onClick={() => setIsCreateModalOpen(true)}
+              aria-disabled={!canManage}
+              onClick={() => { if (canManage) setIsCreateModalOpen(true); }}
             >
               <div
                 style={{
@@ -958,7 +975,8 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                 <p style={{ color: '#64748b', fontSize: '0.875rem', maxWidth: '400px', margin: '0.25rem auto 1.5rem' }}>
                   {t('groupWorkspace.emptyGroupsDesc')}
                 </p>
-                <Button variant="primary" icon={<Plus size={16} />} onClick={() => setIsCreateModalOpen(true)}>
+                <Button variant="primary" icon={<Plus size={16} />} disabled={!canManage}
+            onClick={() => setIsCreateModalOpen(true)}>
                   {t('groupWorkspace.createFirstGroup')}
                 </Button>
               </div>
@@ -1063,7 +1081,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                             return (
                               <div
                                 key={member.studentId}
-                                draggable
+                                draggable={canManage}
                                 onDragStart={(e) => handleDragStart(e, member, group.id)}
                                 onDragEnd={handleDragEnd}
                                 style={{
@@ -1296,11 +1314,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             )}
           </div>
         </div>
+        </fieldset>
       )}
 
       {/* Modal: Giảng viên Tạo & Phân Công Nhóm */}
       <LecturerGroupModal
-        open={isCreateModalOpen}
+        open={isCreateModalOpen && canManage}
         unassignedStudents={workspace?.unassignedStudents || []}
         rules={workspace?.rules || []}
         maxMembers={maxMembers}
@@ -1313,7 +1332,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
       {/* Modal: Từ Chối Nhóm */}
       <RejectGroupModal
-        open={rejectingGroupId !== null}
+        open={rejectingGroupId !== null && canManage}
         groupId={rejectingGroupId}
         onClose={() => setRejectingGroupId(null)}
         onSubmit={async (groupId, reason) => {

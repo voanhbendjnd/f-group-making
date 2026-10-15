@@ -17,6 +17,11 @@ public class DeadlineDTO {
     private Instant startTime;
     private Instant endTime;
     private DeadlineStatus status;
+    private long version;
+    private Instant cancelledAt;
+    private String cancelledBy;
+    private boolean canEdit;
+    private boolean canCancel;
     private List<Integer> schoolClassIds;
     private List<String> schoolClassNames;
     private Instant createdDate;

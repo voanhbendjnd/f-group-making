@@ -8,6 +8,8 @@
 
 ---
 
+> Cập nhật 16/10/2026: vòng đời deadline đã được bổ sung theo [kế hoạch 14](14-ke-hoach-dong-bo-deadline-va-realtime.md). `CANCELLED` ưu tiên trạng thái thời gian; hủy giữ dữ liệu để xem lại và khóa thao tác. Các ví dụ chỉ tính thời gian bên dưới mô tả thiết kế ban đầu; mã hiện tại dùng resolver xét cả trạng thái lưu.
+
 ## 1. MỤC TIÊU & NGUYÊN TẮC THIẾT KẾ CỐT LÕI
 
 ### 1.1. Mục tiêu
@@ -56,7 +58,8 @@ Xây dựng tính năng quản lý **Deadline (Hạn chót chọn nhóm)** hoàn
 public enum DeadlineStatus {
     UPCOMING, // Chưa bắt đầu (now < startTime)
     ACTIVE,   // Đang diễn ra  (startTime <= now < endTime)
-    EXPIRED   // Đã kết thúc  (now >= endTime)
+    EXPIRED,  // Đã kết thúc  (now >= endTime)
+    CANCELLED // Đã hủy: ưu tiên trước mọi điều kiện thời gian
 }
 ```
 

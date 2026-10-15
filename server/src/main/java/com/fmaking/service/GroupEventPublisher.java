@@ -27,6 +27,7 @@ public class GroupEventPublisher {
 
     public void publish(String eventType, Long groupId, Integer deadlineId, Integer schoolClassId, String actor, Object payload) {
         GroupRealtimeEvent event = GroupRealtimeEvent.builder()
+            .eventId(java.util.UUID.randomUUID().toString())
             .eventType(eventType)
             .groupId(groupId)
             .deadlineId(deadlineId)
@@ -49,6 +50,7 @@ public class GroupEventPublisher {
 
         try {
             messagingTemplate.convertAndSend(destination, event);
+            messagingTemplate.convertAndSend("/topic/classes/" + event.getSchoolClassId() + "/deadlines", event);
         } catch (Exception e) {
             log.error("Failed to broadcast realtime event to {}", destination, e);
         }

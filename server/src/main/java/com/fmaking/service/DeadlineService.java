@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.Clock;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -34,6 +35,10 @@ public class DeadlineService {
     private final GroupRuleValidationService ruleValidationService;
     private final SchoolClassAccessService schoolClassAccessService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final DeadlinePolicy policy;
+    private final DeadlineEventPublisher deadlineEvents;
+    private final Clock clock;
+    private final TermService termService;
 
     public DeadlineService(
             DeadlineRepository deadlineRepository,
@@ -44,7 +49,8 @@ public class DeadlineService {
             GroupRepository groupRepository,
             GroupRuleValidationService ruleValidationService,
             SchoolClassAccessService schoolClassAccessService,
-            ApplicationEventPublisher applicationEventPublisher
+            ApplicationEventPublisher applicationEventPublisher,
+            DeadlinePolicy policy, DeadlineEventPublisher deadlineEvents, Clock clock, TermService termService
     ) {
         this.deadlineRepository = deadlineRepository;
         this.schoolClassRepository = schoolClassRepository;
@@ -55,10 +61,14 @@ public class DeadlineService {
         this.ruleValidationService = ruleValidationService;
         this.schoolClassAccessService = schoolClassAccessService;
         this.applicationEventPublisher = applicationEventPublisher;
+        this.policy = policy;
+        this.deadlineEvents = deadlineEvents;
+        this.clock = clock;
+        this.termService = termService;
     }
 
     public DeadlineDTO createDeadline(CreateDeadlineDTO dto) {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
 
         if (dto.getStartTime().isAfter(dto.getEndTime()) || dto.getStartTime().equals(dto.getEndTime())) {
             throw new BadRequestResourceException("End time must be after start time", "deadline", "endTimeBeforeStartTime");
@@ -91,7 +101,8 @@ public class DeadlineService {
         deadline.setStatus("ACTIVE");
         deadline.setSchoolClasses(new HashSet<>(classes));
 
-        Deadline saved = deadlineRepository.save(deadline);
+        Deadline saved = deadlineRepository.saveAndFlush(deadline);
+        deadlineEvents.publish("DEADLINE_CREATED", saved, List.of());
 
         // Publish event to trigger async notifications after transaction commits
         applicationEventPublisher.publishEvent(new DeadlineCreatedEvent(saved.getId(), classIds));
@@ -100,9 +111,10 @@ public class DeadlineService {
     }
 
     public DeadlineDTO updateDeadline(UpdateDeadlineDTO dto) {
-        Instant now = Instant.now();
-        Deadline existing = deadlineRepository.findByIdWithClasses(dto.getId())
+        Deadline existing = deadlineRepository.findForUpdate(dto.getId())
                 .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
+        Instant now = clock.instant();
+        Set<SchoolClass> previousClasses = new HashSet<>(existing.getSchoolClasses());
 
         // Strict Ownership Check on EXISTING classes in DB
         if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
@@ -123,7 +135,8 @@ public class DeadlineService {
             }
         }
 
-        DeadlineStatus currentStatus = DeadlineStatus.calculateStatus(existing.getStartTime(), existing.getEndTime(), now);
+        policy.requireNotCancelled(existing);
+        DeadlineStatus currentStatus = policy.status(existing);
 
         if (currentStatus == DeadlineStatus.ACTIVE) {
             // Immutable startTime
@@ -165,18 +178,37 @@ public class DeadlineService {
         existing.setDescription(dto.getDescription());
         existing.setEndTime(dto.getEndTime());
 
-        Deadline saved = deadlineRepository.save(existing);
+        Deadline saved = deadlineRepository.saveAndFlush(existing);
+        deadlineEvents.publish(currentStatus == DeadlineStatus.ACTIVE ? "DEADLINE_EXTENDED" : "DEADLINE_UPDATED", saved, previousClasses);
         return toDTO(saved);
     }
 
     @Transactional(readOnly = true)
     public Page<DeadlineDTO> getDeadlines(Pageable pageable) {
+        return getDeadlines(pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DeadlineDTO> getDeadlines(Pageable pageable, Integer termId) {
+        termService.validateTerm(termId);
+        org.springframework.data.jpa.domain.Specification<Deadline> scope = (root, query, cb) -> {
+            if (termId == null) return cb.conjunction();
+            var classes = query.subquery(Integer.class);
+            var schoolClass = classes.from(SchoolClass.class);
+            var deadline = classes.correlate(root);
+            var appliedClass = deadline.join("schoolClasses");
+            classes.select(schoolClass.get("id")).where(cb.equal(schoolClass.get("id"), appliedClass.get("id")), cb.equal(schoolClass.get("termId"), termId));
+            return cb.exists(classes);
+        };
         if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
-            return deadlineRepository.findAll(pageable).map(this::toDTO);
+            return deadlineRepository.findAll(scope, pageable).map(this::toDTO);
         } else if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
                 || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
             Long currentLecturerId = schoolClassAccessService.currentLecturerId();
-            return deadlineRepository.findAllByLecturerId(currentLecturerId, pageable).map(this::toDTO);
+            return deadlineRepository.findAll(scope.and((root, query, cb) -> {
+                query.distinct(true);
+                return cb.equal(root.join("schoolClasses").get("lecturerId"), currentLecturerId);
+            }), pageable).map(this::toDTO);
         } else if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.STUDENT)) {
             Long currentUserId = getCurrentUserId();
             Student student = studentRepository.findById(currentUserId)
@@ -185,8 +217,11 @@ public class DeadlineService {
                 return new PageImpl<>(List.of(), pageable, 0);
             }
             List<Deadline> deadlines = deadlineRepository.findAllBySchoolClassId(student.getSchoolClassId());
-            List<DeadlineDTO> dtos = deadlines.stream().map(this::toDTO).toList();
-            return new PageImpl<>(dtos, pageable, dtos.size());
+            List<DeadlineDTO> dtos = deadlines.stream()
+                    .filter(d -> termId == null || d.getSchoolClasses().stream().anyMatch(c -> Objects.equals(c.getTermId(), termId) && Objects.equals(c.getId(), student.getSchoolClassId())))
+                    .map(this::toDTO).toList();
+            int start = (int) Math.min(pageable.getOffset(), dtos.size());
+            return new PageImpl<>(dtos.subList(start, Math.min(start + pageable.getPageSize(), dtos.size())), pageable, dtos.size());
         } else {
             throw new ForbiddenAlertException("Access denied", "deadline", "accessDenied");
         }
@@ -246,9 +281,8 @@ public class DeadlineService {
             throw new BadRequestResourceException("This class is not included in the specified deadline", "deadline", "classNotInDeadline");
         }
 
-        Instant now = Instant.now();
-        DeadlineStatus status = DeadlineStatus.calculateStatus(deadline.getStartTime(), deadline.getEndTime(), now);
-        boolean isValid = (status == DeadlineStatus.ACTIVE) && !"CANCELLED".equalsIgnoreCase(deadline.getStatus());
+        DeadlineStatus status = policy.status(deadline);
+        boolean isValid = status == DeadlineStatus.ACTIVE;
 
         String message;
         if ("CANCELLED".equalsIgnoreCase(deadline.getStatus())) {
@@ -276,7 +310,7 @@ public class DeadlineService {
     }
 
     public void cancelOrDeleteDeadline(Integer id) {
-        Deadline deadline = deadlineRepository.findByIdWithClasses(id)
+        Deadline deadline = deadlineRepository.findForUpdate(id)
                 .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
 
         if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
@@ -288,8 +322,12 @@ public class DeadlineService {
             }
         }
 
+        if (policy.status(deadline) == DeadlineStatus.CANCELLED) return;
         deadline.setStatus("CANCELLED");
-        deadlineRepository.save(deadline);
+        deadline.setCancelledAt(clock.instant());
+        deadline.setCancelledBy(SecurityUtils.getCurrentUserLogin().orElseThrow());
+        deadlineRepository.saveAndFlush(deadline);
+        deadlineEvents.publish("DEADLINE_CANCELLED", deadline, List.of());
     }
 
     @Transactional(readOnly = true)
@@ -307,11 +345,10 @@ public class DeadlineService {
         String className = schoolClass != null ? schoolClass.getName() : "Lớp học";
 
         List<Deadline> deadlines = deadlineRepository.findAllBySchoolClassId(classId);
-        Instant now = Instant.now();
 
         return deadlines.stream()
                 .map(deadline -> {
-                    DeadlineStatus status = DeadlineStatus.calculateStatus(deadline.getStartTime(), deadline.getEndTime(), now);
+                    DeadlineStatus status = policy.status(deadline);
 
                     StudentDeadlineActivityDTO.StudentDeadlineActivityDTOBuilder builder = StudentDeadlineActivityDTO.builder()
                             .deadlineId(deadline.getId())
@@ -365,7 +402,13 @@ public class DeadlineService {
         dto.setDescription(deadline.getDescription());
         dto.setStartTime(deadline.getStartTime());
         dto.setEndTime(deadline.getEndTime());
-        dto.setStatus(DeadlineStatus.calculateStatus(deadline.getStartTime(), deadline.getEndTime(), Instant.now()));
+        dto.setStatus(policy.status(deadline));
+        dto.setVersion(deadline.getVersion());
+        dto.setCancelledAt(deadline.getCancelledAt());
+        dto.setCancelledBy(deadline.getCancelledBy());
+        boolean manages = canManage(deadline);
+        dto.setCanCancel(manages && dto.getStatus() != DeadlineStatus.CANCELLED);
+        dto.setCanEdit(manages && (dto.getStatus() == DeadlineStatus.ACTIVE || dto.getStatus() == DeadlineStatus.UPCOMING));
         dto.setCreatedDate(deadline.getCreatedDate());
         dto.setCreatedBy(deadline.getCreatedBy());
         dto.setLastModifiedDate(deadline.getLastModifiedDate());
@@ -379,5 +422,14 @@ public class DeadlineService {
             dto.setSchoolClassNames(List.of());
         }
         return dto;
+    }
+
+    private boolean canManage(Deadline deadline) {
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) return true;
+        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) return false;
+        Long lecturerId = schoolClassAccessService.currentLecturerId();
+        return !deadline.getSchoolClasses().isEmpty() && deadline.getSchoolClasses().stream()
+            .allMatch(c -> Objects.equals(c.getLecturerId(), lecturerId));
     }
 }

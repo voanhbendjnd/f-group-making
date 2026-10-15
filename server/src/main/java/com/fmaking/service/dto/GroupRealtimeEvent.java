@@ -12,6 +12,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 public class GroupRealtimeEvent {
+    private String eventId;
     private String eventType;
     private Long groupId;
     private Integer deadlineId;

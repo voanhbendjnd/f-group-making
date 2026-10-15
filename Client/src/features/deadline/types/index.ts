@@ -1,4 +1,4 @@
-export type DeadlineStatus = 'UPCOMING' | 'ACTIVE' | 'EXPIRED';
+export type DeadlineStatus = 'UPCOMING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 
 export interface Deadline {
   id: number;
@@ -7,6 +7,11 @@ export interface Deadline {
   startTime: string;
   endTime: string;
   status: DeadlineStatus;
+  version?: number;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  canEdit?: boolean;
+  canCancel?: boolean;
   schoolClassIds: number[];
   schoolClassNames: string[];
   createdDate?: string;
@@ -67,7 +72,7 @@ export interface StudentDeadlineActivity {
   hasGroup: boolean;
   groupId?: number;
   groupName?: string;
-  groupStatus?: 'OPEN' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  groupStatus?: 'OPEN' | 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'DISBANDED';
   memberCount?: number;
   maxMembers?: number;
   isLeader?: boolean;

@@ -10,6 +10,17 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 @EnableWebSocketMessageBroker
 public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer {
 
+    private final com.fmaking.security.RealtimeChannelInterceptor authentication;
+
+    public WebSocketConfiguration(com.fmaking.security.RealtimeChannelInterceptor authentication) {
+        this.authentication = authentication;
+    }
+
+    @Override
+    public void configureClientInboundChannel(org.springframework.messaging.simp.config.ChannelRegistration registration) {
+        registration.interceptors(authentication);
+    }
+
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Register with SockJS support
@@ -24,7 +35,8 @@ public class WebSocketConfiguration implements WebSocketMessageBrokerConfigurer 
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.enableSimpleBroker("/topic", "/user");
+        registry.enableSimpleBroker("/topic", "/queue");
+        registry.setPreservePublishOrder(true);
         registry.setApplicationDestinationPrefixes("/app");
         registry.setUserDestinationPrefix("/user");
     }

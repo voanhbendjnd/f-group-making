@@ -134,6 +134,12 @@ export function translateErrorMessage(error: any): string {
     case 'ERR_GROUP_STATE_CONFLICT':
       return i18n.t('groupFormation.errors.stateConflict', 'Thao tác không hợp lệ với trạng thái nhóm hiện tại.');
 
+    case 'error.ERR_DEADLINE_CANCELLED':
+    case 'ERR_DEADLINE_CANCELLED':
+      return i18n.t('deadline.closed.CANCELLED.title');
+    case 'error.ERR_DEADLINE_NOT_STARTED':
+    case 'ERR_DEADLINE_NOT_STARTED':
+      return i18n.t('deadline.closed.UPCOMING.title');
     case 'error.ERR_DEADLINE_EXPIRED':
     case 'ERR_DEADLINE_EXPIRED':
       return i18n.t('groupFormation.errors.deadlineExpired', 'Hạn chót chọn nhóm đã kết thúc.');

@@ -778,7 +778,8 @@
     "status": {
       "active": "Active",
       "upcoming": "Upcoming",
-      "expired": "Expired"
+      "expired": "Expired",
+      "cancelled": "Cancelled"
     },
     "table": {
       "name": "Deadline Name",
@@ -792,7 +793,9 @@
       "editTitle": "Edit",
       "extendTitle": "Extend deadline",
       "cancelTitle": "Cancel deadline",
-      "classesCount": "{{count}} classes"
+      "classesCount": "{{count}} classes",
+      "viewGroups": "View groups",
+      "manageGroups": "Manage groups"
     },
     "confirmCancel": {
       "title": "Confirm Deadline Cancellation",
@@ -881,6 +884,20 @@
       "placeholderDesc": "Your account and class have been successfully verified for this deadline. The group formation and member selection features are being prepared and will be available soon.",
       "backToDashboard": "Back to Student Dashboard",
       "verifying": "Verifying deadline and class information..."
+    },
+    "closed": {
+      "CANCELLED": {
+        "title": "This group selection round was cancelled",
+        "description": "Registration has stopped. Existing groups and history are preserved for viewing; changes in this round are locked."
+      },
+      "UPCOMING": {
+        "title": "Group selection has not started",
+        "description": "You can view the round and existing groups. Group selection opens at the scheduled start time."
+      },
+      "EXPIRED": {
+        "title": "Group selection has ended",
+        "description": "Registration has ended. Existing groups remain available to view; student changes are locked."
+      }
     }
   },
   "groupFormation": {

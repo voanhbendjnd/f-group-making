@@ -37,6 +37,7 @@ public class GroupService {
     private final GroupRuleValidationService ruleValidationService;
     private final SchoolClassAccessService accessService;
     private final GroupEventPublisher eventPublisher;
+    private final DeadlinePolicy deadlinePolicy;
 
     public GroupService(GroupRepository groupRepository,
                         GroupMemberRepository groupMemberRepository,
@@ -50,7 +51,7 @@ public class GroupService {
                         ClassRuleService classRuleService,
                         GroupRuleValidationService ruleValidationService,
                         SchoolClassAccessService accessService,
-                        GroupEventPublisher eventPublisher) {
+                        GroupEventPublisher eventPublisher, DeadlinePolicy deadlinePolicy) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupMemberHistoryRepository = groupMemberHistoryRepository;
@@ -64,6 +65,7 @@ public class GroupService {
         this.ruleValidationService = ruleValidationService;
         this.accessService = accessService;
         this.eventPublisher = eventPublisher;
+        this.deadlinePolicy = deadlinePolicy;
     }
 
     // ==========================================
@@ -89,8 +91,11 @@ public class GroupService {
             }
         }
 
-        boolean isDeadlineExpired = "EXPIRED".equalsIgnoreCase(deadline.getStatus())
-            || Instant.now().isAfter(deadline.getEndTime());
+        if (isLecturerOrAdmin) accessService.requireReadAccess(schoolClass);
+        DeadlineStatus deadlineStatus = deadlinePolicy.status(deadline);
+        boolean isDeadlineExpired = deadlineStatus == DeadlineStatus.EXPIRED;
+        boolean studentCanWrite = deadlineStatus == DeadlineStatus.ACTIVE;
+        boolean canManageGroups = isLecturerOrAdmin && deadlineStatus != DeadlineStatus.CANCELLED;
 
         // Get all students of this class
         List<StudentRow> classStudents = studentRepository.findStudentsBySchoolClassId(classId);
@@ -177,17 +182,19 @@ public class GroupService {
         // Rules of class
         List<GroupingRuleDTO> classRules = ruleValidationService.getClassRules(classId);
 
-        boolean canCreate = !isDeadlineExpired && myGroupDTO == null && !isLecturerOrAdmin;
-        boolean canJoin = !isDeadlineExpired && myGroupDTO == null && !isLecturerOrAdmin;
+        boolean canCreate = studentCanWrite && myGroupDTO == null && !isLecturerOrAdmin;
+        boolean canJoin = studentCanWrite && myGroupDTO == null && !isLecturerOrAdmin;
 
         return WorkspaceDTO.builder()
             .deadlineId(deadline.getId())
             .deadlineName(deadline.getName())
             .deadlineDescription(deadline.getDescription())
-            .deadlineStatus(deadline.getStatus())
+            .deadlineStatus(deadlineStatus.name())
             .deadlineStartTime(deadline.getStartTime())
             .deadlineEndTime(deadline.getEndTime())
             .deadlineExpired(isDeadlineExpired)
+            .readOnlyReason((isLecturerOrAdmin ? !canManageGroups : !studentCanWrite) ? deadlineStatus.name() : null)
+            .canManageGroups(canManageGroups)
             .schoolClassId(schoolClass.getId())
             .schoolClassName(schoolClass.getName())
             .lecturerId(schoolClass.getLecturerId())
@@ -258,8 +265,8 @@ public class GroupService {
         Long studentId = student.getUserId();
 
         // 1. Acquire pessimistic write lock
-        Group group = groupRepository.findByIdForUpdate(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (!Objects.equals(group.getSchoolClassId(), classId) || !Objects.equals(group.getDeadlineId(), deadlineId)) {
             throw new ForbiddenAlertException("Nhóm không thuộc đợt hạn hoặc lớp học này", "group", "ERR_FORBIDDEN_NOT_IN_CLASS");
@@ -305,8 +312,8 @@ public class GroupService {
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (group.getStatus() != GroupStatus.OPEN) {
             throw new ConflictAlertException("Không thể rời nhóm khi nhóm không ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -346,8 +353,8 @@ public class GroupService {
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (group.getStatus() != GroupStatus.OPEN) {
             throw new ConflictAlertException("Chỉ có thể chuyển quyền Leader khi nhóm ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -389,8 +396,8 @@ public class GroupService {
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (group.getStatus() != GroupStatus.OPEN) {
             throw new ConflictAlertException("Chỉ có thể nộp nhóm khi đang ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -441,8 +448,8 @@ public class GroupService {
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (group.getStatus() != GroupStatus.PENDING) {
             throw new ConflictAlertException("Chỉ có thể hủy nộp khi nhóm đang ở trạng thái PENDING.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -468,8 +475,8 @@ public class GroupService {
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadlineRepository.getReferenceById(deadlineId));
 
         if (group.getStatus() != GroupStatus.OPEN) {
             throw new ConflictAlertException("Chỉ có thể giải tán nhóm khi ở trạng thái OPEN.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -499,7 +506,7 @@ public class GroupService {
     // 3. LECTURER OPERATIONS
     // ==========================================
     public GroupDTO lecturerCreateGroup(Integer deadlineId, Integer classId, LecturerCreateGroupRequest req) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
@@ -597,13 +604,12 @@ public class GroupService {
     }
 
     public GroupDTO acceptGroup(Integer deadlineId, Integer classId, Long groupId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         if (group.getStatus() != GroupStatus.PENDING) {
             throw new ConflictAlertException("Chỉ có thể phê duyệt nhóm đang ở trạng thái PENDING.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -622,13 +628,12 @@ public class GroupService {
     }
 
     public GroupDTO rejectGroup(Integer deadlineId, Integer classId, Long groupId, RejectGroupRequest req) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         if (group.getStatus() != GroupStatus.PENDING) {
             throw new ConflictAlertException("Chỉ có thể từ chối nhóm đang ở trạng thái PENDING.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -648,13 +653,12 @@ public class GroupService {
     }
 
     public GroupDTO revokeGroup(Integer deadlineId, Integer classId, Long groupId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         if (group.getStatus() != GroupStatus.ACCEPTED) {
             throw new ConflictAlertException("Chỉ có thể thu hồi phê duyệt nhóm đang ở trạng thái ACCEPTED.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -672,13 +676,12 @@ public class GroupService {
     }
 
     public GroupDTO lecturerAddMember(Integer deadlineId, Integer classId, Long groupId, Long studentId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         if (group.getStatus() == GroupStatus.DISBANDED) {
             throw new ConflictAlertException("Nhóm đã bị giải tán.", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -714,13 +717,12 @@ public class GroupService {
     }
 
     public GroupDTO lecturerRemoveMember(Integer deadlineId, Integer classId, Long groupId, Long studentId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         GroupMember member = groupMemberRepository.findByGroupIdAndStudentId(groupId, studentId)
             .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
@@ -748,13 +750,12 @@ public class GroupService {
     }
 
     public GroupDTO lecturerSetLeader(Integer deadlineId, Integer classId, Long groupId, Long newLeaderId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         GroupMember newLeader = groupMemberRepository.findByGroupIdAndStudentId(groupId, newLeaderId)
             .orElseThrow(() -> new NotFoundAlertException("Sinh viên không thuộc nhóm này", "group", "ERR_MEMBER_NOT_IN_GROUP"));
@@ -779,13 +780,12 @@ public class GroupService {
     }
 
     public void lecturerDisbandGroup(Integer deadlineId, Integer classId, Long groupId) {
-        validateDeadlineExists(deadlineId, classId);
+        validateManagementDeadline(deadlineId, classId);
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
-        Group group = groupRepository.findById(groupId)
-            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
+        Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
 
         List<GroupMember> members = groupMemberRepository.findByGroupId(groupId);
         String actor = getCurrentUserLogin();
@@ -815,11 +815,37 @@ public class GroupService {
         return deadline;
     }
 
-    private Deadline validateDeadlineActive(Integer deadlineId, Integer classId) {
-        Deadline deadline = validateDeadlineExists(deadlineId, classId);
-        if ("EXPIRED".equalsIgnoreCase(deadline.getStatus()) || Instant.now().isAfter(deadline.getEndTime())) {
-            throw new ConflictAlertException("Hạn chót chọn nhóm đã kết thúc.", "deadline", "ERR_DEADLINE_EXPIRED");
+    private Group findScopedGroupForUpdate(Long groupId, Integer deadlineId, Integer classId) {
+        Group group = groupRepository.findByIdForUpdate(groupId)
+            .orElseThrow(() -> new NotFoundAlertException("Group not found", "group", "ERR_GROUP_NOT_FOUND"));
+        if (!Objects.equals(group.getDeadlineId(), deadlineId) || !Objects.equals(group.getSchoolClassId(), classId)) {
+            throw new ForbiddenAlertException("Group does not belong to this deadline and class", "group", "ERR_FORBIDDEN_NOT_IN_CLASS");
         }
+        return group;
+    }
+
+    private Deadline lockDeadlineForMutation(Integer deadlineId, Integer classId) {
+        Deadline deadline = deadlineRepository.findForShare(deadlineId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy đợt hạn này", "deadline", "ERR_DEADLINE_NOT_FOUND"));
+        if (deadlineRepository.countByDeadlineIdAndClassId(deadlineId, classId) == 0) {
+            throw new ForbiddenAlertException("Đợt hạn không áp dụng cho lớp học này", "deadline", "ERR_DEADLINE_NOT_IN_CLASS");
+        }
+        return deadline;
+    }
+
+    private Deadline validateDeadlineActive(Integer deadlineId, Integer classId) {
+        getCurrentStudent(classId);
+        Deadline deadline = lockDeadlineForMutation(deadlineId, classId);
+        deadlinePolicy.requireStudentWrite(deadline);
+        return deadline;
+    }
+
+    private Deadline validateManagementDeadline(Integer deadlineId, Integer classId) {
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+        accessService.requireWriteAccess(schoolClass);
+        Deadline deadline = lockDeadlineForMutation(deadlineId, classId);
+        deadlinePolicy.requireNotCancelled(deadline);
         return deadline;
     }
 

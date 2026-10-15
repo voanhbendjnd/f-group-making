@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from 'antd';
 import { Plus, Clock } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
@@ -17,6 +17,7 @@ import { classApi } from '@/features/classes/api/classApi';
 import { DeadlineTable } from '@/features/deadline/components/DeadlineTable';
 import { CreateDeadlineModal } from '@/features/deadline/components/CreateDeadlineModal';
 import { ExtendDeadlineModal } from '@/features/deadline/components/ExtendDeadlineModal';
+import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import type { Deadline } from '@/features/deadline/types';
 
 export const AdminDeadlinePage: React.FC = () => (
@@ -28,6 +29,7 @@ export const AdminDeadlinePage: React.FC = () => (
 const AdminDeadlineContent: React.FC = () => {
   const { t } = useTranslation();
   const toast = useToast();
+  const queries = useQueryClient();
   const { selectedTermId } = useTerm();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -43,8 +45,8 @@ const AdminDeadlineContent: React.FC = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['admin-deadlines', page, pageSize],
-    queryFn: () => deadlineApi.getDeadlines({ page, size: pageSize }),
+    queryKey: ['admin-deadlines', selectedTermId, page, pageSize],
+    queryFn: ({ signal }) => deadlineApi.getDeadlines({ page, size: pageSize, termId: selectedTermId ?? undefined }, signal),
   });
 
   // Fetch classes for modal
@@ -60,6 +62,8 @@ const AdminDeadlineContent: React.FC = () => {
 
   const deadlines = deadlineData?.result || [];
   const meta = deadlineData?.meta || { page, pageSize, pages: 1, total: 0 };
+  const currentEditing = deadlines.find(d => d.id === editingDeadline?.id) ?? editingDeadline;
+  const visibleEditing = currentEditing?.status === 'CANCELLED' ? null : currentEditing;
 
   const handleCancel = (d: Deadline) => {
     Modal.confirm({
@@ -83,7 +87,7 @@ const AdminDeadlineContent: React.FC = () => {
         try {
           await deadlineApi.cancelDeadline(d.id);
           toast.success(t('deadline.messages.cancelSuccess'));
-          refetch();
+          await syncDeadlineQueries(queries, { eventType: 'DEADLINE_CANCELLED', deadlineId: d.id });
         } catch (err: any) {
           toast.error(err.message || t('deadline.messages.cancelError'));
         }
@@ -160,9 +164,9 @@ const AdminDeadlineContent: React.FC = () => {
       />
 
       <ExtendDeadlineModal
-        open={!!editingDeadline}
+        open={!!visibleEditing}
         onClose={() => setEditingDeadline(null)}
-        deadline={editingDeadline}
+        deadline={visibleEditing}
         onSuccess={() => refetch()}
       />
     </div>
