@@ -1,7 +1,11 @@
 import { apiClient } from '@/services/api/client';
+import type { CreateStudentValues } from '../types';
 import type { BatchActivationResult, PaginatedStudents, Student, StudentFilterParams } from '../types';
 
 export const studentApi = {
+  async createStudent(values: CreateStudentValues): Promise<Student> {
+    return apiClient.post<unknown, Student>('/api/students', values);
+  },
   async getStudents(params: StudentFilterParams = {}): Promise<PaginatedStudents> {
     const queryParams: Record<string, any> = {};
     if (params.termId !== undefined) queryParams.termId = params.termId;

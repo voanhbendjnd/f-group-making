@@ -3,7 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
-import { Upload, Users } from 'lucide-react';
+import { Upload, Users, UserPlus } from 'lucide-react';
+import { CreateStudentModal } from '@/features/students/components/CreateStudentModal';
+import { useToast } from '@/app/providers/ToastContext';
 import { useTranslation } from 'react-i18next';
 import { studentApi } from '@/features/students/api/studentApi';
 import type { Student, StudentFilterParams } from '@/features/students/types';
@@ -26,6 +28,8 @@ const StudentListContent: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { success } = useToast();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   // Filters state
   const [filters, setFilters] = useState<StudentFilterParams>({
@@ -123,15 +127,27 @@ const StudentListContent: React.FC = () => {
         title={t('students.title')}
         description={t('students.description')}
         action={
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <Button variant="primary" icon={<UserPlus size={16} />} onClick={() => setIsCreateOpen(true)}>{t('addStudent.button')}</Button>
           <Button
-            variant="primary"
+            variant="secondary"
             icon={<Upload size={16} />}
             onClick={() => navigate('/admin/students/import')}
           >
             {t('students.importBtn')}
           </Button>
+          </div>
         }
       />
+
+      {isCreateOpen && <CreateStudentModal onClose={() => setIsCreateOpen(false)} onSuccess={() => {
+        setIsCreateOpen(false);
+        handleClearSelection();
+        for (const key of ['students', 'admin-dashboard', 'school-class-students', 'school-classes', 'school-class', 'my-school-classes']) {
+          void queryClient.invalidateQueries({ queryKey: [key] });
+        }
+        success(t('addStudent.success'));
+      }} />}
 
       {/* Filter Bar */}
       <StudentFilterBar

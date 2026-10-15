@@ -1,3 +1,13 @@
+export interface CreateStudentValues {
+  fullName: string;
+  rollNumber: string;
+  memberCode: string;
+  email: string;
+  majorId: number;
+  termId: number;
+  schoolClassId: number;
+}
+
 export interface Student {
   userId: number;
   rollNumber: string;

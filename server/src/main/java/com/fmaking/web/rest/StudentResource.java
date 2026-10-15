@@ -1,6 +1,9 @@
 package com.fmaking.web.rest;
 
 import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import com.fmaking.service.dto.CreateStudentDTO;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -32,6 +35,13 @@ public class StudentResource {
 
     public StudentResource(StudentService studentService) {
         this.studentService = studentService;
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority(\"" + AuthoritiesConstants.ADMIN + "\")")
+    @ApiMessage("Create student successfully")
+    public ResponseEntity<StudentDTO> createStudent(@Valid @RequestBody CreateStudentDTO request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(studentService.createStudent(request));
     }
 
     /**

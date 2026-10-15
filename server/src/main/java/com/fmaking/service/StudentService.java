@@ -33,6 +33,7 @@ import com.fmaking.service.dto.ImportResultDTO;
 import com.fmaking.service.dto.ImportRowErrorDTO;
 import com.fmaking.service.dto.ResultPaginationDTO;
 import com.fmaking.service.dto.StudentDTO;
+import com.fmaking.service.dto.CreateStudentDTO;
 import com.fmaking.service.dto.StudentImportRowDTO;
 import com.fmaking.service.dto.UserDTO;
 import com.fmaking.service.errors.BadRequestResourceException;
@@ -50,11 +51,28 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
 @Transactional
 public class StudentService {
+
+    private final ReentrantLock studentCreationLock = new ReentrantLock();
+
+    private void lockStudentCreation() {
+        studentCreationLock.lock();
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            studentCreationLock.unlock();
+            throw new IllegalStateException("Student creation requires a transaction");
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                studentCreationLock.unlock();
+            }
+        });
+    }
 
     private static final long MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024L; // 5 MB
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -119,6 +137,8 @@ public class StudentService {
     public ImportResultDTO importFromExcel(MultipartFile file, Integer termId, Set<String> confirmedMajorCodes) {
         // Step 1: Validate file (format, size, empty)
         validateFile(file);
+        // Both entry points validate duplicates after acquiring this transaction-scoped guard.
+        lockStudentCreation();
         log.info("Starting Excel import: filename={}, size={} bytes, termId={}",
                 file.getOriginalFilename(), file.getSize(), termId);
 
@@ -231,7 +251,63 @@ public class StudentService {
 
         List<StudentDTO> studentDTOs = mapToEntities(rows, majorsByCode, schoolClassMap);
 
-        // Create user accounts before creating student records
+        saveStudents(studentDTOs);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                log.info("Import completed successfully: {} student(s) saved into termId={}",
+                        studentDTOs.size(), effectiveTermId);
+            }
+        });
+        return ImportResultDTO.builder()
+                .success(true)
+                .totalImported(studentDTOs.size())
+                .createdMajorCodes(newMajorCodes)
+                .errors(List.of())
+                .build();
+    }
+
+    public StudentDTO createStudent(CreateStudentDTO request) {
+        lockStudentCreation();
+        termService.validateTerm(request.termId());
+        Major major = majorRepository.findById(request.majorId()).orElseThrow(() -> createError("majorId"));
+        SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(request.schoolClassId())
+                .orElseThrow(() -> createError("schoolClassId"));
+        if (!Objects.equals(schoolClass.getTermId(), request.termId())) throw createError("schoolClassId");
+        Lecturer lecturer = schoolClass.getLecturerId() == null ? null
+                : lecturerRepository.findById(schoolClass.getLecturerId()).orElse(null);
+        if (lecturer == null || !userRepository.existsById(lecturer.getUserId())) throw createError("lecturer");
+        if (!MajorCode.isValid(major.getCode())) throw createError("majorId");
+        StudentImportRowDTO row = StudentImportRowDTO.builder()
+                .rowIndex(1)
+                .fullName(request.fullName().trim())
+                .rollNumber(request.rollNumber().trim())
+                .memberCode(request.memberCode().trim())
+                .email(request.email().trim().toLowerCase(Locale.ENGLISH))
+                .originalMajor(major.getCode())
+                .majorCode(MajorCode.normalize(major.getCode()))
+                .groupName(schoolClass.getName())
+                .lecturerCode(lecturer.getCode())
+                .build();
+        List<ImportRowErrorDTO> errors = validateRows(List.of(row),
+                Map.of(lecturer.getCode().trim().toUpperCase(Locale.ROOT), lecturer));
+        if (!errors.isEmpty()) throw createError(errors.getFirst().getField());
+        List<StudentDTO> students = mapToEntities(List.of(row), Map.of(row.getMajorCode(), major),
+                Map.of(schoolClass.getName().trim().toUpperCase(Locale.ROOT), schoolClass));
+        saveStudents(students);
+        StudentDTO created = getStudentByUserId(students.getFirst().getUserId());
+        created.setSchoolClassId(schoolClass.getId());
+        return created;
+    }
+
+    private static BadRequestResourceException createError(String field) {
+        return new BadRequestResourceException("Student information is invalid or already exists",
+                "studentManagement", "studentCreate." + field);
+    }
+
+    private void saveStudents(List<StudentDTO> studentDTOs) {
+        // Shared account creation: no password, activation key, group or role supplied by the client.
         List<User> userStudents = new ArrayList<>();
         studentDTOs.forEach(student -> {
             User user = new User();
@@ -248,20 +324,6 @@ public class StudentService {
 
         studentRepository.saveAll(studentDTOs.stream().map(this::toEntity).toList());
         studentRepository.flush();
-
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                log.info("Import completed successfully: {} student(s) saved into termId={}",
-                        studentDTOs.size(), effectiveTermId);
-            }
-        });
-        return ImportResultDTO.builder()
-                .success(true)
-                .totalImported(studentDTOs.size())
-                .createdMajorCodes(newMajorCodes)
-                .errors(List.of())
-                .build();
     }
 
     private Student toEntity(StudentDTO dto) {
