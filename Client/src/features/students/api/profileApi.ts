@@ -6,6 +6,7 @@ export interface ProfileInfo {
 }
 
 export interface StudentProfile {
+  schoolClassId?: number | null;
   fullName: string | null;
   rollNumber: string | null;
   email: string | null;

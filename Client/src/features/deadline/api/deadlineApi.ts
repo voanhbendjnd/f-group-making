@@ -9,7 +9,7 @@ import type {
 } from '../types';
 
 export const deadlineApi = {
-  async getDeadlines(params?: { page?: number; size?: number }, signal?: AbortSignal): Promise<PaginatedDeadlines> {
+  async getDeadlines(params?: { page?: number; size?: number; termId?: number }, signal?: AbortSignal): Promise<PaginatedDeadlines> {
     const data = await apiClient.get<unknown, any>('/api/deadlines', {
       params,
       signal,

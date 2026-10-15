@@ -70,6 +70,8 @@ export interface WorkspaceDTO {
   deadlineStartTime: string;
   deadlineEndTime: string;
   deadlineExpired: boolean;
+  readOnlyReason?: string | null;
+  canManageGroups: boolean;
 
   schoolClassId: number;
   schoolClassName: string;

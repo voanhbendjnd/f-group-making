@@ -3,6 +3,7 @@ import { RouterProvider } from 'react-router-dom';
 import { ToastProvider } from '@/app/providers/ToastContext';
 import { AuthProvider } from '@/app/providers/AuthContext';
 import { QueryProvider } from '@/app/providers/QueryProvider';
+import { RealtimeProvider } from '@/app/providers/RealtimeProvider';
 import { router } from '@/app/router/routes';
 import '@/styles/index.css';
 
@@ -11,7 +12,7 @@ export const App: React.FC = () => {
     <ToastProvider>
       <AuthProvider>
         <QueryProvider>
-          <RouterProvider router={router} />
+          <RealtimeProvider><RouterProvider router={router} /></RealtimeProvider>
         </QueryProvider>
       </AuthProvider>
     </ToastProvider>
