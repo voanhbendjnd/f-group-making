@@ -93,6 +93,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: t('nav.studentDashboard'),
           icon: <LayoutDashboard size={18} />,
         },
+        {
+          to: '/student/groups/select',
+          label: t('nav.selectGroup', 'Chọn nhóm'),
+          icon: <Users size={18} />,
+        },
       ];
 
   if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });

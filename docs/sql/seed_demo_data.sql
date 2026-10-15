@@ -1,10 +1,9 @@
--- Seed User LALA & Students for Class EXE101_G02
 INSERT INTO users (id, email, name, password_hash, activated, created_date)
 VALUES 
-  (6, 'voanhben102@gmail.com', 'LALA', '$2a$10$RIt/OdUl8riEnUFZOCe3T.NxiusKklK8QAIXP8lWlQwIpcADZoQmK', 1, NOW()),
-  (7, 'sinhvien1@fpt.edu.vn', 'Nguyen Van An', '$2a$10$RIt/OdUl8riEnUFZOCe3T.NxiusKklK8QAIXP8lWlQwIpcADZoQmK', 1, NOW()),
-  (8, 'sinhvien2@fpt.edu.vn', 'Tran Thi Binh', '$2a$10$RIt/OdUl8riEnUFZOCe3T.NxiusKklK8QAIXP8lWlQwIpcADZoQmK', 1, NOW()),
-  (9, 'sinhvien3@fpt.edu.vn', 'Le Van Cuong', '$2a$10$RIt/OdUl8riEnUFZOCe3T.NxiusKklK8QAIXP8lWlQwIpcADZoQmK', 1, NOW())
+  (6, 'voanhben102@gmail.com', 'LALA', '$2a$10$k.TwAVRzZ0E2g04XDSG3DuXMLhj4Wv2LFdpFo9k.d2d2mPfERUWWa', 1, NOW()),
+  (7, 'sinhvien1@fpt.edu.vn', 'Nguyen Van An', '$2a$10$k.TwAVRzZ0E2g04XDSG3DuXMLhj4Wv2LFdpFo9k.d2d2mPfERUWWa', 1, NOW()),
+  (8, 'sinhvien2@fpt.edu.vn', 'Tran Thi Binh', '$2a$10$k.TwAVRzZ0E2g04XDSG3DuXMLhj4Wv2LFdpFo9k.d2d2mPfERUWWa', 1, NOW()),
+  (9, 'sinhvien3@fpt.edu.vn', 'Le Van Cuong', '$2a$10$k.TwAVRzZ0E2g04XDSG3DuXMLhj4Wv2LFdpFo9k.d2d2mPfERUWWa', 1, NOW())
 ON DUPLICATE KEY UPDATE name=VALUES(name), email=VALUES(email);
 
 INSERT IGNORE INTO user_authority (user_id, authority_name)

@@ -184,6 +184,10 @@ export const router = createBrowserRouter([
         path: 'groups/select',
         element: <SelectGroupPage />,
       },
+      {
+        path: 'select-group',
+        element: <SelectGroupPage />,
+      },
     ],
   },
 

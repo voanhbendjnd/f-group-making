@@ -7,7 +7,6 @@ import {
   AlertTriangle,
   ArrowLeft,
   Users,
-  ShieldAlert,
   Plus,
   UserPlus,
   RefreshCw,
@@ -38,6 +37,25 @@ export const SelectGroupPage: React.FC = () => {
 
   const deadlineId = deadlineIdStr ? parseInt(deadlineIdStr, 10) : null;
   const classId = classIdStr ? parseInt(classIdStr, 10) : null;
+
+  // Auto-resolve deadlineId and classId if accessed directly without query params
+  const { data: myActivities, isLoading: isActivitiesLoading } = useQuery({
+    queryKey: ['student-deadline-activities'],
+    queryFn: () => deadlineApi.getMyActivities(),
+    enabled: !deadlineId || !classId,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if ((!deadlineId || !classId) && myActivities && myActivities.length > 0) {
+      const active = myActivities.find((a) => a.status === 'ACTIVE') || myActivities[0];
+      if (active?.deadlineId && active?.schoolClassId) {
+        navigate(`/student/groups/select?deadlineId=${active.deadlineId}&classId=${active.schoolClassId}`, {
+          replace: true,
+        });
+      }
+    }
+  }, [deadlineId, classId, myActivities, navigate]);
 
   // Validate deadline
   const {
@@ -262,6 +280,16 @@ export const SelectGroupPage: React.FC = () => {
 
   // Missing query parameters
   if (!deadlineId || !classId) {
+    if (isActivitiesLoading) {
+      return (
+        <div style={{ maxWidth: '640px', margin: '4rem auto', padding: '0 1rem', textAlign: 'center' }}>
+          <div className="card" style={{ padding: '3rem' }}>
+            <LoadingSpinner message={t('studentWidget.resolving', 'Đang kết nối không gian chọn nhóm của lớp bạn...')} />
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div style={{ maxWidth: '640px', margin: '3rem auto', padding: '0 1rem' }}>
         <div className="card" style={{ padding: '2.5rem', textAlign: 'center' }}>
@@ -270,24 +298,24 @@ export const SelectGroupPage: React.FC = () => {
               width: '64px',
               height: '64px',
               borderRadius: '50%',
-              backgroundColor: 'var(--color-error-bg, #fee2e2)',
-              color: 'var(--color-error, #ef4444)',
+              backgroundColor: '#eff6ff',
+              color: 'var(--color-primary, #2563eb)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
               marginBottom: '1.25rem',
             }}
           >
-            <ShieldAlert size={32} />
+            <Users size={32} />
           </div>
           <h2 style={{ fontSize: '1.375rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-            {t('deadline.student.invalidLinkTitle')}
+            {t('studentWidget.noDeadlineTitle', 'Chưa có đợt chọn nhóm nào đang mở')}
           </h2>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '0.9375rem', margin: '0.75rem 0 1.5rem' }}>
-            {t('deadline.student.invalidLinkDesc')}
+            {t('studentWidget.noDeadlineDesc', 'Khi giảng viên mở đợt chọn nhóm mới cho lớp học của bạn, thông tin chọn nhóm sẽ hiển thị ngay tại đây.')}
           </p>
           <Button variant="primary" icon={<ArrowLeft size={16} />} onClick={() => navigate('/student/dashboard')}>
-            {t('deadline.student.backToDashboard')}
+            {t('deadline.student.backToDashboard', 'Quay lại Bảng điều khiển')}
           </Button>
         </div>
       </div>

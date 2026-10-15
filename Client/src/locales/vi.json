@@ -137,7 +137,8 @@
     "toggleSidebarOpen": "Mở thanh điều hướng bên trái",
     "toggleSidebarCollapse": "Thu gọn thanh điều hướng bên trái",
     "adminDeadlines": "Hạn chót chọn nhóm",
-    "lecturerDeadlines": "Hạn chót của lớp"
+    "lecturerDeadlines": "Hạn chót của lớp",
+    "selectGroup": "Chọn nhóm"
   },
   "sidebar": {
     "adminSection": "Quản trị hệ thống",
@@ -889,5 +890,41 @@
       "leaderCannotLeave": "Trưởng nhóm phải chuyển quyền Leader cho thành viên khác trước khi rời nhóm.",
       "disbandNotEmpty": "Chỉ có thể giải tán nhóm khi nhóm không còn thành viên nào khác ngoài Leader."
     }
+  },
+  "studentWidget": {
+    "resolving": "Đang kết nối không gian chọn nhóm của lớp bạn...",
+    "errorTitle": "Không thể tải tiện ích chọn nhóm",
+    "errorDesc": "Vui lòng kiểm tra lại kết nối hoặc làm mới trang.",
+    "noDeadlineTitle": "Chưa có đợt chọn nhóm nào đang mở",
+    "noDeadlineDesc": "Khi giảng viên mở đợt chọn nhóm mới cho lớp học của bạn, thông tin chọn nhóm sẽ hiển thị ngay tại đây.",
+    "activeBadge": "Đang Diễn Ra",
+    "upcomingBadge": "Sắp Diễn Ra",
+    "expiredBadge": "Đã Kết Thúc",
+    "deadlineLabel": "Hạn chót",
+    "timeRemaining": "Thời gian còn lại",
+    "roleLeader": "Trưởng nhóm",
+    "roleMember": "Thành viên",
+    "statusApproved": "Đã duyệt",
+    "statusSubmitted": "Chờ GV duyệt",
+    "statusOpen": "Đang mở (chưa nộp)",
+    "statusRejected": "Cần chỉnh sửa lại",
+    "membersCount": "Thành viên",
+    "unassignedTitle": "Bạn chưa tham gia nhóm nào",
+    "unassignedDesc": "Hãy vào không gian chọn nhóm ngay để tạo nhóm mới hoặc xin gia nhập nhóm của các bạn trong lớp!",
+    "enterWorkspaceBtn": "Vào Không Gian Nhóm",
+    "joinNowBtn": "Tham Gia Chọn Nhóm Ngay",
+    "otherActivitiesTitle": "Các đợt chọn nhóm khác của lớp"
+  },
+  "studentDashboard": {
+    "greeting": "Xin chào, {{name}}!",
+    "welcome": "Chào mừng bạn đến với Cổng thông tin sinh viên F-Group Making.",
+    "accountActive": "Tài khoản đang hoạt động bình thường",
+    "emailRegistered": "Email đăng ký: {{email}}",
+    "featureTitle": "Không gian chọn nhóm",
+    "featureDesc": "Tham gia hoặc tạo nhóm cho các môn học kỳ này. Hệ thống hỗ trợ kiểm tra quy tắc nhóm tự động và cập nhật dữ liệu thời gian thực.",
+    "timelineTitle": "Lộ trình chia nhóm",
+    "week12": "Tuần 1 - 2: Giảng viên mở đợt và cấu hình quy tắc ghép nhóm",
+    "week3": "Tuần 3: Sinh viên tự lập nhóm hoặc xin gia nhập nhóm",
+    "week4": "Tuần 4: Giảng viên xem xét và phê duyệt danh sách chính thức"
   }
 }

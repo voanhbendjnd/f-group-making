@@ -137,7 +137,8 @@
     "toggleSidebarOpen": "Open navigation sidebar",
     "toggleSidebarCollapse": "Collapse navigation sidebar",
     "adminDeadlines": "Group Deadlines",
-    "lecturerDeadlines": "Class Deadlines"
+    "lecturerDeadlines": "Class Deadlines",
+    "selectGroup": "Select Group"
   },
   "sidebar": {
     "adminSection": "System Administration",
@@ -889,5 +890,41 @@
       "leaderCannotLeave": "The Leader must transfer the leader role to another member before leaving.",
       "disbandNotEmpty": "A group can only be disbanded when no other members remain except the Leader."
     }
+  },
+  "studentWidget": {
+    "resolving": "Connecting to your class group workspace...",
+    "errorTitle": "Unable to load group widget",
+    "errorDesc": "Please check your network connection or refresh the page.",
+    "noDeadlineTitle": "No group formation currently open",
+    "noDeadlineDesc": "When your instructor opens a group formation deadline for your class, it will appear right here.",
+    "activeBadge": "Active Now",
+    "upcomingBadge": "Upcoming",
+    "expiredBadge": "Ended",
+    "deadlineLabel": "Deadline",
+    "timeRemaining": "Time Remaining",
+    "roleLeader": "Leader",
+    "roleMember": "Member",
+    "statusApproved": "Approved",
+    "statusSubmitted": "Submitted (Pending Review)",
+    "statusOpen": "Open (Draft)",
+    "statusRejected": "Needs Revision",
+    "membersCount": "Members",
+    "unassignedTitle": "You have not joined any group yet",
+    "unassignedDesc": "Enter the group workspace now to create a new team or request to join existing groups with your classmates!",
+    "enterWorkspaceBtn": "Enter Group Workspace",
+    "joinNowBtn": "Join Group Formation Now",
+    "otherActivitiesTitle": "Other class group deadlines"
+  },
+  "studentDashboard": {
+    "greeting": "Hello, {{name}}!",
+    "welcome": "Welcome to F-Group Making Student Portal.",
+    "accountActive": "Account is active and verified",
+    "emailRegistered": "Registered Email: {{email}}",
+    "featureTitle": "Group Formation Workspace",
+    "featureDesc": "Create or join project teams for your courses. Real-time synchronizations and rule validations are fully automated.",
+    "timelineTitle": "Grouping Schedule",
+    "week12": "Weeks 1 - 2: Instructors configure group formation rules and deadlines",
+    "week3": "Week 3: Students form teams and assign roles",
+    "week4": "Week 4: Instructors review and finalize group rosters"
   }
 }
