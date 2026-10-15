@@ -54,21 +54,3 @@ export interface PaginatedDeadlines {
   };
   result: Deadline[];
 }
-
-export interface StudentDeadlineActivity {
-  deadlineId: number;
-  deadlineName: string;
-  deadlineDescription?: string;
-  startTime: string;
-  endTime: string;
-  status: DeadlineStatus;
-  schoolClassId: number;
-  schoolClassName: string;
-  hasGroup: boolean;
-  groupId?: number;
-  groupName?: string;
-  groupStatus?: 'OPEN' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
-  memberCount?: number;
-  maxMembers?: number;
-  isLeader?: boolean;
-}

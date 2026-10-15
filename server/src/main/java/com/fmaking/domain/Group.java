@@ -2,65 +2,32 @@ package com.fmaking.domain;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
 import org.hibernate.validator.constraints.Length;
 
-import java.io.Serial;
-import java.io.Serializable;
-
 @Entity
-@Table(name = "`groups`", indexes = {
-    @Index(name = "idx_groups_class_deadline", columnList = "school_class_id, deadline_id, status")
-})
-@Getter
-@Setter
-public class Group extends AbstractAuditingEntity<Long> implements Serializable {
-
-    @Serial
-    private static final long serialVersionUID = 1L;
-
+@Table(name = "groups")
+public class Group extends AbstractAuditingEntity<Long>{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @NotNull
-    @Column(name = "deadline_id", nullable = false)
-    private Integer deadlineId;
-
+    private  Long id;
+    @Length(max = 100, min = 2)
+    @Column(name = "name", length = 100)
+    private  String name;
+    private  Long leaderId;
+    private String reason;
+    // enum
+    private String status;
     @NotNull
     @Column(name = "school_class_id", nullable = false)
     private Integer schoolClassId;
 
-    @NotNull
-    @Length(max = 100, min = 2)
-    @Column(name = "name", length = 100, nullable = false)
-    private String name;
+    public Integer getSchoolClassId() {
+        return schoolClassId;
+    }
 
-    @NotNull
-    @Column(name = "leader_id", nullable = false)
-    private Long leaderId;
-
-    @NotNull
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", length = 20, nullable = false)
-    private GroupStatus status = GroupStatus.OPEN;
-
-    @Column(name = "reject_reason", columnDefinition = "TEXT")
-    private String rejectReason;
-
-    @Column(name = "submitted_rules_version")
-    private Long submittedRulesVersion;
-
-    @Column(name = "rules_evaluation_snapshot", columnDefinition = "TEXT")
-    private String rulesEvaluationSnapshot;
-
-    @Column(name = "is_lecturer_created", nullable = false)
-    private Boolean isLecturerCreated = false;
-
-    @Version
-    @Column(name = "version", nullable = false)
-    private Long version = 0L;
+    public void setSchoolClassId(Integer schoolClassId) {
+        this.schoolClassId = schoolClassId;
+    }
 
     @Override
     public Long getId() {
@@ -69,5 +36,37 @@ public class Group extends AbstractAuditingEntity<Long> implements Serializable 
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Long getLeaderId() {
+        return leaderId;
+    }
+
+    public void setLeaderId(Long leaderId) {
+        this.leaderId = leaderId;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 }

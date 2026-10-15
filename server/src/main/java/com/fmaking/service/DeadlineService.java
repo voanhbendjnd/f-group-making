@@ -1,7 +1,14 @@
 package com.fmaking.service;
 
-import com.fmaking.domain.*;
-import com.fmaking.repository.*;
+import com.fmaking.domain.Deadline;
+import com.fmaking.domain.DeadlineStatus;
+import com.fmaking.domain.SchoolClass;
+import com.fmaking.domain.Student;
+import com.fmaking.domain.User;
+import com.fmaking.repository.DeadlineRepository;
+import com.fmaking.repository.SchoolClassRepository;
+import com.fmaking.repository.StudentRepository;
+import com.fmaking.repository.UserRepository;
 import com.fmaking.security.AuthoritiesConstants;
 import com.fmaking.security.SecurityUtils;
 import com.fmaking.service.dto.*;
@@ -29,9 +36,6 @@ public class DeadlineService {
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
-    private final GroupMemberRepository groupMemberRepository;
-    private final GroupRepository groupRepository;
-    private final GroupRuleValidationService ruleValidationService;
     private final SchoolClassAccessService schoolClassAccessService;
     private final ApplicationEventPublisher applicationEventPublisher;
 
@@ -40,9 +44,6 @@ public class DeadlineService {
             SchoolClassRepository schoolClassRepository,
             StudentRepository studentRepository,
             UserRepository userRepository,
-            GroupMemberRepository groupMemberRepository,
-            GroupRepository groupRepository,
-            GroupRuleValidationService ruleValidationService,
             SchoolClassAccessService schoolClassAccessService,
             ApplicationEventPublisher applicationEventPublisher
     ) {
@@ -50,9 +51,6 @@ public class DeadlineService {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
-        this.groupMemberRepository = groupMemberRepository;
-        this.groupRepository = groupRepository;
-        this.ruleValidationService = ruleValidationService;
         this.schoolClassAccessService = schoolClassAccessService;
         this.applicationEventPublisher = applicationEventPublisher;
     }
@@ -290,65 +288,6 @@ public class DeadlineService {
 
         deadline.setStatus("CANCELLED");
         deadlineRepository.save(deadline);
-    }
-
-    @Transactional(readOnly = true)
-    public List<StudentDeadlineActivityDTO> getMyActivities() {
-        Long currentUserId = getCurrentUserId();
-        Student student = studentRepository.findById(currentUserId)
-                .orElseThrow(() -> new DataResourceNotFoundException("Student profile not found", "student", "notFound"));
-
-        if (student.getSchoolClassId() == null) {
-            return Collections.emptyList();
-        }
-
-        Integer classId = student.getSchoolClassId();
-        SchoolClass schoolClass = schoolClassRepository.findById(classId).orElse(null);
-        String className = schoolClass != null ? schoolClass.getName() : "Lớp học";
-
-        List<Deadline> deadlines = deadlineRepository.findAllBySchoolClassId(classId);
-        Instant now = Instant.now();
-
-        return deadlines.stream()
-                .map(deadline -> {
-                    DeadlineStatus status = DeadlineStatus.calculateStatus(deadline.getStartTime(), deadline.getEndTime(), now);
-
-                    StudentDeadlineActivityDTO.StudentDeadlineActivityDTOBuilder builder = StudentDeadlineActivityDTO.builder()
-                            .deadlineId(deadline.getId())
-                            .deadlineName(deadline.getName())
-                            .deadlineDescription(deadline.getDescription())
-                            .startTime(deadline.getStartTime())
-                            .endTime(deadline.getEndTime())
-                            .status(status)
-                            .schoolClassId(classId)
-                            .schoolClassName(className)
-                            .hasGroup(false);
-
-                    Optional<GroupMember> memberOpt = groupMemberRepository.findByStudentIdAndDeadlineId(currentUserId, deadline.getId());
-                    if (memberOpt.isPresent()) {
-                        GroupMember member = memberOpt.get();
-                        Group group = groupRepository.findById(member.getGroupId()).orElse(null);
-                        if (group != null && group.getStatus() != GroupStatus.DISBANDED) {
-                            int memberCount = (int) groupMemberRepository.countByGroupId(group.getId());
-                            int maxMembers = ruleValidationService.getMaxMembers(classId);
-                            builder.hasGroup(true)
-                                    .groupId(group.getId())
-                                    .groupName(group.getName())
-                                    .groupStatus(group.getStatus().name())
-                                    .memberCount(memberCount)
-                                    .maxMembers(maxMembers)
-                                    .isLeader(member.getRole() == GroupMemberRole.LEADER);
-                        }
-                    }
-
-                    return builder.build();
-                })
-                .sorted(Comparator.comparing((StudentDeadlineActivityDTO dto) -> {
-                    if (dto.getStatus() == DeadlineStatus.ACTIVE) return 0;
-                    if (dto.getStatus() == DeadlineStatus.UPCOMING) return 1;
-                    return 2;
-                }).thenComparing(StudentDeadlineActivityDTO::getEndTime, Comparator.nullsLast(Comparator.reverseOrder())))
-                .toList();
     }
 
     private Long getCurrentUserId() {

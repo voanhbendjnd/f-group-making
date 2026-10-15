@@ -3,7 +3,6 @@ import { CheckCircle2, Users, Calendar } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { PageHeader } from '@/components/common/PageHeader';
-import { StudentGroupWidget } from './components/StudentGroupWidget';
 
 export const StudentDashboardPage: React.FC = () => {
   const { t } = useTranslation();
@@ -15,9 +14,6 @@ export const StudentDashboardPage: React.FC = () => {
         title={t('studentDashboard.greeting', { name: user?.name || user?.email || 'Student' })}
         description={t('studentDashboard.welcome')}
       />
-
-      {/* Realtime Group Formation Widget */}
-      <StudentGroupWidget />
 
       {/* Account Status Card */}
       <div

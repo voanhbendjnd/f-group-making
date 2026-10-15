@@ -27,7 +27,6 @@ import { ClassListPage } from '@/pages/admin/ClassListPage';
 import { ClassDetailPage } from '@/pages/admin/ClassDetailPage';
 import { AdminDeadlinePage } from '@/pages/admin/AdminDeadlinePage';
 import { LecturerDeadlinePage } from '@/pages/lecturer/LecturerDeadlinePage';
-import { LecturerGroupWorkspacePage } from '@/pages/lecturer/LecturerGroupWorkspacePage';
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
 import { StudentProfilePage } from '@/pages/student/StudentProfilePage';
 import { SelectGroupPage } from '@/pages/student/SelectGroupPage';
@@ -158,8 +157,6 @@ export const router = createBrowserRouter([
       { path: 'classes', element: <LecturerClassListPage /> },
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
       { path: 'deadlines', element: <LecturerDeadlinePage /> },
-      { path: 'groups', element: <LecturerGroupWorkspacePage /> },
-      { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],
   },
 
@@ -185,10 +182,6 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <StudentProfilePage /> },
       {
         path: 'groups/select',
-        element: <SelectGroupPage />,
-      },
-      {
-        path: 'select-group',
         element: <SelectGroupPage />,
       },
     ],

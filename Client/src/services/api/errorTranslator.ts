@@ -118,50 +118,6 @@ export function translateErrorMessage(error: any): string {
     case 'userexists':
       return i18n.t('errors.userExists');
 
-    case 'error.ERR_GROUP_FULL':
-    case 'ERR_GROUP_FULL':
-      return i18n.t('groupFormation.errors.groupFull', 'Nhóm đã đủ số lượng thành viên tối đa.');
-
-    case 'error.ERR_ALREADY_IN_GROUP':
-    case 'ERR_ALREADY_IN_GROUP':
-      return i18n.t('groupFormation.errors.alreadyInGroup', 'Bạn đã tham gia một nhóm khác trong đợt hạn này.');
-
-    case 'error.ERR_GROUP_NAME_EXISTS':
-    case 'ERR_GROUP_NAME_EXISTS':
-      return i18n.t('groupFormation.errors.nameExists', 'Tên nhóm này đã tồn tại trong lớp học.');
-
-    case 'error.ERR_GROUP_STATE_CONFLICT':
-    case 'ERR_GROUP_STATE_CONFLICT':
-      return i18n.t('groupFormation.errors.stateConflict', 'Thao tác không hợp lệ với trạng thái nhóm hiện tại.');
-
-    case 'error.ERR_DEADLINE_EXPIRED':
-    case 'ERR_DEADLINE_EXPIRED':
-      return i18n.t('groupFormation.errors.deadlineExpired', 'Hạn chót chọn nhóm đã kết thúc.');
-
-    case 'error.ERR_FORBIDDEN_NOT_LEADER':
-    case 'ERR_FORBIDDEN_NOT_LEADER':
-      return i18n.t('groupFormation.errors.notLeader', 'Chỉ Trưởng nhóm mới có quyền thực hiện thao tác này.');
-
-    case 'error.ERR_FORBIDDEN_NOT_IN_CLASS':
-    case 'ERR_FORBIDDEN_NOT_IN_CLASS':
-      return i18n.t('groupFormation.errors.notInClass', 'Bạn không thuộc danh sách lớp học này.');
-
-    case 'error.ERR_HARD_RULE_VIOLATED':
-    case 'ERR_HARD_RULE_VIOLATED':
-      return detail || i18n.t('groupFormation.errors.hardRuleViolated', 'Nhóm chưa thỏa mãn toàn bộ các quy tắc bắt buộc của lớp.');
-
-    case 'error.ERR_SOFT_RULE_NOT_SATISFIED':
-    case 'ERR_SOFT_RULE_NOT_SATISFIED':
-      return detail || i18n.t('groupFormation.errors.softRuleNotSatisfied', 'Nhóm chưa đạt Soft Rules. Giảng viên bắt buộc phải nhập lý do ngoại lệ.');
-
-    case 'error.ERR_LEADER_CANNOT_LEAVE':
-    case 'ERR_LEADER_CANNOT_LEAVE':
-      return i18n.t('groupFormation.errors.leaderCannotLeave', 'Trưởng nhóm phải chuyển quyền Leader cho thành viên khác trước khi rời nhóm.');
-
-    case 'error.ERR_DISBAND_NOT_EMPTY':
-    case 'ERR_DISBAND_NOT_EMPTY':
-      return i18n.t('groupFormation.errors.disbandNotEmpty', 'Chỉ có thể giải tán nhóm khi nhóm không còn thành viên nào khác ngoài Leader.');
-
     default:
       break;
   }
