@@ -858,5 +858,36 @@
       "backToDashboard": "Về trang chủ sinh viên",
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
     }
+  },
+  "groupFormation": {
+    "title": "Không Gian Chọn Nhóm",
+    "myGroup": "Nhóm của bạn",
+    "otherGroups": "Danh Sách Nhóm Đang Mở",
+    "createGroup": "Tạo Nhóm Mới",
+    "unassigned": "Sinh viên chưa có nhóm",
+    "join": "Tham gia",
+    "leave": "Rời nhóm",
+    "disband": "Giải tán nhóm",
+    "transferLeader": "Chuyển quyền Leader",
+    "submit": "Nộp nhóm (Submit)",
+    "cancelSubmit": "Hủy nộp (Cancel Submit)",
+    "rules": {
+      "title": "Quy tắc chia nhóm của lớp",
+      "allMet": "Đủ điều kiện nộp",
+      "notMet": "Chưa đạt yêu cầu"
+    },
+    "errors": {
+      "groupFull": "Nhóm đã đủ số lượng thành viên tối đa.",
+      "alreadyInGroup": "Bạn đã tham gia một nhóm khác trong đợt hạn này.",
+      "nameExists": "Tên nhóm này đã tồn tại trong lớp học.",
+      "stateConflict": "Thao tác không hợp lệ với trạng thái nhóm hiện tại.",
+      "deadlineExpired": "Hạn chót chọn nhóm đã kết thúc.",
+      "notLeader": "Chỉ Trưởng nhóm mới có quyền thực hiện thao tác này.",
+      "notInClass": "Bạn không thuộc danh sách lớp học này.",
+      "hardRuleViolated": "Nhóm chưa thỏa mãn toàn bộ các quy tắc bắt buộc của lớp.",
+      "softRuleNotSatisfied": "Nhóm chưa đạt Soft Rules. Giảng viên bắt buộc phải nhập lý do ngoại lệ.",
+      "leaderCannotLeave": "Trưởng nhóm phải chuyển quyền Leader cho thành viên khác trước khi rời nhóm.",
+      "disbandNotEmpty": "Chỉ có thể giải tán nhóm khi nhóm không còn thành viên nào khác ngoài Leader."
+    }
   }
 }

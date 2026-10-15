@@ -858,5 +858,36 @@
       "backToDashboard": "Back to Student Dashboard",
       "verifying": "Verifying deadline and class information..."
     }
+  },
+  "groupFormation": {
+    "title": "Group Selection Workspace",
+    "myGroup": "Your Group",
+    "otherGroups": "Available Groups",
+    "createGroup": "Create New Group",
+    "unassigned": "Unassigned Students",
+    "join": "Join",
+    "leave": "Leave Group",
+    "disband": "Disband Group",
+    "transferLeader": "Transfer Leader",
+    "submit": "Submit Group",
+    "cancelSubmit": "Cancel Submit",
+    "rules": {
+      "title": "Class Grouping Rules",
+      "allMet": "Eligible to Submit",
+      "notMet": "Requirements Not Met"
+    },
+    "errors": {
+      "groupFull": "The group has reached its maximum member capacity.",
+      "alreadyInGroup": "You have already joined another group in this deadline.",
+      "nameExists": "This group name already exists in the class.",
+      "stateConflict": "Action not allowed in current group state.",
+      "deadlineExpired": "The group formation deadline has expired.",
+      "notLeader": "Only the Leader can perform this action.",
+      "notInClass": "You are not enrolled in this class.",
+      "hardRuleViolated": "The group does not satisfy all mandatory class rules.",
+      "softRuleNotSatisfied": "The group does not meet soft rules. Lecturer must provide an override reason.",
+      "leaderCannotLeave": "The Leader must transfer the leader role to another member before leaving.",
+      "disbandNotEmpty": "A group can only be disbanded when no other members remain except the Leader."
+    }
   }
 }
