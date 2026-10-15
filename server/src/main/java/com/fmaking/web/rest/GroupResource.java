@@ -105,6 +105,21 @@ public class GroupResource {
             .body(groupService.lecturerCreateGroup(deadlineId, classId, request));
     }
 
+    @PostMapping("/{groupId}/submit-review")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Group submitted for review")
+    public ResponseEntity<GroupDTO> lecturerSubmit(@PathVariable("deadlineId") Integer deadlineId, @PathVariable("classId") Integer classId, @PathVariable("groupId") Long groupId) {
+        return ResponseEntity.ok(groupService.lecturerSubmitGroup(deadlineId, classId, groupId));
+    }
+
+    @PostMapping("/{groupId}/move-member/{studentId}/to/{targetId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
+    @ApiMessage("Group member moved successfully")
+    public ResponseEntity<GroupDTO> moveMember(@PathVariable("deadlineId") Integer deadlineId, @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId, @PathVariable("studentId") Long studentId, @PathVariable("targetId") Long targetId) {
+        return ResponseEntity.ok(groupService.lecturerMoveMember(deadlineId, classId, groupId, targetId, studentId));
+    }
+
     @PostMapping("/{groupId}/accept")
     @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER', 'ROLE_LECTURE')")
     @ApiMessage("Phê duyệt nhóm thành công")

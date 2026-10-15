@@ -117,15 +117,15 @@ export const DeadlineTable: React.FC<DeadlineTableProps> = ({
                       <Users size={14} /> {t(deadline.status === 'CANCELLED' ? 'deadline.table.viewGroups' : 'deadline.table.manageGroups')}
                     </Link>
 
-                    {onEdit && deadline.canEdit !== false && ['ACTIVE', 'UPCOMING'].includes(deadline.status) && (
+                    {onEdit && deadline.canEdit !== false && ['ACTIVE', 'UPCOMING', 'EXPIRED'].includes(deadline.status) && (
                       <Button
                         size="sm"
                         variant="secondary"
                         icon={<Edit3 size={14} />}
                         onClick={() => onEdit(deadline)}
-                        title={deadline.status === 'ACTIVE' ? t('deadline.table.extendTitle') : t('deadline.table.editTitle')}
+                        title={deadline.status === 'EXPIRED' ? t('deadlineLifecycle.reopen') : deadline.status === 'ACTIVE' ? t('deadline.table.extendTitle') : t('deadline.table.editTitle')}
                       >
-                        {deadline.status === 'ACTIVE' ? t('deadline.table.extend') : t('deadline.table.edit')}
+                        {deadline.status === 'EXPIRED' ? t('deadlineLifecycle.reopen') : deadline.status === 'ACTIVE' ? t('deadline.table.extend') : t('deadline.table.edit')}
                       </Button>
                     )}
                     {onCancel && deadline.canCancel !== false && deadline.status !== 'CANCELLED' && (

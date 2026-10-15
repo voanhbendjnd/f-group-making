@@ -1,3 +1,4 @@
+import { useAuth } from '@/app/providers/AuthContext';
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +35,7 @@ export const SelectGroupPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   const deadlineIdStr = searchParams.get('deadlineId');
   const classIdStr = searchParams.get('classId');
@@ -554,6 +556,7 @@ export const SelectGroupPage: React.FC = () => {
                 canJoin={!!workspace?.canJoinGroup && !isExpired}
                 isMyGroup={false}
                 isLecturer={!!workspace?.isLecturer}
+                canUnlock={Boolean(user?.authorities.includes('ROLE_ADMIN') || user?.id === workspace?.lecturerId)}
                 isDeadlineExpired={isExpired}
                 onJoin={(id) => joinGroupMutation.mutate(id)}
                 onAccept={(id) => acceptGroupMutation.mutate(id)}

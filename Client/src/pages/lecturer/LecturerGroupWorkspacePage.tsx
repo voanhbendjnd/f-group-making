@@ -1,3 +1,5 @@
+import './LecturerGroupWorkspacePage.css';
+import { useToast } from '@/app/providers/ToastContext';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,7 +19,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from 'lucide-react';
-import { Modal, Tooltip, message, Dropdown, type MenuProps } from 'antd';
+import { Modal, Tooltip, Dropdown, type MenuProps } from 'antd';
 import { classApi } from '@/features/classes/api/classApi';
 import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStateNotice';
 import type { DeadlineStatus } from '@/features/deadline/types';
@@ -43,6 +45,7 @@ interface DragPayload {
 
 export const LecturerGroupWorkspacePage: React.FC = () => {
   const { t } = useTranslation();
+  const message = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
 
@@ -66,6 +69,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
 
   // Modals
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [initialStudentIds, setInitialStudentIds] = useState<number[]>([]);
   const [rejectingGroupId, setRejectingGroupId] = useState<number | null>(null);
 
   const { user } = useAuth();
@@ -127,6 +131,14 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
   });
 
   const canManage = !!workspace?.canManageGroups;
+  const canUnlock = Boolean(user?.authorities.includes('ROLE_ADMIN') || user?.id === workspace?.lecturerId);
+  const canEditGroup = (group: GroupDTO) => canManage && (group.status === 'OPEN'
+    || (group.status === 'REVOKED' && workspace?.deadlineStatus === 'ACTIVE'));
+  const submitReviewMutation = useMutation({
+    mutationFn: (groupId: number) => groupApi.lecturerSubmitGroup(selectedDeadlineId!, selectedClassId!, groupId),
+    onSuccess: () => { message.success(t('groupLifecycle.submitted')); invalidateCurrentWorkspace(); },
+    onError: (error: any) => message.error(error.message || t('groupLifecycle.rulesRequired')),
+  });
 
 
   // 4. Realtime WebSocket
@@ -225,7 +237,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
     mutationFn: (payload: { name: string; studentIds: number[]; overrideReason?: string }) =>
       groupApi.lecturerCreateGroup(selectedDeadlineId!, selectedClassId!, payload),
     onSuccess: (data) => {
-      message.success(t('groupWorkspace.messages.createSuccess', { name: data.name }));
+      message.success(t('groupLifecycle.draftCreated', { name: data.name }));
       invalidateCurrentWorkspace();
     },
     onError: (err: any) => {
@@ -273,9 +285,15 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
     return rule?.value || 4;
   }, [workspace?.rules]);
 
+  const openCreateModal = (studentId?: number) => {
+    if (!canManage || createGroupMutation.isPending) return;
+    setInitialStudentIds(studentId === undefined ? [] : [studentId]);
+    setIsCreateModalOpen(true);
+  };
+
   // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, student: GroupMemberDTO, fromGroupId: number | null) => {
-    if (!canManage) { e.preventDefault(); return; }
+    if (!canManage || (fromGroupId !== null && !workspace?.groups.some(group => group.id === fromGroupId && canEditGroup(group)))) { e.preventDefault(); return; }
     const payload: DragPayload = {
       studentId: student.studentId,
       studentName: student.fullName,
@@ -295,6 +313,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
     e.preventDefault();
     if (!canManage) return;
     setDragOverGroupId(null);
+    if (!workspace?.groups.some(group => group.id === targetGroupId && canEditGroup(group))) return;
     try {
       const raw = e.dataTransfer.getData('application/json');
       if (!raw) return;
@@ -305,13 +324,15 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
       }
 
       if (data.fromGroupId !== null) {
-        // Move from another group: remove first, then add
-        await removeMemberMutation.mutateAsync({ groupId: data.fromGroupId, studentId: data.studentId });
+        await groupApi.lecturerMoveMember(selectedDeadlineId!, selectedClassId!, data.fromGroupId, targetGroupId, data.studentId);
+        invalidateCurrentWorkspace();
+        return;
       }
 
       await addMemberMutation.mutateAsync({ groupId: targetGroupId, studentId: data.studentId });
-    } catch (err) {
-      console.error('Drop on group failed', err);
+    } catch {
+      message.error(t('groupLifecycle.moveError'));
+      invalidateCurrentWorkspace();
     }
   };
 
@@ -329,15 +350,13 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
         return;
       }
 
-      const existingCount = workspace?.groups?.length || 0;
-      const defaultName = t('groupWorkspace.defaultGroupName', { count: existingCount + 1 });
-
-      await createGroupMutation.mutateAsync({
-        name: defaultName,
-        studentIds: [data.studentId],
-      });
-    } catch (err) {
-      console.error('Quick create drop failed', err);
+      if (!workspace?.unassignedStudents.some(student => student.studentId === data.studentId)) {
+        message.warning(t('groupWorkspace.messages.dragUnassignedOnly'));
+        return;
+      }
+      openCreateModal(data.studentId);
+    } catch {
+      message.warning(t('groupWorkspace.messages.dragUnassignedOnly'));
     }
   };
 
@@ -351,6 +370,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
       const data: DragPayload = JSON.parse(raw);
 
       if (data.fromGroupId !== null) {
+        const source = workspace?.groups.find(group => group.id === data.fromGroupId);
+        if (!source || !canEditGroup(source) || !source.members.some(member => member.studentId === data.studentId)) return;
+        if (source.memberCount === 1) {
+          confirmDisband(source);
+          return;
+        }
         await removeMemberMutation.mutateAsync({
           groupId: data.fromGroupId,
           studentId: data.studentId,
@@ -378,7 +403,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
       okType: 'danger',
       cancelText: t('groupWorkspace.disbandConfirm.cancel'),
       centered: true,
-      onOk: () => disbandGroupMutation.mutate(group.id),
+      onOk: () => disbandGroupMutation.mutateAsync(group.id),
     });
   };
 
@@ -466,7 +491,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
               border: '1px solid #fecaca',
             }}
           >
-            {t('groupWorkspace.status.revoked')}
+            {t('groupLifecycle.revoked')}
           </span>
         );
       default:
@@ -491,22 +516,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
     <div className="space-y-6 lecturer-group-workspace">
       {/* Top Header & Context Selectors */}
       <div
-        className="card"
-        style={{
-          padding: '1.25rem 1.5rem',
-          display: 'flex',
-          flexWrap: 'wrap',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          borderLeft: '4px solid #2563eb',
-          background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-        }}
+        className="card workspace-header"
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+        <div className="workspace-heading">
           <Link
             to="/lecturer/classes"
-            className="btn btn-secondary"
+            className="btn btn-secondary workspace-back"
             style={{ padding: '6px 12px', fontSize: '0.875rem' }}
           >
             <ArrowLeft size={16} /> {t('groupWorkspace.backToClasses')}
@@ -523,15 +538,15 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
         </div>
 
         {/* Toolbar Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="workspace-toolbar">
           {/* Class Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="workspace-selector">
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569' }}>
               {t('groupWorkspace.classLabel')}
             </span>
             <select
               className="form-control"
-              style={{ padding: '6px 10px', fontSize: '0.875rem', minWidth: '150px' }}
+              aria-label={t('groupWorkspace.classLabel')}
               value={selectedClassId || ''}
               onChange={(e) => {
                 const newClassId = e.target.value;
@@ -550,13 +565,13 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
           </div>
 
           {/* Deadline Selector */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <div className="workspace-selector">
             <span style={{ fontSize: '0.8125rem', fontWeight: 600, color: '#475569' }}>
               {t('groupWorkspace.deadlineLabel')}
             </span>
             <select
               className="form-control"
-              style={{ padding: '6px 10px', fontSize: '0.875rem', minWidth: '170px' }}
+              aria-label={t('groupWorkspace.deadlineLabel')}
               value={selectedDeadlineId || ''}
               onChange={(e) => {
                 const newDeadlineId = e.target.value;
@@ -574,6 +589,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             </select>
           </div>
 
+          <div className="workspace-toolbar-actions">
           {/* Realtime WebSocket Indicator */}
           <Tooltip title={`WebSocket Realtime: ${wsStatus}`}>
             <span
@@ -610,7 +626,9 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             icon={<RefreshCw size={14} className={isLoadingWorkspace ? 'animate-spin' : ''} />}
             onClick={() => refetchWorkspace()}
             title={t('groupWorkspace.refreshData')}
-          />
+          >
+            {t('groupWorkspace.refreshData')}
+          </Button>
 
           {/* Add Group Modal Button */}
           <Button
@@ -618,10 +636,11 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             variant="primary"
             icon={<Plus size={15} />}
             disabled={!canManage}
-            onClick={() => setIsCreateModalOpen(true)}
+            onClick={() => openCreateModal()}
           >
             {t('groupWorkspace.createNewGroup')}
           </Button>
+          </div>
         </div>
       </div>
 
@@ -646,30 +665,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
         </div>
       ) : (
         <fieldset disabled={!canManage} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: '320px 1fr',
-            gap: '1.5rem',
-            alignItems: 'start',
-          }}
-        >
+        <div className="workspace-panels">
           {/* ======================================================== */}
           {/* COLUMN 1: UNASSIGNED STUDENTS POOL (LEFT)                */}
           {/* ======================================================== */}
           <div
             className={`card unassigned-pool ${isDragOverUnassigned ? 'drag-over' : ''}`}
-            style={{
-              padding: '1.25rem',
-              position: 'sticky',
-              top: '1rem',
-              maxHeight: 'calc(100vh - 120px)',
-              display: 'flex',
-              flexDirection: 'column',
-              border: isDragOverUnassigned ? '2px dashed #3b82f6' : '1px solid var(--color-border, #e2e8f0)',
-              backgroundColor: isDragOverUnassigned ? '#eff6ff' : '#ffffff',
-              transition: 'all 0.2s ease',
-            }}
             onDragOver={(e) => {
               e.preventDefault();
               e.dataTransfer.dropEffect = 'move';
@@ -679,7 +680,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             onDrop={handleDropOnUnassigned}
           >
             {/* Pool Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+            <div className="workspace-pool-heading">
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={18} color="#2563eb" />
                 <h2 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
@@ -806,7 +807,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                 </div>
               ) : (
                 filteredUnassignedStudents.map((student) => {
-                  const quickAddMenu: MenuProps['items'] = (workspace?.groups || []).map((g) => ({
+                  const quickAddMenu: MenuProps['items'] = (workspace?.groups || []).filter(g => canEditGroup(g) && g.memberCount < g.maxMembers).map((g) => ({
                     key: String(g.id),
                     label: t('groupWorkspace.quickAddTo', { name: g.name }),
                     onClick: () => addMemberMutation.mutate({ groupId: g.id, studentId: student.studentId }),
@@ -834,15 +835,15 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                       }}
                       className="draggable-student-card"
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                      <div className="workspace-person">
                         <GripVertical size={14} color="#94a3b8" style={{ flexShrink: 0 }} />
                         <div
                           style={{
                             width: 28,
                             height: 28,
                             borderRadius: '50%',
-                            backgroundColor: student.majorCode?.toUpperCase() === 'SE' ? '#dbeafe' : '#f3e8ff',
-                            color: student.majorCode?.toUpperCase() === 'SE' ? '#1d4ed8' : '#7e22ce',
+                            backgroundColor: 'var(--color-primary-light)',
+                            color: 'var(--color-primary)',
                             fontSize: '0.75rem',
                             fontWeight: 700,
                             display: 'flex',
@@ -866,7 +867,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                           >
                             {student.fullName}
                           </div>
-                          <div style={{ fontSize: '0.6875rem', color: '#64748b' }}>
+                          <div className="workspace-person-meta">
                             {student.rollNumber}
                           </div>
                         </div>
@@ -910,33 +911,23 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
           {/* ======================================================== */}
           {/* COLUMN 2: GROUPS CANVAS & DROP ZONES (RIGHT)             */}
           {/* ======================================================== */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+          <div className="workspace-canvas">
             {/* Quick Drop Zone: Drag here to create a new group instantly */}
             <div
+              className={`workspace-create-zone ${isDragOverQuickCreate ? 'is-drag-over' : ''}`}
               onDragOver={(e) => {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = 'copy';
+                if (!canManage || createGroupMutation.isPending) return;
+                e.dataTransfer.dropEffect = 'move';
                 setIsDragOverQuickCreate(true);
               }}
               onDragLeave={() => setIsDragOverQuickCreate(false)}
               onDrop={handleDropOnQuickCreate}
-              style={{
-                border: isDragOverQuickCreate
-                  ? '2px dashed #2563eb'
-                  : '2px dashed #cbd5e1',
-                borderRadius: '10px',
-                padding: '1.25rem',
-                textAlign: 'center',
-                backgroundColor: isDragOverQuickCreate ? '#eff6ff' : '#f8fafc',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px',
-              }}
-              aria-disabled={!canManage}
-              onClick={() => { if (canManage) setIsCreateModalOpen(true); }}
+              role="button"
+              tabIndex={canManage ? 0 : -1}
+              onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openCreateModal(); } }}
+              aria-disabled={!canManage || createGroupMutation.isPending}
+              onClick={() => { if (canManage) openCreateModal(); }}
             >
               <div
                 style={{
@@ -976,18 +967,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                   {t('groupWorkspace.emptyGroupsDesc')}
                 </p>
                 <Button variant="primary" icon={<Plus size={16} />} disabled={!canManage}
-            onClick={() => setIsCreateModalOpen(true)}>
+            onClick={() => openCreateModal()}>
                   {t('groupWorkspace.createFirstGroup')}
                 </Button>
               </div>
             ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
-                  gap: '1.25rem',
-                }}
-              >
+              <div className="workspace-group-grid">
                 {workspace?.groups?.map((group) => {
                   const isDragOverThis = dragOverGroupId === group.id;
                   const isRulesExpanded = !!expandedRulesGroupIds[group.id];
@@ -1020,9 +1005,9 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                       }}
                     >
                       {/* Card Header */}
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+                      <div className="workspace-group-heading">
                         <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <div className="workspace-group-title">
                             <h3 style={{ fontSize: '1.0625rem', fontWeight: 700, margin: 0, color: '#0f172a' }}>
                               {group.name}
                             </h3>
@@ -1081,22 +1066,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                             return (
                               <div
                                 key={member.studentId}
-                                draggable={canManage}
+                                className={`workspace-member ${isLeader ? 'is-leader' : ''}`}
+                                draggable={canEditGroup(group)}
                                 onDragStart={(e) => handleDragStart(e, member, group.id)}
                                 onDragEnd={handleDragEnd}
-                                style={{
-                                  padding: '8px 10px',
-                                  backgroundColor: isLeader ? '#f8fafc' : '#ffffff',
-                                  border: isLeader ? '1px solid #cbd5e1' : '1px solid #e2e8f0',
-                                  borderRadius: '6px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: '8px',
-                                  cursor: 'grab',
-                                }}
                               >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                                <div className="workspace-person">
                                   <GripVertical size={13} color="#94a3b8" />
                                   {isLeader ? (
                                     <Tooltip title={t('groupWorkspace.leader')}>
@@ -1117,7 +1092,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                                         flexShrink: 0,
                                       }}
                                     >
-                                      M
+                                      {member.fullName?.charAt(0).toUpperCase()}
                                     </div>
                                   )}
                                   <div style={{ minWidth: 0 }}>
@@ -1133,18 +1108,19 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                                     >
                                       {member.fullName}
                                     </div>
-                                    <div style={{ fontSize: '0.6875rem', color: '#64748b' }}>
+                                    <div className="workspace-person-meta">
                                       {member.rollNumber} • {member.majorCode || 'N/A'}
                                     </div>
                                   </div>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                                <div className="workspace-member-actions">
                                   {!isLeader && (
                                     <Tooltip title={t('groupWorkspace.makeLeader')}>
                                       <button
                                         type="button"
                                         className="btn btn-ghost"
+                                        disabled={!canEditGroup(group)}
                                         style={{ padding: '2px 4px', color: '#64748b' }}
                                         onClick={() =>
                                           setLeaderMutation.mutate({
@@ -1162,6 +1138,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                                     <button
                                       type="button"
                                       className="btn btn-ghost"
+                                      disabled={!canEditGroup(group)}
                                       style={{ padding: '2px 4px', color: '#ef4444' }}
                                       onClick={() =>
                                         removeMemberMutation.mutate({
@@ -1194,7 +1171,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                       </div>
 
                       {/* Rule Evaluation Summary */}
-                      <div
+                      <div className="workspace-rule-summary"
                         style={{
                           backgroundColor: '#f8fafc',
                           borderRadius: '6px',
@@ -1253,19 +1230,10 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                       </div>
 
                       {/* Actions Toolbar */}
-                      <div
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '6px',
-                          paddingTop: '8px',
-                          borderTop: '1px solid #f1f5f9',
-                        }}
-                      >
+                      <div className="workspace-group-actions">
                         {/* Approval Actions */}
-                        <div style={{ display: 'flex', gap: '6px' }}>
-                          {group.status !== 'ACCEPTED' ? (
+                        <div className="workspace-review-actions">
+                          {group.status === 'PENDING' ? (
                             <Button
                               size="sm"
                               variant="primary"
@@ -1274,16 +1242,17 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                             >
                               {t('groupWorkspace.approve')}
                             </Button>
-                          ) : (
+                          ) : group.status === 'ACCEPTED' && canUnlock ? (
                             <Button
                               size="sm"
                               variant="secondary"
                               onClick={() => revokeGroupMutation.mutate(group.id)}
                               loading={revokeGroupMutation.isPending}
                             >
-                              {t('groupWorkspace.revokeApproval')}
+                              {t('groupLifecycle.unlock')}
                             </Button>
-                          )}
+                          ) : null}
+                          {canEditGroup(group) && <Button size="sm" variant="secondary" loading={submitReviewMutation.isPending} onClick={() => submitReviewMutation.mutate(group.id)}>{t('groupLifecycle.submit')}</Button>}
 
                           {group.status === 'PENDING' && (
                             <Button
@@ -1303,9 +1272,12 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                           variant="ghost"
                           style={{ color: '#ef4444' }}
                           icon={<Trash2 size={13} />}
+                          disabled={!canEditGroup(group)}
                           onClick={() => confirmDisband(group)}
                           title={t('groupWorkspace.disband')}
-                        />
+                        >
+                          {t('groupWorkspace.disband')}
+                        </Button>
                       </div>
                     </div>
                   );
@@ -1317,8 +1289,11 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
         </fieldset>
       )}
 
+      <p className="alert alert-info">{t('groupLifecycle.draftNotice')}</p>
       {/* Modal: Giảng viên Tạo & Phân Công Nhóm */}
       <LecturerGroupModal
+        key={`${selectedClassId}-${selectedDeadlineId}-${initialStudentIds.join('-')}`}
+        initialStudentIds={initialStudentIds}
         open={isCreateModalOpen && canManage}
         unassignedStudents={workspace?.unassignedStudents || []}
         rules={workspace?.rules || []}

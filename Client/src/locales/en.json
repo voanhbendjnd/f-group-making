@@ -1,5 +1,24 @@
 {
-  "terms": {
+  "deadlineLifecycle": {
+    "reopen": "Reopen deadline",
+    "reopened": "Deadline reopened. Groups and approval history are preserved.",
+    "confirmScope": "I confirm this change applies to every class listed above.",
+    "sessionExists": "This class already has a group selection session. Extend or reopen the existing deadline.",
+    "scopeRequired": "Review and confirm all affected classes before saving."
+  },
+  "groupLifecycle": {
+    "createDraft": "Create draft group",
+    "draftDescription": "Create a draft for allocation. Complete the class rules, then submit and review the group.",
+    "unlock": "Unlock for revision",
+    "submit": "Submit for review",
+    "submitted": "Group submitted for review.",
+    "rulesRequired": "Complete all active class rules before submission or approval.",
+    "draftCreated": "Created draft group {{name}}. Complete allocation and submit for review.",
+    "revoked": "Needs revision and reapproval",
+    "draftNotice": "Draft groups may be arranged after the deadline. Approved groups stay locked; reopened groups can only be edited while the deadline is active.",
+    "moveError": "Unable to confirm the move. Refresh membership before retrying.",
+    "locked": "This group is locked. Pending groups must be rejected before editing; approved groups must be unlocked by the assigned lecturer or Admin."
+  },  "terms": {
     "profileGlobal": "Your personal profile is independent of the selected academic term.",
     "studentScopeNotice": "This screen is not filtered by the selected term. Student information and deadline links follow your actual assigned class.",
     "deadlineScopeNotice": "Deadlines currently cover all terms you are authorized to access. The academic term filter does not apply to this screen.",
@@ -1123,9 +1142,9 @@
     "allAssignedDesc": "No unassigned students remaining in this class.",
     "quickAddTo": "Add to {{name}}",
     "quickAdd": "Quick add to group",
-    "quickDropActive": "Drop here to create a new group with this student!",
-    "quickDropIdle": "Drag & drop a student here to create a new group instantly",
-    "quickDropHint": "Or click here to open the advanced group creation dialog",
+    "quickDropActive": "Drop here to preselect this student in the creation dialog",
+    "quickDropIdle": "Drag & drop a student here to create a new group",
+    "quickDropHint": "Confirm the group name and members in the dialog, or click here to open it",
     "emptyGroupsTitle": "No groups formed in this class yet",
     "emptyGroupsDesc": "Drag students from the left panel to the area above to create the first group, or click Create New Group.",
     "createFirstGroup": "Create First Group",

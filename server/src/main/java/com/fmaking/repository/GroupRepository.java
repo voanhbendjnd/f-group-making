@@ -29,7 +29,7 @@ public interface GroupRepository extends JpaRepository<Group, Long>, JpaSpecific
 
     Optional<Group> findByIdAndSchoolClassIdAndDeadlineId(Long id, Integer schoolClassId, Integer deadlineId);
 
-    boolean existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCase(Integer schoolClassId, Integer deadlineId, String name);
+    boolean existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(Integer schoolClassId, Integer deadlineId, String name, GroupStatus status);
 
     long countBySchoolClassIdAndDeadlineId(Integer schoolClassId, Integer deadlineId);
 }

@@ -83,6 +83,14 @@ export const groupApi = {
     return data;
   },
 
+  async lecturerSubmitGroup(deadlineId: number, classId: number, groupId: number): Promise<GroupDTO> {
+    return apiClient.post<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/submit-review`);
+  },
+  async lecturerMoveMember(deadlineId: number, classId: number, sourceId: number, targetId: number, studentId: number): Promise<GroupDTO> {
+    return apiClient.post<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${sourceId}/move-member/${studentId}/to/${targetId}`);
+  },
   async acceptGroup(deadlineId: number, classId: number, groupId: number): Promise<GroupDTO> {
     const data = await apiClient.post<unknown, GroupDTO>(
       `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/accept`

@@ -178,3 +178,6 @@ Backend cần unit test resolver/policy và integration test transaction, author
 - Kiểm tra trình duyệt thực trên app test riêng (backend 18080, UI 3001), gồm 4 browser context cho Admin, GV, SV chưa có nhóm và SV là leader: join cập nhật cả dashboard/workspace; hủy từ nút UI cập nhật cả 4 phiên không F5 trong khoảng 339 ms ở lần chạy local, giữ đủ 2 thành viên. Không có exception JS hoặc HTTP lỗi ngoài trạng thái offline chủ động.
 - Đã kiểm tra ngắt mạng SV, tạo đợt mới, kết nối lại, nhận đợt mới; trạng thái tự chuyển sắp mở -> đang mở -> hết hạn mà không tải lại trang.
 - Build artifacts và ứng dụng test được kiểm tra riêng; để dùng trong phiên IDE đang chạy cần dừng backend cũ và chạy lại bản mới. Với cấu hình phát triển `ddl-auto=update`, Hibernate thêm các cột audit/version; không backfill thông tin người/giờ hủy cho bản ghi cũ bằng dữ liệu suy đoán.
+
+
+> 16/10/2026: [Group session / deadline / reapproval policy](15-group-session-deadline-approval.md) supersedes conflicting earlier lifecycle rules. Shared deadline updates require confirmedClassIds; EXPIRED may reopen, CANCELLED may not. Lecturer-created groups are drafts; member moves use one atomic request.

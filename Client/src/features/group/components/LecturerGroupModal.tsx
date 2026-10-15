@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { Modal, Form, Input, Select, Button, Alert } from 'antd';
 import { UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -6,6 +6,7 @@ import type { GroupMemberDTO, GroupingRuleDTO } from '../types/groupTypes';
 
 interface LecturerGroupModalProps {
   open: boolean;
+  initialStudentIds?: number[];
   unassignedStudents: GroupMemberDTO[];
   rules?: GroupingRuleDTO[];
   maxMembers: number;
@@ -16,6 +17,7 @@ interface LecturerGroupModalProps {
 
 export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   open,
+  initialStudentIds = [],
   unassignedStudents,
   maxMembers,
   onClose,
@@ -25,11 +27,12 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   const { t } = useTranslation();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
-  const selectedStudentIds = Form.useWatch('studentIds', form) || [];
+  const requestInFlight = useRef(false);
+  const selectedStudentIds = Form.useWatch('studentIds', form);
 
   // Compute stats on currently selected students
   const selectedStudents = useMemo(() => {
-    return unassignedStudents.filter((s) => selectedStudentIds.includes(s.studentId));
+    return unassignedStudents.filter((s) => (selectedStudentIds ?? []).includes(s.studentId));
   }, [unassignedStudents, selectedStudentIds]);
 
   const distinctMajorsCount = useMemo(() => {
@@ -55,6 +58,8 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   }, [selectedStudents, maxMembers, t]);
 
   const handleFinish = async (values: { name: string; studentIds: number[]; overrideReason?: string }) => {
+    if (submitting || isLoading || requestInFlight.current) return;
+    requestInFlight.current = true;
     try {
       setSubmitting(true);
       await onSubmit({
@@ -64,7 +69,10 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
       });
       form.resetFields();
       onClose();
+    } catch {
+      // The caller reports the API error; preserve the form for correction/retry.
     } finally {
+      requestInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -74,20 +82,20 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
       title={
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '1.125rem' }}>
           <UserPlus size={20} color="var(--color-primary, #2563eb)" />
-          <span>{t('groupWorkspace.createModal.title')}</span>
+          <span>{t('groupLifecycle.createDraft')}</span>
         </div>
       }
       open={open}
-      onCancel={onClose}
+      onCancel={() => { if (!submitting && !isLoading && !requestInFlight.current) { form.resetFields(); onClose(); } }}
       footer={null}
       width={640}
       destroyOnClose
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
-        {t('groupWorkspace.createModal.description')}
+        {t('groupLifecycle.draftDescription')}
       </p>
 
-      <Form form={form} layout="vertical" onFinish={handleFinish}>
+      <Form form={form} layout="vertical" initialValues={{ studentIds: initialStudentIds }} onFinish={handleFinish}>
         <Form.Item
           name="name"
           label={t('groupWorkspace.createModal.nameLabel')}
@@ -150,23 +158,14 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
           />
         )}
 
-        <Form.Item
-          name="overrideReason"
-          label={t('groupWorkspace.createModal.overrideLabel')}
-          tooltip={t('groupWorkspace.createModal.overrideTooltip')}
-        >
-          <Input.TextArea
-            rows={3}
-            placeholder={t('groupWorkspace.createModal.overridePlaceholder')}
-          />
-        </Form.Item>
+
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '1.5rem' }}>
-          <Button onClick={onClose} disabled={submitting || isLoading}>
+          <Button onClick={() => { form.resetFields(); onClose(); }} disabled={submitting || isLoading}>
             {t('groupWorkspace.createModal.cancel')}
           </Button>
           <Button type="primary" htmlType="submit" loading={submitting || isLoading} size="large">
-            {t('groupWorkspace.createModal.submit')}
+            {t('groupLifecycle.createDraft')}
           </Button>
         </div>
       </Form>

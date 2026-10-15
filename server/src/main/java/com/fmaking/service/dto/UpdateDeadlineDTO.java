@@ -28,4 +28,6 @@ public class UpdateDeadlineDTO {
     private Instant endTime;
 
     private List<Integer> schoolClassIds;
+
+    private List<Integer> confirmedClassIds;
 }

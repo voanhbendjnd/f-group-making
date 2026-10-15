@@ -8,6 +8,7 @@ import java.util.List;
 
 @Repository
 public interface GroupStatusHistoryRepository extends JpaRepository<GroupStatusHistory, Long> {
+    boolean existsByGroupIdAndToStatus(Long groupId, com.fmaking.domain.GroupStatus toStatus);
 
     List<GroupStatusHistory> findByGroupIdOrderByCreatedAtDesc(Long groupId);
 }
