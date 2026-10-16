@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input as AntInput, Select, Table } from 'antd';
@@ -14,6 +15,7 @@ import { ErrorState } from '@/components/common/ErrorState';
 import { Pagination } from '@/components/common/Pagination';
 import { classApi } from '@/features/classes/api/classApi';
 import { groupApi } from '@/features/group/api/groupApi';
+import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTypes';
 import { getApiError } from '@/services/api/types';
@@ -35,8 +37,22 @@ function ReviewContent() {
   const toast = useToast();
   const client = useQueryClient();
   const { subscribe } = useRealtime();
-  const [filters, setFilters] = useState({ page: 1, size: 10, search: '', classId: undefined as number | undefined, status: undefined as GroupStatus | undefined });
-  const [search, setSearch] = useState('');
+  const navigate = useNavigate(); const [params, setParams] = useSearchParams();
+  const [filters, setFilters] = useState(() => {
+    const sameTerm = !params.has('termId') || positiveId(params.get('termId')) === selectedTermId;
+    const status = params.get('status') as GroupStatus;
+    return { page: sameTerm ? positiveId(params.get('page')) ?? 1 : 1, size: 10,
+      search: sameTerm ? params.get('search') ?? '' : '',
+      classId: sameTerm ? positiveId(params.get('classId')) ?? undefined : undefined,
+      status: sameTerm && statuses.includes(status) ? status : undefined };
+  });
+  const [search, setSearch] = useState(filters.search);
+  const filterQuery = new URLSearchParams({ termId: String(selectedTermId), page: String(filters.page) });
+  if (filters.classId) filterQuery.set('classId', String(filters.classId));
+  if (filters.status) filterQuery.set('status', filters.status);
+  if (filters.search) filterQuery.set('search', filters.search);
+  const filterString = filterQuery.toString();
+  useEffect(() => { if (params.toString() !== filterString) setParams(filterString, { replace: true }); }, [params, filterString, setParams]);
   const [viewId, setViewId] = useState<number | null>(null);
   const [action, setAction] = useState<Action | null>(null);
   const [reason, setReason] = useState('');
@@ -60,6 +76,12 @@ function ReviewContent() {
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
   const rows = reviews.data?.result ?? [];
+  const boardClassId = filters.classId ?? (classes.data?.result.length === 1 ? classes.data.result[0].id : undefined);
+  const openBoard = () => {
+    if (!boardClassId) return;
+    const deadlineId = rows.find(row => row.group.schoolClassId === boardClassId)?.group.deadlineId;
+    navigate(advancedGroupPath(boardClassId, filterQuery, deadlineId));
+  };
   const topics = [...new Set([...(classes.data?.result ?? []).map(item => item.id), ...rows.map(row => row.group.schoolClassId)])].sort((a, b) => a - b).join(',');
   useEffect(() => {
     const cleanup = topics.split(',').filter(Boolean).map(id => subscribe(`/topic/classes/${id}/deadlines`));
@@ -107,7 +129,9 @@ function ReviewContent() {
     </div> },
   ];
   return <div className="group-review-page">
-    <PageHeader title={t('groupReview.title')} description={t('groupReview.description')} />
+    <PageHeader title={t('groupReview.title')} description={t('groupReview.description')}
+      action={<div className="review-board-entry"><Button icon={<Users size={17} />} disabled={!boardClassId || classes.isError || classes.isPending} onClick={openBoard}>{t('groupBoard.open')}</Button>
+        {!boardClassId && <small>{t('groupBoard.chooseClass')}</small>}</div>} />
     <div className="review-summary" aria-label={t('groupReview.pageSummary')}>
       {[
         { key: 'pending', count: rows.filter(row => row.group.status === 'PENDING').length, Icon: Clock3 },

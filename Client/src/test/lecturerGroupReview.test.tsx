@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { LecturerGroupReviewPage } from '@/pages/lecturer/LecturerGroupReviewPage';
 import { groupApi } from '@/features/group/api/groupApi';
 import { classApi } from '@/features/classes/api/classApi';
@@ -22,10 +23,12 @@ function row(status: GroupStatus = 'PENDING'): GroupReviewRow {
     group: { id: 1, schoolClassId: 2, deadlineId: 3, name: 'Review fixture', leaderId: 4, leaderName: 'Leader', status,
       memberCount: 4, maxMembers: 6, version: 0, members: [], ruleEvaluations: [], allRulesPassed: true, hasHardRuleViolations: false } };
 }
-function mount(value = row()) {
+function Destination() { const location = useLocation(); return <output data-testid="board-url">{location.pathname}{location.search}</output>; }
+function TestRoutes() { return <Routes><Route path="/lecturer/group-review/advanced" element={<Destination />} /><Route path="*" element={<LecturerGroupReviewPage />} /></Routes>; }
+function mount(value = row(), entry = '/') {
   vi.mocked(groupApi.getReviews).mockResolvedValue({ result: [value], meta: { total: 1, page: 1, pageSize: 10, pages: 1 } });
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={client}><LecturerGroupReviewPage /></QueryClientProvider>);
+  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[entry]}><TestRoutes /></MemoryRouter></QueryClientProvider>);
 }
 beforeEach(async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
@@ -37,6 +40,29 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); vi.unstubAllGlobals(); });
 
 describe('group review', () => {
+  it('opens the selected class and retains review context, even if the status filter has no other groups', async () => {
+    mount(row(), '/lecturer/group-review?termId=8&classId=2&status=PENDING&search=Leader');
+    await screen.findByText('Review fixture');
+    expect(screen.getByLabelText('Search group or leader')).toHaveValue('Leader');
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupBoard.open') }));
+    const output = await screen.findByTestId('board-url');
+    const url = new URL(output.textContent!, 'http://localhost');
+    expect(url.pathname).toBe('/lecturer/group-review/advanced');
+    expect(Object.fromEntries(url.searchParams)).toMatchObject({ classId: '2', deadlineId: '3', termId: '8', status: 'PENDING', search: 'Leader' });
+  });
+
+  it('requires a class choice when several classes are available', async () => {
+    vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [2, 5].map(id => ({ id, name: `Class ${id}`, termId: 8, lecturerId: 1, studentCount: 4 })), meta: { total: 2, pages: 1, page: 1, pageSize: 50 } });
+    mount(); await screen.findByText('Review fixture');
+    expect(screen.getByRole('button', { name: i18n.t('groupBoard.open') })).toBeDisabled();
+    expect(screen.getByText(i18n.t('groupBoard.chooseClass'))).toBeInTheDocument();
+  });
+
+  it('discards class and search filters from another term', async () => {
+    mount(row(), '/lecturer/group-review?termId=7&classId=99&search=Previous&page=4');
+    await screen.findByText('Review fixture');
+    expect(groupApi.getReviews).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 8, classId: undefined, search: '', page: 1 }), expect.anything());
+  });
   it('sends term and search filters and subscribes to assigned class events', async () => {
     mount(); await screen.findByText('Review fixture');
     fireEvent.change(screen.getByLabelText('Search group or leader'), { target: { value: 'Leader' } });
@@ -87,7 +113,7 @@ describe('group review', () => {
     const mounted = mount(); await screen.findByText('Review fixture');
     vi.mocked(groupApi.getReviews).mockResolvedValue({ result: [], meta: { total: 0, pages: 0, page: 1, pageSize: 10 } });
     context.term = 9;
-    mounted.rerender(<QueryClientProvider client={client}><LecturerGroupReviewPage /></QueryClientProvider>);
+    mounted.rerender(<QueryClientProvider client={client}><MemoryRouter><TestRoutes /></MemoryRouter></QueryClientProvider>);
     await waitFor(() => expect(groupApi.getReviews).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 9, page: 1 }), expect.anything()));
     expect(screen.queryByText('Review fixture')).not.toBeInTheDocument();
     await act(async () => { await i18n.changeLanguage('vi'); });

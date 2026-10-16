@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopNavbar } from './TopNavbar';
 import { TermProvider } from '@/app/providers/TermContext';
@@ -11,6 +11,8 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
   showTermFilter = false,
 }) => {
   const { user } = useAuth();
+  const { pathname } = useLocation();
+  const isGroupBoard = area === 'lecturer' && (pathname === '/lecturer/group-review/advanced' || pathname === '/lecturer/groups' || /\/classes\/\d+\/deadlines\/\d+\/groups$/.test(pathname));
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -53,7 +55,7 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
           isSidebarCollapsed={isCollapsed}
           onToggleSidebar={handleToggleSidebar}
         />
-        <main id="main-content" className="page-container">
+        <main id="main-content" className={`page-container${isGroupBoard ? ' group-board-container' : ''}`}>
           {area === 'lecturer' && showTermFilter && <TermFilterNotice area="lecturer" />}
           <Outlet />
         </main>

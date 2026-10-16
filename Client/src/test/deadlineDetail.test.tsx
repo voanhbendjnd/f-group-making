@@ -82,7 +82,7 @@ describe('compact deadline list and detail view', () => {
     expect(within(dialog).getByText(deadline.description!)).toBeInTheDocument();
     await waitFor(() => expect(within(dialog).getByRole('button', { name: i18n.t('deadlineLifecycle.reopen') })).toBeEnabled());
     expect(deadlineApi.getDeadlineById).toHaveBeenCalledWith(8, expect.any(AbortSignal));
-    expect(within(dialog).getAllByRole('link')[1]).toHaveAttribute('href', '/lecturer/groups?deadlineId=8&classId=2');
+    expect(within(dialog).getAllByRole('link')[1]).toHaveAttribute('href', '/lecturer/group-review/advanced?classId=2&deadlineId=8');
   });
 
   it('hands the latest fetched version to the extension modal and closes the detail modal', async () => {

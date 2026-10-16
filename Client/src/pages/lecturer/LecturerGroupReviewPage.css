@@ -115,3 +115,5 @@
   .review-summary .review-stat { padding: 1rem; gap: 0.5rem; }
   .review-stat-icon { width: 2rem; height: 2rem; }
 }
+.review-board-entry { display: flex; flex-direction: column; align-items: flex-end; gap: .4rem; }
+.review-board-entry small { font-size: .75rem; color: var(--color-text-muted); }

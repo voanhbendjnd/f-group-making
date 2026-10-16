@@ -29,6 +29,8 @@ export const RejectGroupModal: React.FC<RejectGroupModalProps> = ({
       await onSubmit(groupId, values.reason.trim());
       form.resetFields();
       onClose();
+    } catch {
+      // The caller reports the API error; keep the reason for correction or retry.
     } finally {
       setSubmitting(false);
     }
