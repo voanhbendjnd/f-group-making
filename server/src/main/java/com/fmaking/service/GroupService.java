@@ -10,6 +10,11 @@ import com.fmaking.web.rest.errors.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +43,7 @@ public class GroupService {
     private final SchoolClassAccessService accessService;
     private final GroupEventPublisher eventPublisher;
     private final DeadlinePolicy deadlinePolicy;
+    private final TermService termService;
 
     public GroupService(GroupRepository groupRepository,
                         GroupMemberRepository groupMemberRepository,
@@ -51,7 +57,7 @@ public class GroupService {
                         ClassRuleService classRuleService,
                         GroupRuleValidationService ruleValidationService,
                         SchoolClassAccessService accessService,
-                        GroupEventPublisher eventPublisher, DeadlinePolicy deadlinePolicy) {
+                        GroupEventPublisher eventPublisher, DeadlinePolicy deadlinePolicy, TermService termService) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupMemberHistoryRepository = groupMemberHistoryRepository;
@@ -66,6 +72,7 @@ public class GroupService {
         this.accessService = accessService;
         this.eventPublisher = eventPublisher;
         this.deadlinePolicy = deadlinePolicy;
+        this.termService = termService;
     }
 
     // ==========================================
@@ -95,7 +102,9 @@ public class GroupService {
         DeadlineStatus deadlineStatus = deadlinePolicy.status(deadline);
         boolean isDeadlineExpired = deadlineStatus == DeadlineStatus.EXPIRED;
         boolean studentCanWrite = deadlineStatus == DeadlineStatus.ACTIVE;
-        boolean canManageGroups = isLecturerOrAdmin && deadlineStatus != DeadlineStatus.CANCELLED;
+        boolean canManageGroups = isLecturerOrAdmin && deadlineStatus != DeadlineStatus.CANCELLED
+            && (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+                || Objects.equals(schoolClass.getLecturerId(), currentUserId));
 
         // Get all students of this class
         List<StudentRow> classStudents = studentRepository.findStudentsBySchoolClassId(classId);
@@ -210,6 +219,71 @@ public class GroupService {
             .build();
     }
 
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMyGroupReviews(Integer termId, Integer classId, GroupStatus status, String search,
+                                                 Pageable pageable) {
+        Long lecturerId = accessService.currentLecturerId();
+        termService.validateTerm(termId);
+        if (classId != null) {
+            SchoolClass schoolClass = schoolClassRepository.findById(classId)
+                .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
+            accessService.requireAssignedLecturer(schoolClass);
+            if (!Objects.equals(schoolClass.getTermId(), termId)) {
+                throw new BadRequestAlertException("Class does not belong to selected term", "schoolClass", "classNotInTerm");
+            }
+        }
+        String text = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        Specification<Group> specification = (root, query, cb) -> {
+            var scope = query.subquery(Integer.class);
+            var schoolClass = scope.from(SchoolClass.class);
+            scope.select(schoolClass.get("id")).where(cb.equal(schoolClass.get("lecturerId"), lecturerId), cb.equal(schoolClass.get("termId"), termId));
+            var predicates = new ArrayList<Predicate>();
+            predicates.add(root.get("schoolClassId").in(scope));
+            predicates.add(cb.notEqual(root.get("status"), GroupStatus.DISBANDED));
+            if (classId != null) predicates.add(cb.equal(root.get("schoolClassId"), classId));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            if (!text.isEmpty()) {
+                String pattern = "%" + text.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+                var leaders = query.subquery(Long.class); var student = leaders.from(Student.class);
+                leaders.select(student.get("userId")).where(cb.like(cb.lower(student.get("fullName")), pattern, '!'));
+                predicates.add(cb.or(cb.like(cb.lower(root.get("name")), pattern, '!'), root.get("leaderId").in(leaders)));
+            }
+            return cb.and(predicates.toArray(Predicate[]::new));
+        };
+        var paging = PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 50),
+            Sort.by("id").descending());
+        var page = groupRepository.findAll(specification, paging);
+        var result = page.getContent().stream().map(group -> {
+            var schoolClass = schoolClassRepository.findById(group.getSchoolClassId()).orElseThrow();
+            var deadline = validateDeadlineExists(group.getDeadlineId(), group.getSchoolClassId());
+            boolean eligible;
+            try { evaluateCompleteGroup(group); eligible = true; }
+            catch (ConflictAlertException | UnprocessableAlertException exception) { eligible = false; }
+            boolean writable = deadlinePolicy.status(deadline) != DeadlineStatus.CANCELLED
+                && deadlineRepository.findAllBySchoolClassId(schoolClass.getId()).size() == 1;
+            var submittedAt = groupStatusHistoryRepository.findByGroupIdOrderByCreatedAtDesc(group.getId()).stream()
+                .filter(history -> history.getToStatus() == GroupStatus.PENDING).map(GroupStatusHistory::getCreatedAt).findFirst().orElse(null);
+            GroupDTO detail = getGroupDetail(group.getId(), group.getSchoolClassId(), group.getDeadlineId());
+            List<GroupRuleEvaluationDTO> evaluations = new ArrayList<>(detail.getRuleEvaluations());
+            int groupCount = (int) groupRepository.findBySchoolClassIdAndDeadlineId(group.getSchoolClassId(), group.getDeadlineId())
+                .stream().filter(value -> value.getStatus() != GroupStatus.DISBANDED).count();
+            for (GroupingRuleDTO rule : ruleValidationService.getClassRules(group.getSchoolClassId())) {
+                if (rule.status() && (rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS || rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS)) {
+                    boolean passed = rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS ? groupCount >= rule.value() : groupCount <= rule.value();
+                    evaluations.add(GroupRuleEvaluationDTO.builder().code(rule.code()).ruleName(rule.code().name())
+                        .targetValue(rule.value()).actualValue(groupCount).passed(passed).hardRule(false).build());
+                }
+            }
+            detail.setRuleEvaluations(evaluations);
+            detail.setAllRulesPassed(eligible);
+            return new GroupReviewDTO(detail,
+                schoolClass.getName(), submittedAt, deadlinePolicy.status(deadline).name(), eligible,
+                writable && group.getStatus() == GroupStatus.PENDING, writable && group.getStatus() == GroupStatus.ACCEPTED);
+        }).toList();
+        return ResultPaginationDTO.builder().result(result).meta(ResultPaginationDTO.Meta.builder()
+            .page(paging.getPageNumber() + 1).pageSize(paging.getPageSize()).total(page.getTotalElements()).pages(page.getTotalPages()).build()).build();
+    }
+
     // ==========================================
     // 2. STUDENT OPERATIONS
     // ==========================================
@@ -224,6 +298,7 @@ public class GroupService {
         });
 
         // Check unique group name
+        requireGroupCapacity(classId, deadlineId);
         String cleanName = req.getName().trim();
         if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(classId, deadlineId, cleanName, GroupStatus.DISBANDED)) {
             throw new ConflictAlertException("Tên nhóm này đã tồn tại trong lớp học.", "group", "ERR_GROUP_NAME_EXISTS");
@@ -251,7 +326,7 @@ public class GroupService {
         // Audit logs
         String actor = getCurrentUserLogin();
         saveMemberHistory(savedGroup.getId(), studentId, deadlineId, GroupMemberAction.JOINED, actor, "Tạo nhóm và làm Leader");
-        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Lecturer created draft for allocation");
+        saveStatusHistory(savedGroup.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Student created draft group");
 
         eventPublisher.publish("GROUP_CREATED", savedGroup.getId(), deadlineId, classId, actor, null);
 
@@ -288,6 +363,8 @@ public class GroupService {
         if (currentCount >= maxMembersLimit) {
             throw new ConflictAlertException("Nhóm đã đủ số lượng thành viên tối đa.", "group", "ERR_GROUP_FULL");
         }
+
+        requireFormationRules(group, studentId);
 
         // 5. Add member
         GroupMember member = new GroupMember();
@@ -408,25 +485,6 @@ public class GroupService {
             throw new ForbiddenAlertException("Chỉ trưởng nhóm mới có quyền nộp danh sách nhóm.", "group", "ERR_FORBIDDEN_NOT_LEADER");
         }
 
-        // Validate rules
-        List<GroupMember> groupMembers = groupMemberRepository.findByGroupId(groupId);
-        List<StudentRow> classStudents = studentRepository.findStudentsBySchoolClassId(classId);
-        Map<Long, StudentRow> studentMap = classStudents.stream().collect(Collectors.toMap(StudentRow::userId, Function.identity()));
-
-        List<GroupMemberDTO> memberDTOs = groupMembers.stream()
-            .map(m -> toMemberDTO(m, studentMap.get(m.getStudentId())))
-            .toList();
-
-        List<GroupRuleEvaluationDTO> evaluations = ruleValidationService.evaluateGroup(classId, memberDTOs);
-        if (!ruleValidationService.areAllRulesPassed(evaluations)) {
-            List<String> violations = evaluations.stream()
-                .filter(e -> !e.isPassed())
-                .map(GroupRuleEvaluationDTO::getMessage)
-                .toList();
-            throw new UnprocessableAlertException("Nhóm chưa thỏa mãn toàn bộ quy tắc: " + String.join(", ", violations),
-                "group", "ERR_HARD_RULE_VIOLATED");
-        }
-
         SchoolClass schoolClass = schoolClassRepository.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
 
@@ -434,7 +492,6 @@ public class GroupService {
         GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.PENDING);
         group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
-        group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
         group.setRejectReason(null);
         groupRepository.save(group);
 
@@ -516,6 +573,7 @@ public class GroupService {
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
         accessService.requireWriteAccess(schoolClass);
 
+        requireGroupCapacity(classId, deadlineId);
         String cleanName = req.getName().trim();
         if (groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(classId, deadlineId, cleanName, GroupStatus.DISBANDED)) {
             throw new ConflictAlertException("Tên nhóm này đã tồn tại trong lớp học.", "group", "ERR_GROUP_NAME_EXISTS");
@@ -550,6 +608,10 @@ public class GroupService {
         }
         if (studentIds.size() > ruleValidationService.getMaxMembers(classId)) {
             throw new ConflictAlertException("Group is full", "group", "ERR_GROUP_FULL");
+        }
+
+        if (!ruleValidationService.areFormationRulesPassed(classId, proposedMembers)) {
+            throw new UnprocessableAlertException("Draft exceeds active maximum rules", "group", "ERR_HARD_RULE_VIOLATED");
         }
 
         // Create a draft; complete rules are checked at submission and approval.
@@ -693,6 +755,7 @@ public class GroupService {
         if (groupMemberRepository.countByGroupId(groupId) >= ruleValidationService.getMaxMembers(classId)) {
             throw new ConflictAlertException("Group is full", "group", "ERR_GROUP_FULL");
         }
+        requireFormationRules(group, studentId);
         // Add member
         GroupMember member = new GroupMember();
         member.setGroupId(groupId);
@@ -823,11 +886,39 @@ public class GroupService {
         }
     }
 
+    private void requireGroupCapacity(Integer classId, Integer deadlineId) {
+        long count = groupRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId).stream()
+            .filter(group -> group.getStatus() != GroupStatus.DISBANDED).count();
+        boolean full = ruleValidationService.getClassRules(classId).stream()
+            .anyMatch(rule -> rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS && rule.status() && count >= rule.value());
+        if (full) {
+            throw new UnprocessableAlertException("Class reached its configured group maximum", "group", "ERR_HARD_RULE_VIOLATED");
+        }
+    }
+
+    private void requireFormationRules(Group group, Long studentId) {
+        Map<Long, StudentRow> students = studentRepository.findStudentsBySchoolClassId(group.getSchoolClassId()).stream()
+            .collect(Collectors.toMap(StudentRow::userId, Function.identity()));
+        List<GroupMemberDTO> proposed = new ArrayList<>(groupMemberRepository.findByGroupId(group.getId()).stream()
+            .map(member -> toMemberDTO(member, students.get(member.getStudentId()))).toList());
+        proposed.add(toMemberDTOFromRow(students.get(studentId), group.getSchoolClassId(), group.getDeadlineId()));
+        if (!ruleValidationService.areFormationRulesPassed(group.getSchoolClassId(), proposed)) {
+            throw new UnprocessableAlertException("Draft exceeds active maximum rules", "group", "ERR_HARD_RULE_VIOLATED");
+        }
+    }
+
     private void requireCompleteGroup(Group group) {
+        group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluateCompleteGroup(group)));
+    }
+
+    private List<GroupRuleEvaluationDTO> evaluateCompleteGroup(Group group) {
         List<StudentRow> rows = studentRepository.findStudentsBySchoolClassId(group.getSchoolClassId());
         Map<Long, StudentRow> students = rows.stream().collect(Collectors.toMap(StudentRow::userId, Function.identity()));
         List<GroupMember> storedMembers = groupMemberRepository.findByGroupId(group.getId());
-        if (storedMembers.isEmpty() || storedMembers.stream().anyMatch(member -> !students.containsKey(member.getStudentId()))
+        if (storedMembers.isEmpty() || storedMembers.stream().anyMatch(member -> !students.containsKey(member.getStudentId())
+                    || !Objects.equals(member.getSchoolClassId(), group.getSchoolClassId())
+                    || !Objects.equals(member.getDeadlineId(), group.getDeadlineId()))
+                || storedMembers.stream().map(GroupMember::getStudentId).distinct().count() != storedMembers.size()
                 || storedMembers.stream().filter(member -> member.getRole() == GroupMemberRole.LEADER).count() != 1
                 || storedMembers.stream().noneMatch(member -> member.getRole() == GroupMemberRole.LEADER && Objects.equals(member.getStudentId(), group.getLeaderId()))) {
             throw new ConflictAlertException("Invalid group membership or leader", "group", "ERR_GROUP_STATE_CONFLICT");
@@ -846,7 +937,7 @@ public class GroupService {
                 throw new UnprocessableAlertException("Class group count violates active rules", "group", "ERR_HARD_RULE_VIOLATED");
             }
         }
-        group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
+        return evaluations;
     }
 
     public GroupDTO lecturerSubmitGroup(Integer deadlineId, Integer classId, Long groupId) {
@@ -866,11 +957,11 @@ public class GroupService {
 
     public GroupDTO lecturerMoveMember(Integer deadlineId, Integer classId, Long sourceId, Long targetId, Long studentId) {
         validateManagementDeadline(deadlineId, classId);
-        if (Objects.equals(sourceId, targetId)) return getGroupDetail(sourceId, classId, deadlineId);
         Group source = findScopedGroupForUpdate(sourceId, deadlineId, classId);
         Group target = findScopedGroupForUpdate(targetId, deadlineId, classId);
         requireStaffEditable(source);
         requireStaffEditable(target);
+        if (Objects.equals(sourceId, targetId)) return getGroupDetail(sourceId, classId, deadlineId);
         if (groupMemberRepository.countByGroupId(sourceId) == 1) {
             groupMemberRepository.findByGroupIdAndStudentId(sourceId, studentId)
                 .orElseThrow(() -> new ConflictAlertException("Not a member", "group", "ERR_MEMBER_NOT_IN_GROUP"));
@@ -903,6 +994,9 @@ public class GroupService {
     }
 
     private Deadline lockDeadlineForMutation(Integer deadlineId, Integer classId) {
+        if (deadlineRepository.findAllBySchoolClassId(classId).size() > 1) {
+            throw new ConflictAlertException("Class has multiple historical grouping sessions; review data before writing", "group", "ERR_GROUP_STATE_CONFLICT");
+        }
         Deadline deadline = deadlineRepository.findForShare(deadlineId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy đợt hạn này", "deadline", "ERR_DEADLINE_NOT_FOUND"));
         if (deadlineRepository.countByDeadlineIdAndClassId(deadlineId, classId) == 0) {
@@ -932,6 +1026,9 @@ public class GroupService {
     }
 
     private Student getCurrentStudent(Integer classId) {
+        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.STUDENT)) {
+            throw new ForbiddenAlertException("Student role required", "student", "ERR_FORBIDDEN_NOT_IN_CLASS");
+        }
         Long currentUserId = resolveCurrentUserId();
         Student student = studentRepository.findById(currentUserId)
             .orElseThrow(() -> new ForbiddenAlertException("Không tìm thấy thông tin sinh viên", "student", "ERR_STUDENT_NOT_FOUND"));

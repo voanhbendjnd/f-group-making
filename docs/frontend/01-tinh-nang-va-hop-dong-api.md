@@ -221,3 +221,5 @@ Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutu
 
 
 > 16/10/2026: [Group session / deadline / reapproval policy](../15-group-session-deadline-approval.md) supersedes conflicting earlier lifecycle rules. Shared deadline updates require confirmedClassIds; EXPIRED may reopen, CANCELLED may not. Lecturer-created groups are drafts; member moves use one atomic request.
+
+> M2: Lecturer Group Review at `/lecturer/group-review` uses `GET /api/me/group-reviews` with required termId, optional classId/status/search and server pagination. Only personally assigned classes are listed, including for Lecturer Master. Approve/reject/revoke reuse the existing scoped endpoints. See the M2 section in the policy above for the response and realtime behavior.

@@ -1,5 +1,23 @@
 # Một phiên chọn nhóm, gia hạn và duyệt lại
 
+## M2 — Lecturer Group Review
+
+- Route `/lecturer/group-review`, menu Duyệt nhóm / Group Review dùng chung Lecturer và Lecturer Master. Danh sách luôn giới hạn các lớp được phân công cho chính tài khoản; quyền xem toàn hệ thống của Master không được dùng cho danh sách cá nhân này.
+- API đọc mới: `GET /api/me/group-reviews?termId=<id>&classId=<optional>&status=<optional>&search=<optional>&page=1&size=10`. `termId` bắt buộc, xác minh tồn tại; class filter phải đúng Term và đúng phân công. Phân trang server, tối đa 50 dòng; tìm tên nhóm hoặc tên Leader, loại DISBANDED.
+- Response dùng wrapper/pagination hiện có, mỗi dòng có `group: GroupDTO`, `className`, `submittedAt` (lần chuyển PENDING gần nhất trong history, null nếu chưa có), `deadlineStatus`, `eligible`, `canReview`, `canReopen`. Điều kiện hoàn chỉnh tái sử dụng cùng validator với submit/approve; GET không ghi snapshot. Chi tiết gồm cả kết quả MIN/MAX_GROUPS_PER_CLASS đang bật.
+- Thao tác tái sử dụng API accept/reject/revoke hiện có, không thay nghiệp vụ M1. Approve chỉ PENDING đạt rules; review PENDING sau hạn được phép. Reject thường về OPEN, nhưng nhóm từng thu hồi duyệt vẫn về REVOKED. Reopen phải xác nhận thu hồi duyệt và nêu rõ điều kiện ACTIVE để chỉnh sửa, nộp/duyệt lại.
+- Summary ghi rõ **trong trang hiện tại**, không dùng số đếm trang làm tổng học kỳ. Bộ lọc và state modal được reset theo Term; không giữ dữ liệu kỳ cũ. Danh mục lớp cá nhân được tải phân trang để đủ lựa chọn và đăng ký topic realtime cho toàn bộ lớp trong Term; danh sách nhóm luôn phân trang. Fallback refetch 30 giây và refetch khi focus theo Query conventions.
+- Query `group-reviews` tham gia cơ chế invalidation chung với Workspace/Profile/Deadline. Khi CANCELLED được thông báo, cache tắt ngay canReview/canReopen. Không thay schema, không bổ sung ý tưởng kinh doanh, tỷ lệ công nghệ, export hay thuật toán phân bổ.
+
+## M1 — Group Data & Business Rules Foundation (16/10/2026)
+
+- `group_members` là nguồn membership hiện tại cho Workspace, Student Profile và Student Deadline Activities. `students.group_id` chỉ được giữ lại để tương thích dữ liệu cũ, không dùng làm fallback và không tự đồng bộ/xóa. Không có membership thì Profile trả `UNASSIGNED`; nếu membership có liên kết sai lớp/phiên, nhóm DISBANDED, hoặc nhiều membership không thể xác định duy nhất thì trả `MISSING`, không chọn bản ghi tùy ý.
+- `MIN_MAJORS_PER_GROUP` mặc định 2 khi chưa có rule lưu. Giá trị/status đã lưu được giữ nguyên. `MIN/MAX_GROUPS_PER_CLASS` chưa lưu mặc định tắt; khi được cấu hình bật thì mới giới hạn số nhóm. Không ép lớp 36 sinh viên thành đúng 6 nhóm.
+- Draft được thiếu người, ngành và SE. Tạo/thêm/join/chuyển phải tuân thủ trần số người và ngành đang bật; tạo nhóm còn phải tuân thủ trần số nhóm được bật. MIN rules và toàn bộ kết quả đánh giá được kiểm tra lại khi submit/approve. Rule SE vẫn là số lượng, không phải phần trăm. Tắt MAX_MEMBERS không âm thầm khôi phục trần 6; metadata số nguyên dùng `Integer.MAX_VALUE` cho trường hợp không giới hạn.
+- Lecturer Master vẫn đọc được lớp theo quyền xem hiện có, nhưng chỉ ghi rules/thao tác nhóm nếu được phân công lớp; Admin được ghi mọi lớp. Workspace trả `canManageGroups=false` cho Master không được phân công. Quyền mở khóa ACCEPTED không mở rộng.
+- Các mutation khóa lớp → deadline → nhóm như hiện có; nếu lớp có nhiều phiên lịch sử thì từ chối ghi với conflict thay vì chọn/xóa/gộp phiên. Cần kiểm kê và quyết định dữ liệu riêng trước khi mở ghi lại. M1 không xác nhận hay sửa dữ liệu MySQL thực tế.
+- Không bổ sung schema, API mới, Review UI, Suggestions, Invitation, Introduction Note hoặc Automatic Allocation. Tests sử dụng H2 riêng, không gửi email thật.
+
 Cập nhật 16/10/2026. Tài liệu này thay thế các quy tắc cũ mâu thuẫn trong kế hoạch 12/14. Không thay schema.
 
 ## Phiên và deadline
@@ -70,4 +88,5 @@ Kết quả chạy:
 - Lecturer Workspace dùng ToastProvider hiện có thay cho Ant Design static message. Container toast dùng header-height để đặt góc trên bên phải, có giới hạn chiều cao và khoảng cách mobile; không thêm hệ thống notification mới.
 - `lecturerGroupPolicy.test.tsx` kiểm tra payload drop, modal preselection, không ghi sớm và xác nhận người cuối; `lecturerGroupModal.test.tsx` kiểm tra modal thực tế khi lỗi/loading/success; `GroupSessionPolicyTest` bổ sung dùng lại tên sau giải tán nhưng vẫn giữ nhóm cũ và lịch sử.
 
-Ghi chú dữ liệu: sau khảo sát hai phiên cũ, người dùng đã yêu cầu reset riêng hai deadline local; thao tác đó được backup và commit trước lượt sửa kéo thả này. Lượt sửa kéo thả chỉ SELECT metadata MySQL, không ghi database.
+Ghi chú dữ liệu: sau khảo sát hai phiên cũ, người dùng đã yêu cầu reset riêng hai deadline local; thao tác đó được backup và commit trước lượt sửa kéo thả này. Lượt sửa kéo thả chỉ SELECT metadata MySQL, không ghi database.- Ki?m tra SELECT MySQL local Docker (host 3307, database fgroup-making) ng?y 16/10: 0 l?p nhi?u phi?n; 0 membership sai li?n k?t/l?p/phi?n, nhi?u membership hi?n t?i ho?c Leader kh?ng h?p l?; 1 membership kh?c legacy students.group_id. Gi? nguy?n b?n ghi, kh?ng backfill. Unique student_id/deadline_id v? rule class/code ?? t?n t?i; metadata th?c t? ch?a c? ??y ?? c?c FK group_members nh? script SQL, n?n ch?a ?? xu?t ?p d?ng FK n?u ch?a audit v? ???c duy?t ri?ng.
+- X?c minh: 240 tests Backend H2, 0 l?i/skip; test + bootJar th?nh c?ng. 43 tests Frontend li?n quan Profile/Workspace/Modal pass. Kh?ng ch?y ghi d? li?u tr?n MySQL ho?c g?i email th?t.

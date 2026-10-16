@@ -89,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     : isLecturer ? [
         { to: '/lecturer/classes', label: t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses'), icon: <Layers size={18} /> },
         { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
+        { to: '/lecturer/group-review', label: t('groupReview.title'), icon: <Users size={18} /> },
         { to: '/lecturer/groups', label: t('nav.lecturerGroups', 'Xếp nhóm & Phân công'), icon: <Users size={18} /> },
       ] : [
         {

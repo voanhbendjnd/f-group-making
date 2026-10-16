@@ -37,12 +37,17 @@ public class GroupRuleValidationService {
     }
 
     public int getMaxMembers(Integer schoolClassId) {
-        List<Rule> storedRules = ruleRepository.findBySchoolClassId(schoolClassId);
-        return storedRules.stream()
-            .filter(r -> r.getStatus() && MAX_MEMBERS_PER_GROUP.name().equals(r.getCode()))
-            .map(Rule::getValue)
-            .findFirst()
-            .orElse(MAX_MEMBERS_PER_GROUP.getSuggestedValue());
+        return getClassRules(schoolClassId).stream()
+            .filter(rule -> rule.code() == MAX_MEMBERS_PER_GROUP)
+            .mapToInt(rule -> rule.status() ? rule.value() : Integer.MAX_VALUE)
+            .findFirst().orElse(MAX_MEMBERS_PER_GROUP.getSuggestedValue());
+    }
+
+    // Minimums are completion criteria, not admission criteria for draft groups.
+    public boolean areFormationRulesPassed(Integer schoolClassId, List<GroupMemberDTO> members) {
+        return evaluateGroup(schoolClassId, members).stream()
+            .filter(rule -> rule.getCode() == MAX_MEMBERS_PER_GROUP || rule.getCode() == MAX_MAJORS_PER_GROUP)
+            .allMatch(GroupRuleEvaluationDTO::isPassed);
     }
 
     public List<GroupingRuleDTO> getClassRules(Integer schoolClassId) {
@@ -50,7 +55,7 @@ public class GroupRuleValidationService {
         Map<String, Rule> byCode = storedRules.stream().collect(Collectors.toMap(Rule::getCode, Function.identity()));
         return Arrays.stream(GroupingRuleCode.values()).map(code -> new GroupingRuleDTO(code,
                 byCode.containsKey(code.name()) ? byCode.get(code.name()).getValue() : code.getSuggestedValue(),
-                !byCode.containsKey(code.name()) || byCode.get(code.name()).getStatus())).toList();
+                byCode.containsKey(code.name()) ? byCode.get(code.name()).getStatus() : code.isEnabledByDefault())).toList();
     }
 
     public List<GroupRuleEvaluationDTO> evaluateGroup(Integer schoolClassId, List<GroupMemberDTO> members) {
@@ -71,7 +76,7 @@ public class GroupRuleValidationService {
 
         for (GroupingRuleCode code : GroupingRuleCode.values()) {
             Rule stored = byCode.get(code.name());
-            boolean active = stored == null || stored.getStatus();
+            boolean active = stored == null ? code.isEnabledByDefault() : Boolean.TRUE.equals(stored.getStatus());
             if (!active) {
                 continue;
             }

@@ -1,5 +1,7 @@
 import { apiClient } from '@/services/api/client';
 import type {
+  GroupReviewParams,
+  GroupReviewPage,
   WorkspaceDTO,
   GroupDTO,
   CreateGroupRequest,
@@ -9,6 +11,9 @@ import type {
 } from '../types/groupTypes';
 
 export const groupApi = {
+  async getReviews(params: GroupReviewParams, signal?: AbortSignal): Promise<GroupReviewPage> {
+    return apiClient.get<unknown, GroupReviewPage>('/api/me/group-reviews', { params, signal });
+  },
   async getWorkspace(deadlineId: number, classId: number, signal?: AbortSignal): Promise<WorkspaceDTO> {
     const data = await apiClient.get<unknown, WorkspaceDTO>(
       `/api/deadlines/${deadlineId}/classes/${classId}/groups/workspace`,

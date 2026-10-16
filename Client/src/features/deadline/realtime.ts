@@ -11,7 +11,7 @@ export interface RealtimeEvent {
 
 const keys = new Set([
   'admin-deadlines', 'lecturer-deadlines', 'lecturer-deadlines-for-workspace',
-  'student-deadline-activities', 'validate-deadline', 'group-workspace', 'deadline-detail', 'student-profile',
+  'student-deadline-activities', 'validate-deadline', 'group-workspace', 'deadline-detail', 'student-profile', 'group-reviews',
 ]);
 export const isRealtimeQuery = (key: QueryKey) => keys.has(String(key[0]));
 
@@ -20,7 +20,9 @@ export async function syncDeadlineQueries(client: QueryClient, event?: RealtimeE
   // Older REST reads must not reopen controls after cancellation.
   await client.cancelQueries({ predicate });
   if (event?.eventType === 'DEADLINE_CANCELLED') {
-    const cancel = (item: any) => item && (item.id === event.deadlineId || item.deadlineId === event.deadlineId)
+    const cancel = (item: any) => item?.group?.deadlineId === event.deadlineId
+      ? { ...item, deadlineStatus: 'CANCELLED', canReview: false, canReopen: false }
+      : item && (item.id === event.deadlineId || item.deadlineId === event.deadlineId)
       ? { ...item, status: 'CANCELLED', deadlineStatus: 'CANCELLED', valid: false,
         canEdit: false, canCancel: false, canManageGroups: false, canCreateGroup: false,
         canJoinGroup: false, readOnlyReason: 'CANCELLED' }

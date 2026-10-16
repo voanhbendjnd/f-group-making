@@ -49,7 +49,7 @@ public class ClassRuleService {
         Map<String, Rule> byCode = storedRules.stream().collect(Collectors.toMap(Rule::getCode, Function.identity()));
         List<GroupingRuleDTO> rules = Arrays.stream(values()).map(code -> new GroupingRuleDTO(code,
                 byCode.containsKey(code.name()) ? byCode.get(code.name()).getValue() : code.getSuggestedValue(),
-                !byCode.containsKey(code.name()) || byCode.get(code.name()).getStatus())).toList();
+                byCode.containsKey(code.name()) ? byCode.get(code.name()).getStatus() : code.isEnabledByDefault())).toList();
         boolean configured = Arrays.stream(values()).allMatch(code -> byCode.containsKey(code.name()));
         return response(schoolClass, configured, rules);
     }

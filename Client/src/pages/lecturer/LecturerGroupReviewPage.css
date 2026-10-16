@@ -1,0 +1,25 @@
+.group-review-page { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+.review-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 1rem; }
+.review-filters label { display: flex; flex-direction: column; gap: 0.5rem; flex: 1 1 12rem; min-width: 0; font-weight: 600; font-size: 0.875rem; }
+.review-filters .ant-select { width: 100%; }
+.review-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+.review-summary .card { display: flex; flex-direction: column; gap: 0.5rem; }
+.review-summary strong { font-size: 1.75rem; color: var(--color-primary); }
+.review-summary small { color: var(--color-text-muted); }
+.review-table { min-width: 0; overflow: hidden; }
+.review-table .ant-table-cell { overflow-wrap: anywhere; }
+.review-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.review-details { display: flex; flex-direction: column; gap: 1rem; }
+.review-details .badge { white-space: normal; }
+.review-members { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+.review-members li { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; border: 1px solid var(--color-border); padding: 0.75rem; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.review-members li > span:not(.badge) { color: var(--color-text-muted); }
+.review-rule-list { padding-left: 1.25rem; }
+.review-rule-list li { margin: 0.5rem 0; }
+.review-rule-pass { color: var(--color-success); }
+.review-rule-fail { color: var(--color-warning); }
+.review-reason { display: flex; flex-direction: column; gap: 0.5rem; margin: 1rem 0; }
+@media (max-width: 600px) {
+  .review-summary { grid-template-columns: minmax(0, 1fr); }
+  .review-table { padding: 0.75rem; }
+}

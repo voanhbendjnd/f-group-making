@@ -117,3 +117,10 @@ export interface GroupRealtimeEvent {
   timestamp: string;
   payload?: any;
 }
+
+export interface GroupReviewRow {
+  group: GroupDTO; className: string; submittedAt: string | null; deadlineStatus: string;
+  eligible: boolean; canReview: boolean; canReopen: boolean;
+}
+export interface GroupReviewParams { termId: number; classId?: number; status?: GroupStatus; search?: string; page: number; size: number; }
+export interface GroupReviewPage { result: GroupReviewRow[]; meta: { page: number; pageSize: number; pages: number; total: number }; }

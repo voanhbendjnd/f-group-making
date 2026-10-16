@@ -381,7 +381,10 @@ public class DeadlineService {
                     if (memberOpt.isPresent()) {
                         GroupMember member = memberOpt.get();
                         Group group = groupRepository.findById(member.getGroupId()).orElse(null);
-                        if (group != null && group.getStatus() != GroupStatus.DISBANDED) {
+                        if (group != null && group.getStatus() != GroupStatus.DISBANDED
+                                && Objects.equals(member.getSchoolClassId(), classId)
+                                && Objects.equals(group.getSchoolClassId(), classId)
+                                && Objects.equals(group.getDeadlineId(), deadline.getId())) {
                             int memberCount = (int) groupMemberRepository.countByGroupId(group.getId());
                             int maxMembers = ruleValidationService.getMaxMembers(classId);
                             builder.hasGroup(true)
