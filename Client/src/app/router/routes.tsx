@@ -1,3 +1,4 @@
+import { LecturerGroupReviewPage } from '@/pages/lecturer/LecturerGroupReviewPage';
 import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
@@ -161,6 +162,7 @@ export const router = createBrowserRouter([
       { path: 'deadlines', element: <LecturerDeadlinePage /> },
       { path: 'profile', element: <LecturerProfilePage /> },
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
+      { path: 'group-review', element: <LecturerGroupReviewPage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],
   },

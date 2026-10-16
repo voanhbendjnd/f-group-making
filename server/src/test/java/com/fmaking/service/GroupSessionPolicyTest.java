@@ -27,6 +27,9 @@ import static org.assertj.core.api.Assertions.*;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class GroupSessionPolicyTest {
     @Autowired GroupService service;
+    @Autowired StudentProfileService profiles;
+    @Autowired ClassRuleService classRules;
+    @Autowired GroupRuleValidationService validation;
     @Autowired DeadlineService deadlineService;
     @Autowired SchoolClassRepository classes;
     @Autowired DeadlineRepository deadlines;
@@ -175,8 +178,9 @@ class GroupSessionPolicyTest {
     }
 
     @Test void teacherConsolidatesNineGroupsIntoSixAfterExpiryWithoutReopening() {
-        rule(GroupingRuleCode.MAX_GROUPS_PER_CLASS, 6); rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 2);
-        List<GroupDTO> values = new ArrayList<>(); for (int i = 0; i < 9; i++) values.add(draft(4)); expire();
+        List<GroupDTO> values = new ArrayList<>(); for (int i = 0; i < 9; i++) values.add(draft(4));
+        // Existing drafts may exceed a maximum configured later; retain them for deliberate consolidation.
+        rule(GroupingRuleCode.MAX_GROUPS_PER_CLASS, 6); rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 2); expire();
         assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), values.getFirst().getId())).isInstanceOf(RuntimeException.class);
         int target = 0;
         for (int i = 6; i < 9; i++) for (GroupMemberDTO member : values.get(i).getMembers()) {
@@ -263,5 +267,116 @@ class GroupSessionPolicyTest {
         assertThatThrownBy(() -> service.leaveGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
         CreateGroupRequest create = new CreateGroupRequest(); create.setName("Not allowed");
         assertThatThrownBy(() -> service.createGroup(deadline.getId(), schoolClass.getId(), create)).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test void defaultsRequireTwoMajorsWithoutPersistingOrOverwritingConfiguredValues() {
+        var defaults = classRules.getRules(schoolClass.getId());
+        assertThat(defaults.rules()).anySatisfy(rule -> {
+            assertThat(rule.code()).isEqualTo(GroupingRuleCode.MIN_MAJORS_PER_GROUP);
+            assertThat(rule.value()).isEqualTo(2); assertThat(rule.status()).isTrue();
+        });
+        assertThat(defaults.rules().stream().filter(rule -> rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS
+            || rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS)).allMatch(rule -> !rule.status());
+        assertThat(rules.findBySchoolClassId(schoolClass.getId())).isEmpty();
+        rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 1);
+        assertThat(validation.getClassRules(schoolClass.getId())).anySatisfy(rule -> {
+            assertThat(rule.code()).isEqualTo(GroupingRuleCode.MIN_MAJORS_PER_GROUP);
+            assertThat(rule.value()).isEqualTo(1);
+        });
+    }
+
+    @Test void draftsCanBeIncompleteButSubmissionAndApprovalReevaluateMajorsAndSe() {
+        List<Long> ids = new ArrayList<>(); for (int i = 0; i < 4; i++) ids.add(student(schoolClass, se).getId());
+        LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("Single major draft"); request.setStudentIds(ids);
+        GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
+        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 1);
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        rule(GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP, 5);
+        assertThatThrownBy(() -> service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        assertThat(groups.findById(group.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.PENDING);
+    }
+
+    @Test void studentCreateJoinLeaveUsesCanonicalMembershipAndOnlyChecksDraftMaximums() {
+        User first = student(schoolClass, otherMajor); User second = student(schoolClass, otherMajor);
+        login(first, "ROLE_STUDENT"); CreateGroupRequest request = new CreateGroupRequest(); request.setName("Student draft");
+        GroupDTO group = service.createGroup(deadline.getId(), schoolClass.getId(), request);
+        assertThat(profiles.getCurrentProfile().group().name()).isEqualTo(group.getName());
+        assertThat(students.findById(first.getId()).orElseThrow().getGroupId()).isNull();
+        login(second, "ROLE_STUDENT"); service.joinGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(profiles.getCurrentProfile().group().name()).isEqualTo(group.getName());
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getMyGroup().getId()).isEqualTo(group.getId());
+        service.leaveGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(profiles.getCurrentProfile().group().state()).isEqualTo("UNASSIGNED");
+        login(first, "ROLE_STUDENT");
+        assertThatThrownBy(() -> service.submitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        service.leaveGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(profiles.getCurrentProfile().group().state()).isEqualTo("UNASSIGNED");
+    }
+
+    @Test void profileFollowsAtomicMoveAndDisbandWithoutLegacyColumnWrites() {
+        GroupDTO source = draft(1); GroupDTO target = draft(1); Long id = source.getLeaderId();
+        service.lecturerMoveMember(deadline.getId(), schoolClass.getId(), source.getId(), target.getId(), id);
+        login(users.findById(id).orElseThrow(), "ROLE_STUDENT");
+        assertThat(profiles.getCurrentProfile().group().name()).isEqualTo(target.getName());
+        login(teacher, "ROLE_LECTURE"); service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), target.getId());
+        login(users.findById(id).orElseThrow(), "ROLE_STUDENT");
+        assertThat(profiles.getCurrentProfile().group().state()).isEqualTo("UNASSIGNED");
+    }
+
+    @Test void unassignedMasterCanReadButCannotMutateAnyGroupOrClassRules() {
+        GroupDTO group = draft(4); User master = user(); login(master, "ROLE_LECTURE_MASTER");
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isFalse();
+        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(com.fmaking.web.rest.errors.ForbiddenAlertException.class);
+        assertThatThrownBy(() -> service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(com.fmaking.web.rest.errors.ForbiddenAlertException.class);
+        login(teacher, "ROLE_LECTURE_MASTER");
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isTrue();
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()); expire();
+        assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+    }
+
+    @Test void configuredMaximumsApplyDuringFormationAndDisabledCapacityIsNotSilentlyRestored() {
+        rule(GroupingRuleCode.MAX_MEMBERS_PER_GROUP, 2); rule(GroupingRuleCode.MAX_MAJORS_PER_GROUP, 1);
+        GroupDTO target = draft(1); Long other = student(schoolClass, otherMajor).getId();
+        assertThatThrownBy(() -> service.lecturerAddMember(deadline.getId(), schoolClass.getId(), target.getId(), other)).isInstanceOf(RuntimeException.class);
+        Long sameMajor = student(schoolClass, se).getId(); service.lecturerAddMember(deadline.getId(), schoolClass.getId(), target.getId(), sameMajor);
+        assertThatThrownBy(() -> service.lecturerAddMember(deadline.getId(), schoolClass.getId(), target.getId(), student(schoolClass, se).getId())).isInstanceOf(RuntimeException.class);
+        rule(GroupingRuleCode.MAX_GROUPS_PER_CLASS, 1);
+        assertThatThrownBy(() -> draft(1)).isInstanceOf(RuntimeException.class);
+        Rule maximum = rules.findBySchoolClassId(schoolClass.getId()).stream().filter(rule -> rule.getCode().equals("MAX_MEMBERS_PER_GROUP")).findFirst().orElseThrow();
+        maximum.setStatus(false); rules.saveAndFlush(maximum);
+        service.lecturerAddMember(deadline.getId(), schoolClass.getId(), target.getId(), student(schoolClass, se).getId());
+        assertThat(members.countByGroupId(target.getId())).isEqualTo(3);
+    }
+
+    @Test void historicalDuplicateSessionsAreReportedWithoutChoosingOrDeletingOne() {
+        GroupDTO group = draft(1);
+        Deadline duplicate = new Deadline(); duplicate.setName("Legacy duplicate"); duplicate.setStartTime(Instant.now().minusSeconds(60));
+        duplicate.setEndTime(Instant.now().plusSeconds(3600)); duplicate.getSchoolClasses().add(schoolClass); deadlines.saveAndFlush(duplicate);
+        assertThatThrownBy(() -> service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), group.getId()))
+            .isInstanceOf(com.fmaking.web.rest.errors.ConflictAlertException.class).hasMessageContaining("historical");
+        assertThat(deadlines.findAllBySchoolClassId(schoolClass.getId())).hasSize(2);
+        assertThat(members.countByGroupId(group.getId())).isEqualTo(1);
+    }
+
+    @Test void customMemberBoundsAndDisabledSeAreRespectedAtCompletion() {
+        rule(GroupingRuleCode.MIN_MEMBERS_PER_GROUP, 5); rule(GroupingRuleCode.MAX_MEMBERS_PER_GROUP, 7);
+        GroupDTO group = draft(4);
+        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        service.lecturerAddMember(deadline.getId(), schoolClass.getId(), group.getId(), student(schoolClass, otherMajor).getId());
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+    }
+
+    @Test void seMinimumIsACompletionCountAndCanBeDisabledExplicitly() {
+        Major third = new Major(); third.setCode("X" + UUID.randomUUID().toString().substring(0, 5)); third.setName("Third"); third = majors.saveAndFlush(third);
+        LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("No SE draft");
+        request.setStudentIds(List.of(student(schoolClass, otherMajor).getId(), student(schoolClass, otherMajor).getId(),
+            student(schoolClass, third).getId(), student(schoolClass, third).getId()));
+        GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
+        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP"); seRule.setValue(1); seRule.setStatus(false); rules.saveAndFlush(seRule);
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
     }
 }

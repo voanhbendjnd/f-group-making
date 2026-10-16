@@ -1,5 +1,6 @@
 import './LecturerGroupWorkspacePage.css';
 import { useToast } from '@/app/providers/ToastContext';
+import { translateErrorMessage } from '@/services/api/errorTranslator';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -583,7 +584,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
             >
               {availableDeadlines.map((d) => (
                 <option key={d.id} value={d.id}>
-                  {d.name} ({d.status})
+                  {d.name} ({t(`deadline.status.${d.status.toLowerCase()}`)})
                 </option>
               ))}
             </select>
@@ -655,9 +656,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
           <AlertTriangle size={36} color="#ef4444" style={{ margin: '0 auto 12px' }} />
           <h3 style={{ color: '#1e293b', fontWeight: 600 }}>{t('groupWorkspace.loadErrorTitle')}</h3>
           <p style={{ color: '#64748b', fontSize: '0.875rem' }}>
-            {(workspaceError as any)?.response?.data?.message ||
-              (workspaceError as any)?.message ||
-              t('groupWorkspace.loadErrorDesc')}
+            {translateErrorMessage(workspaceError)}
           </p>
           <Button variant="secondary" onClick={() => refetchWorkspace()} style={{ marginTop: '1rem' }}>
             {t('groupWorkspace.retry')}
@@ -1109,7 +1108,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                                       {member.fullName}
                                     </div>
                                     <div className="workspace-person-meta">
-                                      {member.rollNumber} • {member.majorCode || 'N/A'}
+                                      {member.rollNumber} • {member.majorCode || t('groupReview.missing')}
                                     </div>
                                   </div>
                                 </div>
@@ -1219,7 +1218,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
                                   fontSize: '0.6875rem',
                                 }}
                               >
-                                <span>{ev.ruleName}</span>
+                                <span>{t(`studentGroup.rules.${ev.code}_${ev.passed ? 'passed' : 'failed'}`, { actual: ev.actualValue, target: ev.targetValue })}</span>
                                 <span style={{ fontWeight: 600 }}>
                                   {ev.actualValue}/{ev.targetValue} {ev.passed ? '✓' : '✗'}
                                 </span>

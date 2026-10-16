@@ -25,6 +25,8 @@ class StudentProfileResourceTest {
     @Autowired private SchoolClassRepository classes;
     @Autowired private TermRepository terms;
     @Autowired private GroupRepository groups;
+    @Autowired private GroupMemberRepository members;
+    @Autowired private DeadlineRepository deadlines;
     private Student student;
     private SchoolClass schoolClass;
 
@@ -106,7 +108,7 @@ class StudentProfileResourceTest {
         students.saveAndFlush(student);
         mvc.perform(get("/api/me/student-profile"))
                 .andExpect(jsonPath("$.data.schoolClass.state").value("MISSING"))
-                .andExpect(jsonPath("$.data.group.state").value("MISSING"));
+                .andExpect(jsonPath("$.data.group.state").value("UNASSIGNED"));
     }
 
     @Test
@@ -115,14 +117,31 @@ class StudentProfileResourceTest {
         Group group = new Group();
         group.setName("Profile Group");
         group.setSchoolClassId(schoolClass.getId());
-        groups.saveAndFlush(group);
-        student.setGroupId(group.getId());
-        students.saveAndFlush(student);
+        Deadline deadline = new Deadline(); deadline.setName("Profile session");
+        deadline.setStartTime(java.time.Instant.now().minusSeconds(60));
+        deadline.setEndTime(java.time.Instant.now().plusSeconds(3600));
+        deadline.getSchoolClasses().add(schoolClass); deadlines.saveAndFlush(deadline);
+        group.setDeadlineId(deadline.getId()); group.setLeaderId(student.getUserId());
+        group = groups.saveAndFlush(group);
+        GroupMember member = new GroupMember(); member.setGroupId(group.getId()); member.setStudentId(student.getUserId());
+        member.setDeadlineId(deadline.getId()); member.setSchoolClassId(schoolClass.getId());
+        member.setRole(GroupMemberRole.LEADER); member.setJoinedAt(java.time.Instant.now()); members.saveAndFlush(member);
+        // The canonical membership must work even though the legacy column is null.
+        student.setGroupId(null); students.saveAndFlush(student);
         mvc.perform(get("/api/me/student-profile")).andExpect(jsonPath("$.data.group.name").value("Profile Group"));
         group.setSchoolClassId(Integer.MAX_VALUE);
         groups.saveAndFlush(group);
         mvc.perform(get("/api/me/student-profile"))
                 .andExpect(jsonPath("$.data.group.state").value("MISSING"))
+                .andExpect(jsonPath("$.data.group.name").isEmpty());
+    }
+
+    @Test
+    @WithMockUser(username = "profile@example.test", authorities = "ROLE_STUDENT")
+    void doesNotTrustLegacyGroupIdWithoutMembership() throws Exception {
+        student.setGroupId(Long.MAX_VALUE); students.saveAndFlush(student);
+        mvc.perform(get("/api/me/student-profile"))
+                .andExpect(jsonPath("$.data.group.state").value("UNASSIGNED"))
                 .andExpect(jsonPath("$.data.group.name").isEmpty());
     }
 

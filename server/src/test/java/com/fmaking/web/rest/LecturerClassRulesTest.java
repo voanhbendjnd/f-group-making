@@ -80,7 +80,8 @@ class LecturerClassRulesTest {
                 .andExpect(jsonPath("$.data.configured").value(false))
                 .andExpect(jsonPath("$.data.version").value(0))
                 .andExpect(jsonPath("$.data.rules.length()").value(GroupingRuleCode.values().length))
-                .andExpect(jsonPath("$.data.rules[*].status", org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(true))));
+                .andExpect(jsonPath("$.data.rules[?(@.code == 'MAX_GROUPS_PER_CLASS')].status", org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.data.rules[?(@.code == 'MIN_MAJORS_PER_GROUP')].value", org.hamcrest.Matchers.contains(2)));
         assertThat(rules.findBySchoolClassId(ownClass.getId())).isEmpty();
     }
 

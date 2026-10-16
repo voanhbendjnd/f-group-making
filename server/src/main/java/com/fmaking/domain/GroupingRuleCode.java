@@ -6,7 +6,7 @@ public enum GroupingRuleCode {
     MAX_MEMBERS_PER_GROUP(6),
     MIN_GROUPS_PER_CLASS(1),
     MAX_GROUPS_PER_CLASS(50),
-    MIN_MAJORS_PER_GROUP(1),
+    MIN_MAJORS_PER_GROUP(2),
     MAX_MAJORS_PER_GROUP(6),
     MIN_SE_MEMBERS_PER_GROUP(1, 0);
 
@@ -20,6 +20,10 @@ public enum GroupingRuleCode {
     GroupingRuleCode(int suggestedValue, int minimumValue) {
         this.suggestedValue = suggestedValue;
         this.minimumValue = minimumValue;
+    }
+
+    public boolean isEnabledByDefault() {
+        return this != MIN_GROUPS_PER_CLASS && this != MAX_GROUPS_PER_CLASS;
     }
 
     public int getSuggestedValue() {

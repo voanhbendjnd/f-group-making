@@ -9,6 +9,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.NativeWebRequest;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.zalando.problem.Status;
 import org.zalando.problem.DefaultProblem;
 import org.zalando.problem.Problem;
 import org.zalando.problem.ProblemBuilder;
@@ -29,6 +31,12 @@ public class ExceptionTranslator implements ProblemHandling, SecurityAdviceTrait
 
     @Value("${djnd.app.name}")
     private String applicationName;
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Problem> handleMissingResource(NoResourceFoundException ex, NativeWebRequest request) {
+        return create(Problem.builder().withStatus(Status.NOT_FOUND).withTitle("Not Found")
+                .with(MESSAGE_KEY, "error.http.404").build(), request);
+    }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<Problem> handleDataConflict(DataIntegrityViolationException ex, NativeWebRequest request) {

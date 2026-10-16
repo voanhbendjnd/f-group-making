@@ -181,7 +181,8 @@ class DeadlineLifecycleIntegrationTest {
         open.setEndTime(Instant.now().plusSeconds(3600)); open.getSchoolClasses().add(schoolClass); open = deadlines.saveAndFlush(open);
         mvc.perform(post("/api/deadlines/" + open.getId() + "/classes/" + schoolClass.getId() + "/groups/" + group.getId() + "/leave")
                 .with(user(studentUser.getEmail()).roles("STUDENT")))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isConflict());
+        // Legacy duplicate sessions now fail closed before any group mutation.
         assertThat(members.findByStudentIdAndDeadlineId(studentUser.getId(), deadline.getId())).isPresent();
     }
 

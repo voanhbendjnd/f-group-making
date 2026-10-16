@@ -38,8 +38,7 @@ public class SchoolClassAccessService {
     }
 
     public void requireWriteAccess(SchoolClass schoolClass) {
-        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
-                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
+        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
             requireAssignedLecturer(schoolClass);
         }
     }
