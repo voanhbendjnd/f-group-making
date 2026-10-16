@@ -402,7 +402,7 @@ export const StudentGroupWidget: React.FC = () => {
             >
               <Calendar size={14} />
               <span>
-                {t('studentWidget.deadlineLabel', 'Hạn chót')}:{' '}
+                {t('studentWidget.deadlineLabel', 'Deadline')}:{' '}
                 <strong style={{ color: '#ffffff' }}>{formatDateTime(activeActivity.endTime)}</strong>
               </span>
             </div>

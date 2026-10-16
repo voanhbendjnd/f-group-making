@@ -30,4 +30,9 @@ public class UpdateDeadlineDTO {
     private List<Integer> schoolClassIds;
 
     private List<Integer> confirmedClassIds;
+
+    @jakarta.validation.constraints.Pattern(regexp = "ALL|SELECTED")
+    private String scope;
+    private List<Integer> targetClassIds;
+    private Long expectedVersion;
 }

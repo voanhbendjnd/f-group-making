@@ -100,7 +100,7 @@ export const SelectGroupPage: React.FC = () => {
     deadlineId,
     classId,
     onEvent: event => {
-      if (event.eventType !== 'DEADLINE_CANCELLED') return;
+      if (!['DEADLINE_CLOSED', 'DEADLINE_EXPIRED', 'DEADLINE_CANCELLED'].includes(event.eventType)) return;
       setCreateModalOpen(false); setTransferModalOpen(false); setRejectModalOpen(false);
       setLecturerModalOpen(false); setUnassignedDrawerOpen(false);
     },

@@ -26,6 +26,8 @@ import java.util.stream.Collectors;
 @Transactional
 public class DeadlineService {
 
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
     private final DeadlineRepository deadlineRepository;
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
@@ -118,85 +120,97 @@ public class DeadlineService {
 
     public DeadlineDTO updateDeadline(UpdateDeadlineDTO dto) {
         Deadline existing = deadlineRepository.findForUpdate(dto.getId())
-                .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
+            .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
+        checkVersion(existing, dto.getExpectedVersion());
         Instant now = clock.instant();
-        Set<SchoolClass> previousClasses = new HashSet<>(existing.getSchoolClasses());
-
-        // Strict Ownership Check on EXISTING classes in DB
-        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
-            Long currentLecturerId = schoolClassAccessService.currentLecturerId();
-            boolean hasOtherLecturerClassInExisting = existing.getSchoolClasses().stream()
-                    .anyMatch(sc -> !Objects.equals(sc.getLecturerId(), currentLecturerId));
-            if (hasOtherLecturerClassInExisting) {
-                throw new ForbiddenAlertException("You cannot edit a shared deadline containing classes of other lecturers.", "deadline", "accessDenied");
-            }
-
-            if (dto.getSchoolClassIds() != null && !dto.getSchoolClassIds().isEmpty()) {
-                List<SchoolClass> newClasses = schoolClassRepository.findAllById(dto.getSchoolClassIds());
-                boolean hasUnauthorizedNewClass = newClasses.stream()
-                        .anyMatch(sc -> !Objects.equals(sc.getLecturerId(), currentLecturerId));
-                if (hasUnauthorizedNewClass) {
-                    throw new ForbiddenAlertException("You can only assign classes that you manage.", "deadline", "accessDenied");
-                }
-            }
-        }
-
-        policy.requireNotCancelled(existing);
-        DeadlineStatus currentStatus = policy.status(existing);
-        Set<Integer> scope = existing.getSchoolClasses().stream().map(SchoolClass::getId).collect(Collectors.toSet());
-        if (dto.getSchoolClassIds() != null && !scope.equals(new HashSet<>(dto.getSchoolClassIds()))) {
+        Set<Integer> all = existing.getSchoolClasses().stream().map(SchoolClass::getId).collect(Collectors.toSet());
+        if (dto.getSchoolClassIds() != null && !all.equals(new HashSet<>(dto.getSchoolClassIds()))) {
             throw new BadRequestResourceException("Session classes cannot be changed", "deadline", "immutableClasses");
         }
-        if (scope.size() > 1 && (dto.getConfirmedClassIds() == null || !scope.equals(new HashSet<>(dto.getConfirmedClassIds())))) {
+        Set<Integer> targets;
+        if ("SELECTED".equals(dto.getScope())) {
+            targets = dto.getTargetClassIds() == null ? Set.of() : new HashSet<>(dto.getTargetClassIds());
+        } else {
+            targets = new HashSet<>(all);
+        }
+        if (targets.isEmpty() || !all.containsAll(targets)) {
+            throw new BadRequestResourceException("Select valid classes in this deadline", "deadline", "invalidTargetClasses");
+        }
+        List<SchoolClass> selected = existing.getSchoolClasses().stream().filter(c -> targets.contains(c.getId())).toList();
+        selected.forEach(schoolClassAccessService::requireWriteAccess);
+        confirmScope(targets, dto.getConfirmedClassIds());
+        boolean changesMetadata = !Objects.equals(existing.getName(), dto.getName().trim())
+            || !Objects.equals(description(existing.getDescription()), description(dto.getDescription()));
+        if (changesMetadata && !canManage(existing)) {
+            throw new ForbiddenAlertException("Only the manager of every class may edit shared metadata", "deadline", "accessDenied");
+        }
+        boolean upcoming = !"CANCELLED".equalsIgnoreCase(existing.getStatus()) && existing.getStartTime().isAfter(now);
+        Instant start = existing.getStartTime();
+        if (dto.getStartTime() != null && !dto.getStartTime().equals(start)) {
+            if (!upcoming || !targets.equals(all) || !canManage(existing) || dto.getStartTime().isBefore(now)) {
+                throw new BadRequestResourceException("Start time is fixed except for all upcoming classes", "deadline", "startTimeInPast");
+            }
+            start = dto.getStartTime();
+        }
+        if (!dto.getEndTime().isAfter(now) || !dto.getEndTime().isAfter(start)) {
+            throw new BadRequestResourceException("Deadline must end in the future and after its start", "deadline", "invalidEndTime");
+        }
+        boolean reopening = false;
+        for (SchoolClass c : selected) {
+            DeadlineStatus state = policy.status(existing, c.getId());
+            if (state == DeadlineStatus.ACTIVE && !dto.getEndTime().isAfter(existing.endTimeFor(c.getId()))) {
+                throw new BadRequestResourceException("Active class deadline can only be extended", "deadline", "invalidEndTime");
+            }
+            reopening |= state == DeadlineStatus.EXPIRED;
+        }
+        // Normalize legacy cancelled sessions without reopening unselected classes.
+        if ("CANCELLED".equalsIgnoreCase(existing.getStatus())) {
+            Instant closed = existing.getCancelledAt() == null ? now : existing.getCancelledAt();
+            if (closed.isAfter(now)) closed = now;
+            existing.setEndTime(closed);
+            if (existing.getStartTime().isAfter(closed)) existing.setStartTime(closed);
+            for (DeadlineClassWindow w : existing.getClassWindows()) w.setEndTimeOverride(null);
+            existing.setStatus("ACTIVE");
+        } else {
+            existing.setStartTime(start);
+        }
+        if (targets.equals(all)) {
+            existing.setEndTime(dto.getEndTime());
+            existing.getClassWindows().forEach(w -> w.setEndTimeOverride(null));
+        } else {
+            for (Integer classId : targets) {
+                DeadlineClassWindow window = existing.getClassWindows().stream()
+                    .filter(w -> w.getSchoolClassId().equals(classId)).findFirst().orElseGet(() -> {
+                        var row = entityManager.find(DeadlineClassWindow.class, new DeadlineClassWindow.Key(existing.getId(), classId));
+                        if (row == null) throw new IllegalStateException("Missing class/deadline link");
+                        existing.getClassWindows().add(row);
+                        return row;
+                    });
+                window.setEndTimeOverride(dto.getEndTime());
+            }
+        }
+        existing.setName(dto.getName().trim());
+        existing.setDescription(description(dto.getDescription()));
+        existing.touchSchedule();
+        Deadline saved = deadlineRepository.saveAndFlush(existing);
+        deadlineEvents.publishForClasses(reopening ? "DEADLINE_REOPENED" : upcoming ? "DEADLINE_UPDATED" : "DEADLINE_EXTENDED", saved, targets);
+        return toDTO(saved);
+    }
+
+    private void checkVersion(Deadline deadline, Long expected) {
+        if (expected != null && expected != deadline.getVersion()) {
+            throw new com.fmaking.web.rest.errors.ConflictAlertException("Deadline changed; refresh and try again", "deadline", "deadlineVersionConflict");
+        }
+    }
+
+    private String description(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private void confirmScope(Set<Integer> targets, List<Integer> confirmed) {
+        if (targets.size() > 1 && (confirmed == null || !targets.equals(new HashSet<>(confirmed)))) {
             throw new BadRequestResourceException("Confirm every affected class", "deadline", "confirmClassesRequired");
         }
-
-        if (currentStatus == DeadlineStatus.ACTIVE) {
-            // Immutable startTime
-            dto.setStartTime(existing.getStartTime());
-
-            // Extension only: new endTime must be strictly after old endTime AND in the future
-            if (!dto.getEndTime().isAfter(existing.getEndTime()) || !dto.getEndTime().isAfter(now)) {
-                throw new BadRequestResourceException("Active deadline can only be extended to a future time greater than current end time", "deadline", "invalidEndTime");
-            }
-
-            // Class list is immutable while active
-            // Preserve existing classes
-        } else if (currentStatus == DeadlineStatus.UPCOMING) {
-            if (dto.getStartTime() == null) {
-                dto.setStartTime(existing.getStartTime());
-            }
-            if (dto.getStartTime().isBefore(now)) {
-                throw new BadRequestResourceException("Start time cannot be set in the past", "deadline", "startTimeInPast");
-            }
-            if (!dto.getEndTime().isAfter(dto.getStartTime())) {
-                throw new BadRequestResourceException("End time must be after start time", "deadline", "endTimeBeforeStartTime");
-            }
-
-            // Updatable class list for upcoming
-            if (dto.getSchoolClassIds() != null && !dto.getSchoolClassIds().isEmpty()) {
-                List<Integer> newClassIds = dto.getSchoolClassIds().stream().distinct().toList();
-                List<SchoolClass> newClasses = schoolClassRepository.findAllById(newClassIds);
-                if (newClasses.size() != newClassIds.size()) {
-                    throw new BadRequestResourceException("One or more school classes not found", "deadline", "classNotFound");
-                }
-                existing.setSchoolClasses(new HashSet<>(newClasses));
-            }
-            existing.setStartTime(dto.getStartTime());
-        } else { // EXPIRED
-            if (!dto.getEndTime().isAfter(now) || !dto.getEndTime().isAfter(existing.getEndTime())) {
-                throw new BadRequestResourceException("Reopened deadline must end in the future", "deadline", "invalidEndTime");
-            }
-            dto.setStartTime(existing.getStartTime());
-        }
-
-        existing.setName(dto.getName().trim());
-        existing.setDescription(dto.getDescription());
-        existing.setEndTime(dto.getEndTime());
-
-        Deadline saved = deadlineRepository.saveAndFlush(existing);
-        deadlineEvents.publish(currentStatus == DeadlineStatus.EXPIRED ? "DEADLINE_REOPENED" : currentStatus == DeadlineStatus.ACTIVE ? "DEADLINE_EXTENDED" : "DEADLINE_UPDATED", saved, previousClasses);
-        return toDTO(saved);
     }
 
     @Transactional(readOnly = true)
@@ -297,18 +311,18 @@ public class DeadlineService {
             throw new BadRequestResourceException("This class is not included in the specified deadline", "deadline", "classNotInDeadline");
         }
 
-        DeadlineStatus status = policy.status(deadline);
+        DeadlineStatus status = policy.status(deadline, classId);
         boolean isValid = status == DeadlineStatus.ACTIVE;
 
         String message;
         if ("CANCELLED".equalsIgnoreCase(deadline.getStatus())) {
-            message = "Deadline đã bị hủy.";
+            message = "Deadline đã kết thúc; có thể được mở lại bởi giáo viên.";
         } else if (status == DeadlineStatus.UPCOMING) {
             message = "Thời gian chọn nhóm chưa bắt đầu.";
         } else if (status == DeadlineStatus.EXPIRED) {
-            message = "Thời hạn chọn nhóm đã kết thúc.";
+            message = "Deadline chọn nhóm đã kết thúc.";
         } else {
-            message = "Thời hạn chọn nhóm đang mở.";
+            message = "Deadline chọn nhóm đang mở.";
         }
 
         return DeadlineValidateDTO.builder()
@@ -318,7 +332,7 @@ public class DeadlineService {
                 .name(deadline.getName())
                 .description(deadline.getDescription())
                 .startTime(deadline.getStartTime())
-                .endTime(deadline.getEndTime())
+                .endTime(deadline.endTimeFor(classId))
                 .classId(classId)
                 .className(targetClassOpt.get().getName())
                 .message(message)
@@ -326,24 +340,29 @@ public class DeadlineService {
     }
 
     public void cancelOrDeleteDeadline(Integer id) {
+        closeDeadline(id, new CloseDeadlineDTO());
+    }
+
+    public DeadlineDTO closeDeadline(Integer id, CloseDeadlineDTO request) {
         Deadline deadline = deadlineRepository.findForUpdate(id)
-                .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
-
-        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
-            Long currentLecturerId = schoolClassAccessService.currentLecturerId();
-            boolean hasOtherLecturerClassInExisting = deadline.getSchoolClasses().stream()
-                    .anyMatch(sc -> !Objects.equals(sc.getLecturerId(), currentLecturerId));
-            if (hasOtherLecturerClassInExisting) {
-                throw new ForbiddenAlertException("You cannot delete a shared deadline containing classes of other lecturers.", "deadline", "accessDenied");
+            .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
+        checkVersion(deadline, request.getExpectedVersion());
+        deadline.getSchoolClasses().forEach(schoolClassAccessService::requireWriteAccess);
+        Set<Integer> scope = deadline.getSchoolClasses().stream().map(SchoolClass::getId).collect(Collectors.toSet());
+        confirmScope(scope, request.getConfirmedClassIds());
+        boolean active = scope.stream().anyMatch(idOfClass -> policy.status(deadline, idOfClass) == DeadlineStatus.ACTIVE);
+        if (!active) {
+            if (scope.stream().anyMatch(idOfClass -> policy.status(deadline, idOfClass) == DeadlineStatus.UPCOMING)) {
+                throw new BadRequestResourceException("An upcoming deadline cannot be closed", "deadline", "deadlineNotActive");
             }
+            return toDTO(deadline);
         }
-
-        if (policy.status(deadline) == DeadlineStatus.CANCELLED) return;
-        deadline.setStatus("CANCELLED");
-        deadline.setCancelledAt(clock.instant());
-        deadline.setCancelledBy(SecurityUtils.getCurrentUserLogin().orElseThrow());
+        deadline.setEndTime(clock.instant());
+        deadline.getClassWindows().forEach(w -> w.setEndTimeOverride(null));
+        deadline.touchSchedule();
         deadlineRepository.saveAndFlush(deadline);
-        deadlineEvents.publish("DEADLINE_CANCELLED", deadline, List.of());
+        deadlineEvents.publish("DEADLINE_CLOSED", deadline, List.of());
+        return toDTO(deadline);
     }
 
     @Transactional(readOnly = true)
@@ -364,14 +383,14 @@ public class DeadlineService {
 
         return deadlines.stream()
                 .map(deadline -> {
-                    DeadlineStatus status = policy.status(deadline);
+                    DeadlineStatus status = policy.status(deadline, classId);
 
                     StudentDeadlineActivityDTO.StudentDeadlineActivityDTOBuilder builder = StudentDeadlineActivityDTO.builder()
                             .deadlineId(deadline.getId())
                             .deadlineName(deadline.getName())
                             .deadlineDescription(deadline.getDescription())
                             .startTime(deadline.getStartTime())
-                            .endTime(deadline.getEndTime())
+                            .endTime(deadline.endTimeFor(classId))
                             .status(status)
                             .schoolClassId(classId)
                             .schoolClassName(className)
@@ -426,8 +445,15 @@ public class DeadlineService {
         dto.setCancelledAt(deadline.getCancelledAt());
         dto.setCancelledBy(deadline.getCancelledBy());
         boolean manages = canManage(deadline);
-        dto.setCanCancel(manages && dto.getStatus() != DeadlineStatus.CANCELLED);
-        dto.setCanEdit(manages && (dto.getStatus() == DeadlineStatus.ACTIVE || dto.getStatus() == DeadlineStatus.UPCOMING || dto.getStatus() == DeadlineStatus.EXPIRED));
+        List<DeadlineClassDTO> windows = deadline.getSchoolClasses().stream().sorted(Comparator.comparing(SchoolClass::getId))
+            .map(c -> new DeadlineClassDTO(c.getId(), c.getName(), deadline.getStartTime(), deadline.endTimeFor(c.getId()),
+                policy.status(deadline, c.getId()), canManageClass(c))).toList();
+        dto.setClassWindows(windows);
+        dto.setMixedClassWindows(windows.stream().map(DeadlineClassDTO::endTime).distinct().count() > 1
+            || windows.stream().map(DeadlineClassDTO::status).distinct().count() > 1);
+        dto.setCanClose(manages && windows.stream().anyMatch(w -> w.status() == DeadlineStatus.ACTIVE));
+        dto.setCanCancel(dto.isCanClose());
+        dto.setCanEdit(windows.stream().anyMatch(DeadlineClassDTO::canEdit));
         dto.setCreatedDate(deadline.getCreatedDate());
         dto.setCreatedBy(deadline.getCreatedBy());
         dto.setLastModifiedDate(deadline.getLastModifiedDate());
@@ -440,7 +466,29 @@ public class DeadlineService {
             dto.setSchoolClassIds(List.of());
             dto.setSchoolClassNames(List.of());
         }
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.STUDENT)
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
+            studentsClassTime(deadline, dto);
+        }
         return dto;
+    }
+
+    private void studentsClassTime(Deadline deadline, DeadlineDTO dto) {
+        studentRepository.findById(getCurrentUserId()).ifPresent(student -> {
+            dto.setEndTime(deadline.endTimeFor(student.getSchoolClassId()));
+            dto.setStatus(policy.status(deadline, student.getSchoolClassId()));
+            dto.setClassWindows(dto.getClassWindows().stream().filter(w -> w.schoolClassId().equals(student.getSchoolClassId())).toList());
+            dto.setMixedClassWindows(false);
+        });
+    }
+
+    private boolean canManageClass(SchoolClass schoolClass) {
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) return true;
+        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) return false;
+        return Objects.equals(schoolClass.getLecturerId(), schoolClassAccessService.currentLecturerId());
     }
 
     private boolean canManage(Deadline deadline) {

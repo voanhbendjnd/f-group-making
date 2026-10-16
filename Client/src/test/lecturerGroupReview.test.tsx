@@ -95,10 +95,10 @@ describe('group review', () => {
     expect(i18n.t('groupReview.title')).not.toContain('?');
   });
 
-  it('immediately disables review actions in cached rows when a deadline is cancelled', async () => {
+  it('keeps staff review available when a deadline is closed', async () => {
     client = new QueryClient();
     client.setQueryData(['group-reviews', 1], { result: [row()] });
-    await syncDeadlineQueries(client, { eventType: 'DEADLINE_CANCELLED', deadlineId: 3 });
-    expect(client.getQueryData(['group-reviews', 1])).toEqual({ result: [expect.objectContaining({ canReview: false, canReopen: false, deadlineStatus: 'CANCELLED' })] });
+    await syncDeadlineQueries(client, { eventType: 'DEADLINE_CLOSED', deadlineId: 3 });
+    expect(client.getQueryData(['group-reviews', 1])).toEqual({ result: [expect.objectContaining({ canReview: true, canReopen: false, deadlineStatus: 'EXPIRED' })] });
   });
 });

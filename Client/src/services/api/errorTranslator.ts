@@ -19,6 +19,18 @@ export function translateErrorMessage(error: any): string {
 
   // Known backend error keys
   switch (errorKey) {
+    case 'deadlineVersionConflict':
+    case 'error.deadlineVersionConflict':
+      return i18n.t('deadlineScope.changed');
+    case 'invalidTargetClasses':
+    case 'error.invalidTargetClasses':
+      return i18n.t('deadlineScope.invalidClasses');
+    case 'deadlineNotActive':
+    case 'error.deadlineNotActive':
+      return i18n.t('deadlineScope.notActive');
+    case 'invalidEndTime':
+    case 'error.invalidEndTime':
+      return i18n.t('deadline.modal.extendTimeMustBeGreater');
     case 'sessionAlreadyExists':
     case 'error.sessionAlreadyExists':
       return i18n.t('deadlineLifecycle.sessionExists');
@@ -137,7 +149,7 @@ export function translateErrorMessage(error: any): string {
 
     case 'error.ERR_ALREADY_IN_GROUP':
     case 'ERR_ALREADY_IN_GROUP':
-      return i18n.t('groupFormation.errors.alreadyInGroup', 'Bạn đã tham gia một nhóm khác trong đợt hạn này.');
+      return i18n.t('groupFormation.errors.alreadyInGroup', 'Bạn đã tham gia một nhóm khác trong deadline này.');
 
     case 'error.ERR_GROUP_NAME_EXISTS':
     case 'ERR_GROUP_NAME_EXISTS':
@@ -152,7 +164,7 @@ export function translateErrorMessage(error: any): string {
       return i18n.t('deadline.closed.UPCOMING.title');
     case 'error.ERR_DEADLINE_EXPIRED':
     case 'ERR_DEADLINE_EXPIRED':
-      return i18n.t('groupFormation.errors.deadlineExpired', 'Hạn chót chọn nhóm đã kết thúc.');
+      return i18n.t('groupFormation.errors.deadlineExpired', 'Deadline chọn nhóm đã kết thúc.');
 
     case 'error.ERR_FORBIDDEN_NOT_LEADER':
     case 'ERR_FORBIDDEN_NOT_LEADER':

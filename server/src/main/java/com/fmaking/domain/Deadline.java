@@ -42,6 +42,22 @@ public class Deadline extends AbstractAuditingEntity<Integer> {
     @Column(nullable = false, columnDefinition = "bigint default 0")
     private long version;
 
+    // Forces a new aggregate version even when only a class time override changes.
+    @Column(name = "schedule_revision", nullable = false, columnDefinition = "bigint default 0")
+    private long scheduleRevision;
+
+    @JsonIgnore
+    @OneToMany
+    @JoinColumn(name = "deadline_id", insertable = false, updatable = false)
+    private Set<DeadlineClassWindow> classWindows = new HashSet<>();
+
+    public Set<DeadlineClassWindow> getClassWindows() { return classWindows; }
+    public void touchSchedule() { scheduleRevision++; }
+    public Instant endTimeFor(Integer classId) {
+        return classWindows.stream().filter(w -> Objects.equals(w.getSchoolClassId(), classId))
+            .map(DeadlineClassWindow::getEndTimeOverride).filter(Objects::nonNull).findFirst().orElse(endTime);
+    }
+
     private Instant cancelledAt;
     private String cancelledBy;
 

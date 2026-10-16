@@ -79,7 +79,7 @@ describe('lecturer group policy controls', () => {
   it.each(['OPEN', 'PENDING', 'ACCEPTED', 'REVOKED'] as const)('only shows Approve for PENDING, not %s indiscriminately', async state => {
     mount(state); await screen.findByText('Policy group');
     expect(screen.queryByRole('button', { name: i18n.t('groupWorkspace.approve'), exact: true }) !== null).toBe(state === 'PENDING');
-    expect(screen.queryByRole('button', { name: i18n.t('groupLifecycle.submit'), exact: true }) !== null).toBe(state === 'OPEN');
+    expect(screen.queryByRole('button', { name: i18n.t('groupLifecycle.submit'), exact: true }) !== null).toBe(['OPEN', 'REVOKED'].includes(state));
   });
   it('hides unlock from an unassigned Lecturer Master', async () => {
     auth.user = { id: 2, authorities: ['ROLE_LECTURE_MASTER'] }; mount('ACCEPTED'); await screen.findByText('Policy group');

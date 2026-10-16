@@ -20,8 +20,8 @@ public class DeadlineScheduleService {
     private final DeadlineBoundaryService boundaries;
     private final DeadlineRepository deadlines;
     private final Clock clock;
-    private final Map<Integer, List<ScheduledFuture<?>>> tasks = new HashMap<>();
-    private final Map<Integer, Long> versions = new HashMap<>();
+    private final Map<String, List<ScheduledFuture<?>>> tasks = new HashMap<>();
+    private final Map<String, Long> versions = new HashMap<>();
 
     public DeadlineScheduleService(@org.springframework.beans.factory.annotation.Qualifier("deadlineTaskScheduler") TaskScheduler scheduler, DeadlineBoundaryService boundaries,
                                    DeadlineRepository deadlines, Clock clock) {
@@ -32,31 +32,36 @@ public class DeadlineScheduleService {
     }
 
     @EventListener(ApplicationReadyEvent.class)
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public void restore() {
-        deadlines.findAll().forEach(d -> schedule(d.getId(), d.getVersion(), d.getStartTime(), d.getEndTime(),
-            DeadlineStatus.resolve(d, clock.instant())));
+        deadlines.findAll().forEach(d -> d.getSchoolClasses().forEach(c ->
+            schedule(d.getId(), c.getId(), d.getVersion(), d.getStartTime(), d.endTimeFor(c.getId()),
+                DeadlineStatus.resolve(d, c.getId(), clock.instant()))));
     }
 
     @TransactionalEventListener
     public void changed(DeadlineLifecycleEvent event) {
         var message = event.message();
-        if (Set.of("DEADLINE_CREATED", "DEADLINE_UPDATED", "DEADLINE_EXTENDED", "DEADLINE_REOPENED", "DEADLINE_CANCELLED").contains(message.eventType())) {
-            schedule(message.deadlineId(), message.version(), message.startTime(), message.endTime(), message.status());
+        if (Set.of("DEADLINE_CREATED", "DEADLINE_UPDATED", "DEADLINE_EXTENDED", "DEADLINE_REOPENED", "DEADLINE_CLOSED", "DEADLINE_CANCELLED").contains(message.eventType())) {
+            // Reschedule unchanged classes too: their jobs must use the new aggregate version.
+            message.classWindows().forEach(w -> schedule(message.deadlineId(), w.schoolClassId(), message.version(),
+                w.startTime(), w.endTime(), w.status()));
         }
     }
 
-    private synchronized void schedule(Integer id, long version, Instant start, Instant end, DeadlineStatus status) {
-        if (versions.getOrDefault(id, -1L) > version) return;
-        versions.put(id, version);
-        tasks.getOrDefault(id, List.of()).forEach(task -> task.cancel(false));
-        tasks.remove(id);
+    private synchronized void schedule(Integer id, Integer classId, long version, Instant start, Instant end, DeadlineStatus status) {
+        String key = id + ":" + classId;
+        if (versions.getOrDefault(key, -1L) > version) return;
+        versions.put(key, version);
+        tasks.getOrDefault(key, List.of()).forEach(task -> task.cancel(false));
+        tasks.remove(key);
         if (status == DeadlineStatus.CANCELLED || status == DeadlineStatus.EXPIRED) return;
         List<ScheduledFuture<?>> scheduled = new ArrayList<>();
         if (start.isAfter(clock.instant())) {
-            scheduled.add(scheduler.schedule(() -> boundaries.announce(id, version, DeadlineStatus.ACTIVE), start));
+            scheduled.add(scheduler.schedule(() -> boundaries.announceClass(id, classId, version, DeadlineStatus.ACTIVE), start));
         }
-        scheduled.add(scheduler.schedule(() -> boundaries.announce(id, version, DeadlineStatus.EXPIRED), end));
-        tasks.put(id, scheduled);
+        scheduled.add(scheduler.schedule(() -> boundaries.announceClass(id, classId, version, DeadlineStatus.EXPIRED), end));
+        tasks.put(key, scheduled);
     }
 
     @PreDestroy

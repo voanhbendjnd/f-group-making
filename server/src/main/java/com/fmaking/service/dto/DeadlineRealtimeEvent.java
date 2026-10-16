@@ -6,4 +6,4 @@ import java.util.List;
 
 public record DeadlineRealtimeEvent(String eventId, String eventType, Integer deadlineId,
         List<Integer> affectedClassIds, DeadlineStatus status, Instant startTime, Instant endTime,
-        Instant occurredAt, long version) { }
+        Instant occurredAt, long version, List<DeadlineClassDTO> classWindows) { }

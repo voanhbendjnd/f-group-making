@@ -134,7 +134,7 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
   const canManage = !!workspace?.canManageGroups;
   const canUnlock = Boolean(user?.authorities.includes('ROLE_ADMIN') || user?.id === workspace?.lecturerId);
   const canEditGroup = (group: GroupDTO) => canManage && (group.status === 'OPEN'
-    || (group.status === 'REVOKED' && workspace?.deadlineStatus === 'ACTIVE'));
+    || group.status === 'REVOKED');
   const submitReviewMutation = useMutation({
     mutationFn: (groupId: number) => groupApi.lecturerSubmitGroup(selectedDeadlineId!, selectedClassId!, groupId),
     onSuccess: () => { message.success(t('groupLifecycle.submitted')); invalidateCurrentWorkspace(); },
@@ -146,10 +146,6 @@ export const LecturerGroupWorkspacePage: React.FC = () => {
   const { status: wsStatus } = useGroupWebSocket({
     deadlineId: selectedDeadlineId,
     classId: selectedClassId,
-    onEvent: event => {
-      if (event.eventType !== 'DEADLINE_CANCELLED') return;
-      setIsCreateModalOpen(false); setRejectingGroupId(null); Modal.destroyAll();
-    },
   });
 
   // Invalidate query helper

@@ -8,6 +8,22 @@ import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
 
 class DeadlineBoundaryTest {
+    @Test void classBoundariesUseTheClassOverrideAndPublishOnlyThatClass() {
+        var repository = mock(DeadlineRepository.class);
+        var events = mock(DeadlineEventPublisher.class);
+        Instant now = Instant.parse("2026-10-16T00:00:00Z");
+        var service = new DeadlineBoundaryService(repository, new DeadlinePolicy(Clock.fixed(now, ZoneOffset.UTC)), events);
+        Deadline deadline = new Deadline(); deadline.setStartTime(now.minusSeconds(60)); deadline.setEndTime(now.minusSeconds(1));
+        SchoolClass a = new SchoolClass(); a.setId(1); SchoolClass b = new SchoolClass(); b.setId(2);
+        deadline.getSchoolClasses().addAll(List.of(a, b));
+        DeadlineClassWindow extended = new DeadlineClassWindow(); extended.setSchoolClassId(2); extended.setDeadlineId(3);
+        extended.setEndTimeOverride(now.plusSeconds(3600)); deadline.getClassWindows().add(extended);
+        when(repository.findForShare(3)).thenReturn(Optional.of(deadline));
+        service.announceClass(3, 2, 0, DeadlineStatus.EXPIRED);
+        verifyNoInteractions(events);
+        service.announceClass(3, 1, 0, DeadlineStatus.EXPIRED);
+        verify(events).publishForClasses("DEADLINE_EXPIRED", deadline, List.of(1));
+    }
     @Test void staleJobsCannotExpireAnExtendedOrCancelledDeadline() {
         var repository = mock(DeadlineRepository.class);
         var events = mock(DeadlineEventPublisher.class);
