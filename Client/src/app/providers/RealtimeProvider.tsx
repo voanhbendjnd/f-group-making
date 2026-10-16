@@ -20,12 +20,17 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const clientRef = useRef<Client | null>(null);
   const entries = useRef(new Map<string, Entry>());
   const seen = useRef(new Set<string>());
+  const receivedVersions = useRef(new Map<number, number>());
 
   const attach = useCallback((topic: string, entry: Entry, client: Client) => {
     entry.subscription = client.subscribe(topic, frame => {
       try {
         const event: RealtimeEvent = JSON.parse(frame.body);
         if (!event.eventType || !event.deadlineId) return;
+        if (event.eventType.startsWith('DEADLINE_') && event.version !== undefined) {
+          if (event.version < (receivedVersions.current.get(event.deadlineId) ?? -1)) return;
+          receivedVersions.current.set(event.deadlineId, event.version);
+        }
         if (event.eventId && seen.current.has(event.eventId)) return;
         if (event.eventId) {
           seen.current.add(event.eventId);
@@ -62,6 +67,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (!accountId) return;
     const activeEntries = entries.current;
     const seenEvents = seen.current;
+    const deadlineVersions = receivedVersions.current;
     const client = new Client({
       webSocketFactory: () => new SockJS('/ws'),
       beforeConnect: () => { client.connectHeaders = { Authorization: `Bearer ${storage.getToken() ?? ''}` }; },
@@ -82,6 +88,7 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clientRef.current = null;
       for (const entry of activeEntries.values()) entry.subscription = undefined;
       seenEvents.clear();
+      deadlineVersions.clear();
       setStatus('disconnected');
     };
   }, [accountId, attach, clientQueries]);

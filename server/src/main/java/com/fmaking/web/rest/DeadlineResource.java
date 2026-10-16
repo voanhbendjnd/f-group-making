@@ -7,6 +7,7 @@ import com.fmaking.service.dto.DeadlineDTO;
 import com.fmaking.service.dto.DeadlineValidateDTO;
 import com.fmaking.service.dto.StudentDeadlineActivityDTO;
 import com.fmaking.service.dto.UpdateDeadlineDTO;
+import com.fmaking.service.dto.CloseDeadlineDTO;
 import com.fmaking.util.anotation.ApiMessage;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -91,13 +92,21 @@ public class DeadlineResource {
         return ResponseEntity.ok(activities);
     }
 
+    @PostMapping("/{id}/close")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE', 'ROLE_LECTURE_MASTER')")
+    @ApiMessage("Deadline closed successfully")
+    public ResponseEntity<DeadlineDTO> closeDeadline(@PathVariable("id") Integer id,
+            @RequestBody(required = false) CloseDeadlineDTO request) {
+        return ResponseEntity.ok(deadlineService.closeDeadline(id, request == null ? new CloseDeadlineDTO() : request));
+    }
+
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyAuthority('" + AuthoritiesConstants.ADMIN + "', '" + AuthoritiesConstants.LECTURE + "', '" + AuthoritiesConstants.LECTURE_MASTER + "')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @ApiMessage("Deadline cancelled successfully")
-    public ResponseEntity<Void> deleteDeadline(@PathVariable("id") Integer id) {
-        log.debug("REST request to cancel Deadline : {}", id);
-        deadlineService.cancelOrDeleteDeadline(id);
+    @ApiMessage("Deadline closed successfully")
+    public ResponseEntity<Void> deleteDeadline(@PathVariable("id") Integer id,
+            @RequestBody(required = false) CloseDeadlineDTO request) {
+        deadlineService.closeDeadline(id, request == null ? new CloseDeadlineDTO() : request);
         return ResponseEntity.noContent().build();
     }
 }

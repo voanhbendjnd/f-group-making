@@ -26,4 +26,15 @@ public class DeadlineBoundaryService {
             }
         });
     }
+
+    @Transactional
+    public void announceClass(Integer id, Integer classId, long version, DeadlineStatus expected) {
+        deadlines.findForShare(id).ifPresent(deadline -> {
+            if (deadline.getVersion() == version && policy.status(deadline, classId) == expected
+                    && deadline.getSchoolClasses().stream().anyMatch(c -> c.getId().equals(classId))) {
+                events.publishForClasses(expected == DeadlineStatus.ACTIVE ? "DEADLINE_STARTED" : "DEADLINE_EXPIRED",
+                    deadline, List.of(classId));
+            }
+        });
+    }
 }

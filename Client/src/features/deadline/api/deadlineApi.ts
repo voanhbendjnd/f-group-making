@@ -56,7 +56,14 @@ export const deadlineApi = {
   },
 
   async cancelDeadline(id: number): Promise<void> {
-    await apiClient.delete(`/api/deadlines/${id}`);
+    await apiClient.post(`/api/deadlines/${id}/close`);
+  },
+
+  async closeDeadline(deadline: Deadline): Promise<Deadline> {
+    return apiClient.post<unknown, Deadline>(`/api/deadlines/${deadline.id}/close`, {
+      confirmedClassIds: deadline.schoolClassIds,
+      expectedVersion: deadline.version,
+    });
   },
 
   async validateDeadline(deadlineId: number, classId: number, signal?: AbortSignal): Promise<DeadlineValidateResult> {

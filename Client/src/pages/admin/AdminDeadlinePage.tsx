@@ -62,8 +62,10 @@ const AdminDeadlineContent: React.FC = () => {
 
   const deadlines = deadlineData?.result || [];
   const meta = deadlineData?.meta || { page, pageSize, pages: 1, total: 0 };
-  const currentEditing = deadlines.find(d => d.id === editingDeadline?.id) ?? editingDeadline;
-  const visibleEditing = currentEditing?.status === 'CANCELLED' ? null : currentEditing;
+  const listedEditing = deadlines.find(d => d.id === editingDeadline?.id);
+  const currentEditing = listedEditing && (listedEditing.version ?? -1) >= (editingDeadline?.version ?? -1)
+    ? listedEditing : editingDeadline;
+  const visibleEditing = currentEditing;
 
   const handleCancel = (d: Deadline) => {
     Modal.confirm({
@@ -72,7 +74,7 @@ const AdminDeadlineContent: React.FC = () => {
       content: (
         <div>
           <p>
-            {t('deadline.confirmCancel.content', { name: d.name })}
+            {t('deadline.confirmCancel.content', { name: d.name })}<br />{d.schoolClassNames.join(', ')}
           </p>
           <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '13px', marginTop: '6px' }}>
             {t('deadline.confirmCancel.adminNotice')}
@@ -85,11 +87,13 @@ const AdminDeadlineContent: React.FC = () => {
       centered: true,
       onOk: async () => {
         try {
-          await deadlineApi.cancelDeadline(d.id);
+          const updated = await deadlineApi.closeDeadline(d);
           toast.success(t('deadline.messages.cancelSuccess'));
-          await syncDeadlineQueries(queries, { eventType: 'DEADLINE_CANCELLED', deadlineId: d.id });
+          await syncDeadlineQueries(queries, { eventType: 'DEADLINE_CLOSED', deadlineId: d.id, affectedClassIds: d.schoolClassIds, version: updated.version, classWindows: updated.classWindows, startTime: updated.startTime, endTime: updated.endTime });
         } catch (err: any) {
           toast.error(err.message || t('deadline.messages.cancelError'));
+          await syncDeadlineQueries(queries);
+          throw err;
         }
       },
     });

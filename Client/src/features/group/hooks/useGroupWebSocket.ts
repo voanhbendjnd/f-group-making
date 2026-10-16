@@ -16,7 +16,9 @@ export function useGroupWebSocket({ deadlineId, classId, onEvent }: {
   useEffect(() => {
     if (!deadlineId || !classId) return;
     return subscribe(`/topic/classes/${classId}/deadlines/${deadlineId}/groups`, event => {
-      if (event.deadlineId === deadlineId) callback.current?.(event as GroupRealtimeEvent);
+      const matchesClass = event.schoolClassId !== undefined ? event.schoolClassId === classId
+        : !event.affectedClassIds || event.affectedClassIds.includes(classId);
+      if (event.deadlineId === deadlineId && matchesClass) callback.current?.(event as GroupRealtimeEvent);
     });
   }, [deadlineId, classId, subscribe]);
   const refetch = useCallback(() => { void syncDeadlineQueries(queries); }, [queries]);

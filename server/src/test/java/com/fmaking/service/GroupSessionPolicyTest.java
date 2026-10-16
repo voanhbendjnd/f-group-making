@@ -26,6 +26,17 @@ import static org.assertj.core.api.Assertions.*;
 })
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class GroupSessionPolicyTest {
+    @org.springframework.test.context.DynamicPropertySource
+    static void isolatedMySql(org.springframework.test.context.DynamicPropertyRegistry properties) {
+        String url = System.getenv("DEADLINE_TEST_MYSQL_URL");
+        if (url != null) {
+            properties.add("spring.datasource.url", () -> url);
+            properties.add("spring.datasource.driver-class-name", () -> "com.mysql.cj.jdbc.Driver");
+            properties.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.MySQLDialect");
+            properties.add("spring.datasource.username", () -> "root");
+            properties.add("spring.datasource.password", () -> System.getenv("DEADLINE_TEST_MYSQL_PASSWORD"));
+        }
+    }
     @Autowired GroupService service;
     @Autowired StudentProfileService profiles;
     @Autowired ClassRuleService classRules;
@@ -68,7 +79,7 @@ class GroupSessionPolicyTest {
     @BeforeEach void setup() {
         teacher = user(); login(teacher, "ROLE_ADMIN"); schoolClass = schoolClass();
         deadline = new Deadline(); deadline.setName("Policy round"); deadline.setStartTime(Instant.now().minusSeconds(60));
-        deadline.setEndTime(Instant.now().plusSeconds(3600)); deadline.getSchoolClasses().add(schoolClass);
+        deadline.setEndTime(Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); deadline.getSchoolClasses().add(schoolClass);
         deadline = deadlines.saveAndFlush(deadline);
         se = majors.findAll().stream().filter(m -> "SE".equalsIgnoreCase(m.getCode())).findFirst().orElseGet(() -> {
             Major m = new Major(); m.setCode("SE"); m.setName("Software"); return majors.saveAndFlush(m);
@@ -92,13 +103,13 @@ class GroupSessionPolicyTest {
         return service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
     }
 
-    void expire() { deadline.setEndTime(Instant.now().minusSeconds(1)); deadline = deadlines.saveAndFlush(deadline); }
+    void expire() { deadline.setEndTime(Instant.now().minusSeconds(1).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); deadline = deadlines.saveAndFlush(deadline); }
     void rule(GroupingRuleCode code, int value) {
         Rule rule = new Rule(); rule.setSchoolClassId(schoolClass.getId()); rule.setCode(code.name()); rule.setValue(value); rule.setStatus(true); rules.saveAndFlush(rule);
     }
     UpdateDeadlineDTO extension() {
         UpdateDeadlineDTO dto = new UpdateDeadlineDTO(); dto.setId(deadline.getId()); dto.setName(deadline.getName());
-        dto.setEndTime(Instant.now().plusSeconds(7200)); return dto;
+        dto.setEndTime(Instant.now().plusSeconds(7200).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); return dto;
     }
 
     @Test void repeatedReopeningPreservesGroupsMembersAndApprovalHistory() {
@@ -116,7 +127,7 @@ class GroupSessionPolicyTest {
         assertThatThrownBy(() -> service.lecturerRemoveMember(deadline.getId(), schoolClass.getId(), group.getId(), group.getMembers().getFirst().getStudentId())).isInstanceOf(RuntimeException.class);
     }
 
-    @Test void sharedScopeMustBeConfirmedExactlyAndCancellationCannotBeReopened() {
+    @Test void sharedScopeMustBeConfirmedExactlyAndClosedDeadlineCanBeReopened() {
         SchoolClass second = schoolClass(); deadline.getSchoolClasses().add(second); deadline = deadlines.saveAndFlush(deadline);
         UpdateDeadlineDTO dto = extension();
         assertThatThrownBy(() -> deadlineService.updateDeadline(dto)).hasMessageContaining("Confirm");
@@ -124,8 +135,9 @@ class GroupSessionPolicyTest {
         assertThatThrownBy(() -> deadlineService.updateDeadline(dto)).hasMessageContaining("Confirm");
         dto.setConfirmedClassIds(List.of(schoolClass.getId(), second.getId()));
         assertThat(deadlineService.updateDeadline(dto).getSchoolClassIds()).containsExactlyInAnyOrder(schoolClass.getId(), second.getId());
-        deadlineService.cancelOrDeleteDeadline(deadline.getId());
-        assertThatThrownBy(() -> deadlineService.updateDeadline(dto)).isInstanceOf(RuntimeException.class);
+        CloseDeadlineDTO close = new CloseDeadlineDTO(); close.setConfirmedClassIds(dto.getConfirmedClassIds());
+        deadlineService.closeDeadline(deadline.getId(), close);
+        assertThat(deadlineService.updateDeadline(dto).getStatus()).isEqualTo(DeadlineStatus.ACTIVE);
     }
 
     @Test void pendingAndApprovedStructuresAreLockedButPendingReviewWorksAfterExpiry() {
@@ -134,7 +146,7 @@ class GroupSessionPolicyTest {
         service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
         assertThatThrownBy(() -> service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
         service.revokeGroup(deadline.getId(), schoolClass.getId(), group.getId());
-        assertThatThrownBy(() -> service.lecturerRemoveMember(deadline.getId(), schoolClass.getId(), group.getId(), group.getMembers().getLast().getStudentId())).isInstanceOf(RuntimeException.class);
+        assertThat(service.lecturerRemoveMember(deadline.getId(), schoolClass.getId(), group.getId(), group.getMembers().getLast().getStudentId()).getMemberCount()).isEqualTo(3);
     }
 
     @Test void unlockRequiresAssignedTeacherOrAdminAndReturnsToReviewFlow() {
@@ -150,12 +162,12 @@ class GroupSessionPolicyTest {
         assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
     }
 
-    @Test void rejectAfterUnlockDoesNotBypassActiveOnlyRevisionRule() {
+    @Test void rejectAfterUnlockKeepsRevokedHistoryAndAllowsStaffRevisionAfterExpiry() {
         GroupDTO group = draft(4); service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()); service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
         service.revokeGroup(deadline.getId(), schoolClass.getId(), group.getId()); service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()); expire();
         RejectGroupRequest reject = new RejectGroupRequest(); reject.setReason("Needs revision");
         assertThat(service.rejectGroup(deadline.getId(), schoolClass.getId(), group.getId(), reject).getStatus()).isEqualTo(GroupStatus.REVOKED);
-        assertThatThrownBy(() -> service.lecturerSetLeader(deadline.getId(), schoolClass.getId(), group.getId(), group.getLeaderId())).isInstanceOf(RuntimeException.class);
+        assertThat(service.lecturerSetLeader(deadline.getId(), schoolClass.getId(), group.getId(), group.getLeaderId()).getStatus()).isEqualTo(GroupStatus.REVOKED);
     }
 
     @Test void intermediateDraftsCanBeCreatedAfterExpiryButMustPassCompositionBeforeReview() {
@@ -203,7 +215,7 @@ class GroupSessionPolicyTest {
             login(teacher, "ROLE_ADMIN"); start.await();
             try {
                 CreateDeadlineDTO request = new CreateDeadlineDTO(); request.setName("One session"); request.setSchoolClassIds(List.of(fresh.getId()));
-                request.setStartTime(Instant.now()); request.setEndTime(Instant.now().plusSeconds(3600));
+                request.setStartTime(Instant.now()); request.setEndTime(Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MICROS));
                 deadlineService.createDeadline(request); return true;
             } catch (RuntimeException conflict) { return false; }
             finally { SecurityContextHolder.clearContext(); }
@@ -352,7 +364,7 @@ class GroupSessionPolicyTest {
     @Test void historicalDuplicateSessionsAreReportedWithoutChoosingOrDeletingOne() {
         GroupDTO group = draft(1);
         Deadline duplicate = new Deadline(); duplicate.setName("Legacy duplicate"); duplicate.setStartTime(Instant.now().minusSeconds(60));
-        duplicate.setEndTime(Instant.now().plusSeconds(3600)); duplicate.getSchoolClasses().add(schoolClass); deadlines.saveAndFlush(duplicate);
+        duplicate.setEndTime(Instant.now().plusSeconds(3600).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); duplicate.getSchoolClasses().add(schoolClass); deadlines.saveAndFlush(duplicate);
         assertThatThrownBy(() -> service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), group.getId()))
             .isInstanceOf(com.fmaking.web.rest.errors.ConflictAlertException.class).hasMessageContaining("historical");
         assertThat(deadlines.findAllBySchoolClassId(schoolClass.getId())).hasSize(2);
@@ -378,5 +390,99 @@ class GroupSessionPolicyTest {
         Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP"); seRule.setValue(1); seRule.setStatus(false); rules.saveAndFlush(seRule);
         service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
         assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+    }
+
+    @Test void selectedClassReopensWithoutChangingOtherClassOrApprovedGroups() {
+        SchoolClass second = schoolClass();
+        deadline.getSchoolClasses().add(second); deadline = deadlines.saveAndFlush(deadline);
+        GroupDTO approved = draft(4);
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), approved.getId());
+        service.acceptGroup(deadline.getId(), schoolClass.getId(), approved.getId());
+        GroupDTO open = draft(4);
+        User secondStudent = student(second, se);
+        expire();
+        Instant oldEnd = deadline.getEndTime();
+        UpdateDeadlineDTO request = extension(); request.setScope("SELECTED");
+        request.setTargetClassIds(List.of(schoolClass.getId())); request.setExpectedVersion(deadline.getVersion());
+        DeadlineDTO result = deadlineService.updateDeadline(request);
+        assertThat(result.isMixedClassWindows()).isTrue();
+        assertThat(result.getClassWindows()).anySatisfy(w -> {
+            assertThat(w.schoolClassId()).isEqualTo(schoolClass.getId());
+            assertThat(w.status()).isEqualTo(DeadlineStatus.ACTIVE);
+            assertThat(w.endTime()).isEqualTo(request.getEndTime());
+        }).anySatisfy(w -> {
+            assertThat(w.schoolClassId()).isEqualTo(second.getId());
+            assertThat(w.status()).isEqualTo(DeadlineStatus.EXPIRED);
+            assertThat(w.endTime()).isEqualTo(oldEnd);
+        });
+        assertThat(groups.findById(approved.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+        assertThat(groups.findById(open.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.OPEN);
+        login(users.findById(open.getLeaderId()).orElseThrow(), "ROLE_STUDENT");
+        assertThat(deadlineService.validateDeadlineForStudent(deadline.getId(), schoolClass.getId()).isValid()).isTrue();
+        service.transferLeader(deadline.getId(), schoolClass.getId(), open.getId(), transfer(open.getMembers().getLast().getStudentId()));
+        login(users.findById(approved.getLeaderId()).orElseThrow(), "ROLE_STUDENT");
+        assertThatThrownBy(() -> service.transferLeader(deadline.getId(), schoolClass.getId(), approved.getId(), transfer(approved.getMembers().getLast().getStudentId())))
+            .isInstanceOf(RuntimeException.class);
+        login(secondStudent, "ROLE_STUDENT");
+        assertThat(deadlineService.validateDeadlineForStudent(deadline.getId(), second.getId()).isValid()).isFalse();
+        assertThat(deadlineService.getMyActivities().getFirst().getEndTime()).isEqualTo(oldEnd);
+        CreateGroupRequest create = new CreateGroupRequest(); create.setName("Not reopened");
+        assertThatThrownBy(() -> service.createGroup(deadline.getId(), second.getId(), create)).isInstanceOf(RuntimeException.class);
+    }
+
+    private TransferLeaderRequest transfer(Long id) {
+        TransferLeaderRequest request = new TransferLeaderRequest(); request.setNewLeaderId(id); return request;
+    }
+
+    @Test void assignedTeacherCanExtendOwnClassInSharedDeadlineButAllScopeIsAtomicAndAuthorized() {
+        SchoolClass other = schoolClass(); User outsider = user(); other.setLecturerId(outsider.getId()); classes.saveAndFlush(other);
+        deadline.getSchoolClasses().add(other); deadline = deadlines.saveAndFlush(deadline);
+        Instant originalEnd = deadline.getEndTime();
+        login(teacher, "ROLE_LECTURE");
+        UpdateDeadlineDTO request = extension(); request.setScope("SELECTED"); request.setTargetClassIds(List.of(schoolClass.getId()));
+        DeadlineDTO result = deadlineService.updateDeadline(request);
+        assertThat(result.isCanEdit()).isTrue(); assertThat(result.isCanClose()).isFalse();
+        assertThat(result.getClassWindows()).filteredOn(w -> w.schoolClassId().equals(other.getId())).first()
+            .satisfies(w -> assertThat(w.endTime()).isEqualTo(originalEnd));
+        request.setScope("ALL"); request.setEndTime(request.getEndTime().plusSeconds(3600));
+        request.setConfirmedClassIds(List.of(schoolClass.getId(), other.getId()));
+        long version = result.getVersion();
+        assertThatThrownBy(() -> deadlineService.updateDeadline(request)).isInstanceOf(RuntimeException.class);
+        assertThat(deadlineService.getDeadlineById(deadline.getId()).getVersion()).isEqualTo(version);
+        request.setScope("SELECTED"); request.setTargetClassIds(List.of(other.getId()));
+        assertThatThrownBy(() -> deadlineService.updateDeadline(request)).isInstanceOf(RuntimeException.class);
+    }
+
+    @Test void allScopeSupersedesOverridesCloseIsIdempotentAndStaleVersionCannotReopen() {
+        SchoolClass second = schoolClass(); deadline.getSchoolClasses().add(second); deadline = deadlines.saveAndFlush(deadline);
+        UpdateDeadlineDTO request = extension(); request.setScope("SELECTED"); request.setTargetClassIds(List.of(schoolClass.getId()));
+        DeadlineDTO first = deadlineService.updateDeadline(request);
+        request.setScope("ALL"); request.setConfirmedClassIds(List.of(schoolClass.getId(), second.getId()));
+        request.setEndTime(request.getEndTime().plusSeconds(3600)); request.setExpectedVersion(first.getVersion());
+        DeadlineDTO all = deadlineService.updateDeadline(request);
+        assertThat(all.isMixedClassWindows()).isFalse();
+        assertThat(all.getClassWindows()).allSatisfy(w -> assertThat(w.endTime()).isEqualTo(request.getEndTime()));
+        CloseDeadlineDTO close = new CloseDeadlineDTO(); close.setExpectedVersion(all.getVersion()); close.setConfirmedClassIds(request.getConfirmedClassIds());
+        DeadlineDTO closed = deadlineService.closeDeadline(deadline.getId(), close);
+        assertThat(closed.getClassWindows()).allSatisfy(w -> assertThat(w.status()).isEqualTo(DeadlineStatus.EXPIRED));
+        close.setExpectedVersion(closed.getVersion());
+        assertThat(deadlineService.closeDeadline(deadline.getId(), close).getVersion()).isEqualTo(closed.getVersion());
+        request.setExpectedVersion(all.getVersion());
+        assertThatThrownBy(() -> deadlineService.updateDeadline(request)).hasMessageContaining("refresh");
+    }
+
+    @Test void legacyCancellationReopensOnlySelectedClassAndKeepsCancellationAudit() {
+        SchoolClass second = schoolClass(); deadline.getSchoolClasses().add(second);
+        deadline.setStatus("CANCELLED"); Instant audit = Instant.now().minusSeconds(30).truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+        deadline.setCancelledAt(audit); deadline.setCancelledBy("legacy@example.test"); deadline = deadlines.saveAndFlush(deadline);
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isTrue();
+        UpdateDeadlineDTO request = extension(); request.setScope("SELECTED"); request.setTargetClassIds(List.of(schoolClass.getId()));
+        DeadlineDTO result = deadlineService.updateDeadline(request);
+        assertThat(result.getCancelledAt()).isEqualTo(audit);
+        assertThat(result.getCancelledBy()).isEqualTo("legacy@example.test");
+        assertThat(result.getClassWindows()).filteredOn(w -> w.schoolClassId().equals(second.getId())).first()
+            .satisfies(w -> assertThat(w.status()).isEqualTo(DeadlineStatus.EXPIRED));
+        assertThat(result.getClassWindows()).filteredOn(w -> w.schoolClassId().equals(schoolClass.getId())).first()
+            .satisfies(w -> assertThat(w.status()).isEqualTo(DeadlineStatus.ACTIVE));
     }
 }

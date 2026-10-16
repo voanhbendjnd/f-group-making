@@ -1,5 +1,14 @@
 export type DeadlineStatus = 'UPCOMING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 
+export interface DeadlineClassWindow {
+  schoolClassId: number;
+  schoolClassName: string;
+  startTime: string;
+  endTime: string;
+  status: DeadlineStatus;
+  canEdit: boolean;
+}
+
 export interface Deadline {
   id: number;
   name: string;
@@ -12,6 +21,9 @@ export interface Deadline {
   cancelledBy?: string;
   canEdit?: boolean;
   canCancel?: boolean;
+  canClose?: boolean;
+  mixedClassWindows?: boolean;
+  classWindows?: DeadlineClassWindow[];
   schoolClassIds: number[];
   schoolClassNames: string[];
   createdDate?: string;
@@ -36,6 +48,9 @@ export interface UpdateDeadlineRequest {
   endTime: string;
   schoolClassIds?: number[];
   confirmedClassIds?: number[];
+  scope?: 'ALL' | 'SELECTED';
+  targetClassIds?: number[];
+  expectedVersion?: number;
 }
 
 export interface DeadlineValidateResult {

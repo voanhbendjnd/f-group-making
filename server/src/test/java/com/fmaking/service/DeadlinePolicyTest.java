@@ -22,12 +22,12 @@ class DeadlinePolicyTest {
         assertThat(at(end).status(d)).isEqualTo(DeadlineStatus.EXPIRED);
         assertThatThrownBy(() -> at(end).requireStudentWrite(d)).isInstanceOf(ConflictAlertException.class);
     }
-    @Test void cancellationOverridesEveryTimeWindow() {
+    @Test void legacyCancelledIsClosedUntilExplicitReopen() {
         Deadline d = deadline(); d.setStatus("CANCELLED");
         for (Instant time : new Instant[] {start.minusSeconds(1), start, end, end.plusSeconds(1)}) {
-            assertThat(at(time).status(d)).isEqualTo(DeadlineStatus.CANCELLED);
+            assertThat(at(time).status(d)).isEqualTo(DeadlineStatus.EXPIRED);
             assertThatThrownBy(() -> at(time).requireStudentWrite(d)).isInstanceOf(ConflictAlertException.class);
-            assertThatThrownBy(() -> at(time).requireNotCancelled(d)).isInstanceOf(ConflictAlertException.class);
+            assertThatCode(() -> at(time).requireNotCancelled(d)).doesNotThrowAnyException();
         }
     }
     @Test void managementCanReviewExpiredButStudentsCannotWriteBeforeStart() {

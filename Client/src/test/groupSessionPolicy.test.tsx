@@ -30,6 +30,7 @@ describe('group session policy UI', () => {
     const closed = vi.fn(); vi.mocked(deadlineApi.updateDeadline).mockResolvedValue({ ...deadline, status: 'ACTIVE' });
     render(<ExtendDeadlineModal open deadline={deadline} onClose={closed} onSuccess={vi.fn()} />);
     expect(screen.getByText('CLASS_A')).toBeInTheDocument(); expect(screen.getByText('CLASS_B')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: i18n.t('deadlineScope.all') }));
     const submit = screen.getByRole('button', { name: i18n.t('deadlineLifecycle.reopen') });
     expect(submit).toBeDisabled();
     fireEvent.change(screen.getByLabelText(i18n.t('deadline.modal.endTimeExtend'), { exact: false }), { target: { value: '2099-01-02T10:00' } });
@@ -43,7 +44,8 @@ describe('group session policy UI', () => {
     const closed = vi.fn(); vi.mocked(deadlineApi.updateDeadline).mockRejectedValue({ message: 'Conflict' });
     render(<ExtendDeadlineModal open deadline={deadline} onClose={closed} onSuccess={vi.fn()} />);
     fireEvent.change(screen.getByLabelText(i18n.t('deadline.modal.endTimeExtend'), { exact: false }), { target: { value: '2099-01-02T10:00' } });
-    fireEvent.click(screen.getByRole('checkbox')); fireEvent.click(screen.getByRole('button', { name: i18n.t('deadlineLifecycle.reopen') }));
+    fireEvent.click(screen.getByRole('radio', { name: i18n.t('deadlineScope.all') }));
+    fireEvent.click(screen.getByRole('checkbox', { name: i18n.t('deadlineLifecycle.confirmScope') })); fireEvent.click(screen.getByRole('button', { name: i18n.t('deadlineLifecycle.reopen') }));
     await waitFor(() => expect(deadlineApi.updateDeadline).toHaveBeenCalledOnce());
     expect(closed).not.toHaveBeenCalled(); expect(screen.getByDisplayValue('2099-01-02T10:00')).toBeInTheDocument();
     await act(async () => { await i18n.changeLanguage('vi'); });
@@ -51,9 +53,9 @@ describe('group session policy UI', () => {
     expect(screen.getByRole('checkbox', { name: i18n.t('deadlineLifecycle.confirmScope') })).toBeChecked();
   });
 
-  it('never shows reopen for cancelled sessions', () => {
+  it('allows reopening legacy cancelled sessions', () => {
     render(<QueryClientProvider client={new QueryClient()}><MemoryRouter><DeadlineTable deadlines={[{ ...deadline, status: 'CANCELLED' }]} onEdit={vi.fn()} /></MemoryRouter></QueryClientProvider>);
-    expect(screen.queryByRole('button', { name: i18n.t('deadlineLifecycle.reopen') })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('deadlineLifecycle.reopen') })).toBeInTheDocument();
   });
 
   it.each(['OPEN', 'PENDING', 'ACCEPTED', 'REVOKED'] as const)('limits Student actions for %s and after expiry', state => {

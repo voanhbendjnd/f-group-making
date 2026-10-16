@@ -113,7 +113,8 @@ class GroupReviewResourceTest {
         mvc.perform(post(action("/accept")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isConflict());
         mvc.perform(post(action("/revoke")).with(user(teacher.getEmail()).roles("LECTURE_MASTER")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("REVOKED"));
-        mvc.perform(post(action("/submit-review")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isConflict());
+        mvc.perform(post(action("/submit-review")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
     }
 
     @Test void rejectionRequiresReasonAndReturnsDraftWithoutDisbanding() throws Exception {

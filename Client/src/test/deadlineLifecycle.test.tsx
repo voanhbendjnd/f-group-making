@@ -1,3 +1,4 @@
+import i18n from '@/locales/i18n';
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -23,25 +24,26 @@ function wrapper(client = new QueryClient({ defaultOptions: { queries: { retry: 
 
 describe('deadline lifecycle contract', () => {
   it('cancellation overrides clocks and endTime is exclusive', () => {
-    expect(effectiveDeadlineStatus('CANCELLED', startTime, endTime, Date.parse(startTime) - 1)).toBe('CANCELLED');
-    expect(effectiveDeadlineStatus('CANCELLED', startTime, endTime, Date.parse(endTime) + 1)).toBe('CANCELLED');
+    expect(effectiveDeadlineStatus('CANCELLED', startTime, endTime, Date.parse(startTime) - 1)).toBe('EXPIRED');
+    expect(effectiveDeadlineStatus('CANCELLED', startTime, endTime, Date.parse(endTime) + 1)).toBe('EXPIRED');
     expect(effectiveDeadlineStatus('ACTIVE', startTime, endTime, Date.parse(startTime))).toBe('ACTIVE');
     expect(effectiveDeadlineStatus('ACTIVE', startTime, endTime, Date.parse(endTime))).toBe('EXPIRED');
   });
 
   it('management keeps the cancelled round visible without edit or cancel controls', () => {
     render(<DeadlineTable deadlines={[deadline]} onEdit={vi.fn()} onCancel={vi.fn()} />, { wrapper: wrapper() });
-    expect(screen.getByText('Đã hủy')).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('deadline.status.expired'))).toBeInTheDocument();
     expect(screen.getByText('Round one')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Xem nhóm' })).toBeInTheDocument();
-    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('deadlineDetail.openNamed', { name: deadline.name }) })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: i18n.t('deadlineLifecycle.reopen') })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: i18n.t('deadline.table.cancelTitle') })).not.toBeInTheDocument();
   });
 
   it('student dashboard preserves the group link without a countdown or invitation to join', async () => {
     vi.mocked(deadlineApi.getMyActivities).mockResolvedValue([{ deadlineId: 1, deadlineName: 'Round one',
       startTime, endTime, status: 'CANCELLED', schoolClassId: 1, schoolClassName: 'EXE101', hasGroup: true, groupName: 'Existing team' }]);
     render(<StudentGroupWidget />, { wrapper: wrapper() });
-    expect(await screen.findByText('Đợt chọn nhóm đã bị hủy')).toBeInTheDocument();
+    expect(await screen.findByText('Deadline chọn nhóm đã kết thúc')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Xem nhóm' })).toBeInTheDocument();
     expect(screen.queryByText('Tham Gia Chọn Nhóm Ngay')).not.toBeInTheDocument();
     expect(screen.queryByText('Thời gian còn lại')).not.toBeInTheDocument();
@@ -52,7 +54,7 @@ describe('deadline lifecycle contract', () => {
     const key = ['group-workspace', 1, 1];
     client.setQueryData(key, { deadlineId: 1, deadlineStatus: 'ACTIVE', canJoinGroup: true });
     client.setQueryData(['admin-deadlines', 1], { result: [deadline, { ...deadline, id: 2, status: 'ACTIVE' }] });
-    client.setQueryData(['student-deadline-activities'], [{ deadlineId: 1, status: 'ACTIVE', hasGroup: true }]);
+    client.setQueryData(['student-deadline-activities'], [{ deadlineId: 1, schoolClassId: 1, status: 'ACTIVE', hasGroup: true }]);
     let signal: AbortSignal | undefined;
     let finish!: (value: unknown) => void;
     const pending = client.fetchQuery({ queryKey: key, queryFn: context => {
@@ -63,8 +65,8 @@ describe('deadline lifecycle contract', () => {
     expect(signal?.aborted).toBe(true);
     finish({ deadlineId: 1, deadlineStatus: 'ACTIVE', canJoinGroup: true });
     await pending;
-    expect(client.getQueryData(key)).toMatchObject({ deadlineStatus: 'CANCELLED', canJoinGroup: false });
-    expect(client.getQueryData(['student-deadline-activities'])).toEqual([expect.objectContaining({ status: 'CANCELLED', hasGroup: true })]);
+    expect(client.getQueryData(key)).toMatchObject({ deadlineStatus: 'EXPIRED', canJoinGroup: false });
+    expect(client.getQueryData(['student-deadline-activities'])).toEqual([expect.objectContaining({ status: 'EXPIRED', hasGroup: true })]);
     expect((client.getQueryData(['admin-deadlines', 1]) as any).result[1].status).toBe('ACTIVE');
     client.clear();
   });

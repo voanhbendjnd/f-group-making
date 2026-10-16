@@ -102,28 +102,44 @@ class DeadlineLifecycleIntegrationTest {
     }
     @AfterEach void clearSecurity() { SecurityContextHolder.clearContext(); }
 
+    @Test void selectiveExtensionPublishesCommittedClassTimesOnlyToAffectedClass() {
+        SchoolClass other = new SchoolClass(); other.setName("Unchanged class"); other = classes.saveAndFlush(other);
+        deadline.getSchoolClasses().add(other); deadline = deadlines.saveAndFlush(deadline);
+        Integer otherId = other.getId();
+        Instant previous = deadline.getEndTime();
+        UpdateDeadlineDTO request = new UpdateDeadlineDTO(); request.setId(deadline.getId()); request.setName(deadline.getName());
+        request.setScope("SELECTED"); request.setTargetClassIds(List.of(schoolClass.getId()));
+        request.setEndTime(previous.plusSeconds(3600));
+        service.updateDeadline(request);
+        verify(messaging).convertAndSend(eq("/topic/admin/deadlines"), argThat((Object value) ->
+            value instanceof DeadlineRealtimeEvent event && event.eventType().equals("DEADLINE_EXTENDED")
+                && event.affectedClassIds().equals(List.of(schoolClass.getId())) && event.classWindows().size() == 2
+                && event.classWindows().stream().anyMatch(w -> w.schoolClassId().equals(otherId) && w.status() == DeadlineStatus.ACTIVE)));
+        verify(messaging, never()).convertAndSend(eq("/topic/classes/" + otherId + "/deadlines"), isA(DeadlineRealtimeEvent.class));
+    }
+
     @Test void cancellationIsConsistentAcrossAllReadsAndPreservesMembership() throws Exception {
         login(studentUser.getEmail(), "ROLE_STUDENT");
         CreateGroupRequest request = new CreateGroupRequest(); request.setName("Existing team");
         var group = groupService.createGroup(deadline.getId(), schoolClass.getId(), request);
         long historyBefore = history.count();
         admin(); service.cancelOrDeleteDeadline(deadline.getId());
-        assertThat(service.getDeadlineById(deadline.getId()).getStatus()).isEqualTo(DeadlineStatus.CANCELLED);
+        assertThat(service.getDeadlineById(deadline.getId()).getStatus()).isEqualTo(DeadlineStatus.EXPIRED);
         assertThat(service.getDeadlines(org.springframework.data.domain.PageRequest.of(0, 20), schoolClass.getTermId()).getContent())
-            .extracting(DeadlineDTO::getStatus).containsOnly(DeadlineStatus.CANCELLED);
+            .extracting(DeadlineDTO::getStatus).containsOnly(DeadlineStatus.EXPIRED);
         login(studentUser.getEmail(), "ROLE_STUDENT");
         var validation = service.validateDeadlineForStudent(deadline.getId(), schoolClass.getId());
         assertThat(validation.isValid()).isFalse();
-        assertThat(validation.getStatus()).isEqualTo(DeadlineStatus.CANCELLED);
-        assertThat(service.getMyActivities().getFirst().getStatus()).isEqualTo(DeadlineStatus.CANCELLED);
+        assertThat(validation.getStatus()).isEqualTo(DeadlineStatus.EXPIRED);
+        assertThat(service.getMyActivities().getFirst().getStatus()).isEqualTo(DeadlineStatus.EXPIRED);
         var workspace = groupService.getWorkspace(deadline.getId(), schoolClass.getId());
-        assertThat(workspace.getDeadlineStatus()).isEqualTo("CANCELLED");
+        assertThat(workspace.getDeadlineStatus()).isEqualTo("EXPIRED");
         assertThat(workspace.isCanJoinGroup()).isFalse();
         assertThat(workspace.getMyGroup().getId()).isEqualTo(group.getId());
         assertThat(members.findByStudentIdAndDeadlineId(studentUser.getId(), deadline.getId())).isPresent();
         assertThat(history.count()).isEqualTo(historyBefore);
         mvc.perform(get("/api/deadlines/my-activities")).andExpect(status().isOk())
-            .andExpect(jsonPath("$.data[0].status").value("CANCELLED"));
+            .andExpect(jsonPath("$.data[0].status").value("EXPIRED"));
     }
 
     @Test void repeatedCancellationDoesNotChangeAuditOrBroadcastTwice() {
@@ -133,7 +149,7 @@ class DeadlineLifecycleIntegrationTest {
         service.cancelOrDeleteDeadline(deadline.getId());
         Deadline repeated = deadlines.findById(deadline.getId()).orElseThrow();
         assertThat(repeated.getCancelledAt()).isEqualTo(cancelledAt);
-        assertThat(repeated.getCancelledBy()).isEqualTo("deadline-admin@example.test");
+        assertThat(repeated.getLastModifiedBy()).isEqualTo("deadline-admin@example.test");
         assertThat(repeated.getVersion()).isEqualTo(version);
         verify(messaging, times(1)).convertAndSend(eq("/topic/admin/deadlines"), isA(DeadlineRealtimeEvent.class));
         verify(messaging, times(1)).convertAndSend(eq("/topic/classes/" + schoolClass.getId() + "/deadlines"), isA(DeadlineRealtimeEvent.class));
@@ -147,22 +163,22 @@ class DeadlineLifecycleIntegrationTest {
         verify(messaging, never()).convertAndSend(anyString(), isA(DeadlineRealtimeEvent.class));
     }
 
-    @Test void cancelledDeadlineRejectsEveryStudentWriteAndStaffWrite() throws Exception {
+    @Test void closedDeadlineRejectsEveryStudentWriteButPermitsStaffAndReopening() throws Exception {
         service.cancelOrDeleteDeadline(deadline.getId());
         login(studentUser.getEmail(), "ROLE_STUDENT");
         String base = "/api/deadlines/" + deadline.getId() + "/classes/" + schoolClass.getId() + "/groups";
         mvc.perform(post(base).with(user(studentUser.getEmail()).roles("STUDENT")).contentType("application/json").content("{\"name\":\"Blocked team\"}"))
-            .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("error.ERR_DEADLINE_CANCELLED"));
+            .andExpect(status().isConflict()).andExpect(jsonPath("$.message").value("error.ERR_DEADLINE_EXPIRED"));
         for (String action : List.of("join", "leave", "submit", "cancel-submit", "transfer-leader")) {
             mvc.perform(post(base + "/123/" + action).with(user(studentUser.getEmail()).roles("STUDENT")).contentType("application/json").content("{\"newLeaderId\":123}"))
                 .andExpect(status().isConflict());
         }
         mvc.perform(delete(base + "/123").with(user(studentUser.getEmail()).roles("STUDENT"))).andExpect(status().isConflict());
         admin();
-        mvc.perform(post(base + "/123/accept").with(user("deadline-admin@example.test").roles("ADMIN"))).andExpect(status().isConflict());
+        mvc.perform(post(base + "/123/accept").with(user("deadline-admin@example.test").roles("ADMIN"))).andExpect(status().isNotFound());
         admin();
         UpdateDeadlineDTO update = new UpdateDeadlineDTO(); update.setId(deadline.getId()); update.setName("Cannot reopen"); update.setEndTime(deadline.getEndTime().plusSeconds(3600));
-        assertThatThrownBy(() -> service.updateDeadline(update)).isInstanceOf(ConflictAlertException.class);
+        assertThat(service.updateDeadline(update).getStatus()).isEqualTo(DeadlineStatus.ACTIVE);
     }
 
     @Test void upcomingIsReadableButCannotBeJoined() {
@@ -198,11 +214,11 @@ class DeadlineLifecycleIntegrationTest {
                 && event.status() == DeadlineStatus.ACTIVE));
     }
 
-    @Test void managerCanReviewExpiredRoundButNotCancelledRound() {
+    @Test void managerCanManageExpiredAndClosedRounds() {
         deadline.setEndTime(Instant.now().minusSeconds(1)); deadlines.saveAndFlush(deadline);
         assertThat(groupService.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isTrue();
         service.cancelOrDeleteDeadline(deadline.getId());
-        assertThat(groupService.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isFalse();
+        assertThat(groupService.getWorkspace(deadline.getId(), schoolClass.getId()).isCanManageGroups()).isTrue();
     }
 
     @Test void sharedDeadlineCannotBeCancelledByOneLecturer() throws Exception {
@@ -235,7 +251,7 @@ class DeadlineLifecycleIntegrationTest {
             Future<?> cancel = executor.submit(() -> { admin(); try { service.cancelOrDeleteDeadline(deadline.getId()); } finally { SecurityContextHolder.clearContext(); } });
             assertThatThrownBy(() -> cancel.get(300, TimeUnit.MILLISECONDS)).isInstanceOf(TimeoutException.class);
             release.countDown(); join.get(15, TimeUnit.SECONDS); cancel.get(15, TimeUnit.SECONDS);
-            assertThat(deadlines.findById(deadline.getId()).orElseThrow().getStatus()).isEqualTo("CANCELLED");
+            assertThat(service.getDeadlineById(deadline.getId()).getStatus()).isEqualTo(DeadlineStatus.EXPIRED);
             assertThat(members.findByStudentIdAndDeadlineId(studentUser.getId(), deadline.getId())).isPresent();
             login(studentUser.getEmail(), "ROLE_STUDENT");
             assertThatThrownBy(() -> groupService.joinGroup(deadline.getId(), schoolClass.getId(), 123L)).isInstanceOf(ConflictAlertException.class);
@@ -270,8 +286,8 @@ class DeadlineLifecycleIntegrationTest {
             waitForSubscription(lecturerDestination);
             service.cancelOrDeleteDeadline(deadline.getId());
             for (var received : List.of(adminEvent, studentEvent, lecturerEvent)) {
-                assertThat(received.get(2, TimeUnit.SECONDS)).containsEntry("eventType", "DEADLINE_CANCELLED")
-                    .containsEntry("status", "CANCELLED").containsEntry("deadlineId", deadline.getId());
+                assertThat(received.get(2, TimeUnit.SECONDS)).containsEntry("eventType", "DEADLINE_CLOSED")
+                    .containsEntry("status", "EXPIRED").containsEntry("deadlineId", deadline.getId());
             }
         } finally { sessions.forEach(s -> { if (s.isConnected()) s.disconnect(); }); client.stop(); }
     }

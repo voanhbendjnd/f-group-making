@@ -4,18 +4,21 @@ import { syncDeadlineQueries } from '../realtime';
 import type { DeadlineStatus } from '../types';
 
 export function effectiveDeadlineStatus(status: DeadlineStatus, startTime: string, endTime: string, now = Date.now()): DeadlineStatus {
-  if (status === 'CANCELLED') return status;
+  // A server-confirmed closure must not be reopened by an old future endTime or a slow client clock.
+  if (status === 'CANCELLED' || status === 'EXPIRED') return 'EXPIRED';
   if (now < Date.parse(startTime)) return 'UPCOMING';
   return now >= Date.parse(endTime) ? 'EXPIRED' : 'ACTIVE';
 }
 
-export function useDeadlineBoundary(items: { status: DeadlineStatus; startTime: string; endTime: string }[]) {
+export function useDeadlineBoundary(items: { status: DeadlineStatus; startTime: string; endTime: string;
+  classWindows?: { status: DeadlineStatus; startTime: string; endTime: string }[] }[]) {
   const client = useQueryClient();
   const [now, setNow] = useState(Date.now);
-  const signature = items.map(item => `${item.status}:${item.startTime}:${item.endTime}`).join('|');
+  const windows = items.flatMap(item => item.classWindows?.length ? item.classWindows : [item]);
+  const signature = windows.map(item => `${item.status}:${item.startTime}:${item.endTime}`).join('|');
   useEffect(() => {
     const time = Date.now();
-    const next = items.filter(item => item.status !== 'CANCELLED')
+    const next = windows.filter(item => item.status !== 'CANCELLED')
       .flatMap(item => [Date.parse(item.startTime), Date.parse(item.endTime)]).filter(t => t > time);
     if (!next.length) return;
     const timer = window.setTimeout(() => {

@@ -22,6 +22,9 @@ public class DeadlineDTO {
     private String cancelledBy;
     private boolean canEdit;
     private boolean canCancel;
+    private boolean canClose;
+    private boolean mixedClassWindows;
+    private List<DeadlineClassDTO> classWindows;
     private List<Integer> schoolClassIds;
     private List<String> schoolClassNames;
     private Instant createdDate;

@@ -13,6 +13,7 @@ import { ClassRulesDisclosure } from '@/features/rules/components/ClassRulesDisc
 import { getApiError } from '@/services/api/types';
 import { useAuth } from '@/app/providers/AuthContext';
 import { canManageClassRules } from '@/features/auth/utils/roleRouting';
+import { advancedGroupPath } from '@/features/group/navigation';
 
 export function LecturerClassDetailPage() {
   return <TermScope><LecturerClassDetailPageContent /></TermScope>;
@@ -35,9 +36,9 @@ function LecturerClassDetailPageContent() {
   const actionButtons = (
     <div style={{ display: 'flex', gap: '8px' }}>
       {back}
-      <Link to={`/lecturer/groups?classId=${classId}`} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+      <Link to={advancedGroupPath(classId, new URLSearchParams({ termId: String(selectedTermId) }))} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
         <Users size={18} aria-hidden="true" />
-        Xếp nhóm lớp này
+        {t('groupBoard.open')}
       </Link>
     </div>
   );

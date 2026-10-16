@@ -34,13 +34,27 @@ public class DeadlineEventPublisher {
     public void publish(String type, Deadline deadline, Collection<SchoolClass> previousClasses) {
         Set<SchoolClass> classes = new HashSet<>(deadline.getSchoolClasses());
         classes.addAll(previousClasses);
+        publishSnapshot(type, deadline, classes);
+    }
+
+    public void publishForClasses(String type, Deadline deadline, Collection<Integer> affectedIds) {
+        Set<SchoolClass> classes = new HashSet<>();
+        deadline.getSchoolClasses().stream().filter(c -> affectedIds.contains(c.getId())).forEach(classes::add);
+        publishSnapshot(type, deadline, classes);
+    }
+
+    private void publishSnapshot(String type, Deadline deadline, Set<SchoolClass> classes) {
         List<Integer> classIds = classes.stream().map(SchoolClass::getId).sorted().toList();
         List<Long> lecturerIds = classes.stream().map(SchoolClass::getLecturerId).filter(Objects::nonNull).distinct().toList();
         List<String> emails = users.findAllById(lecturerIds).stream().map(com.fmaking.domain.User::getEmail).toList();
         events.publishEvent(new DeadlineLifecycleEvent(new DeadlineRealtimeEvent(
             UUID.randomUUID().toString(), type, deadline.getId(), classIds,
             com.fmaking.domain.DeadlineStatus.resolve(deadline, clock.instant()),
-            deadline.getStartTime(), deadline.getEndTime(), clock.instant(), deadline.getVersion()), emails));
+            deadline.getStartTime(), deadline.getEndTime(), clock.instant(), deadline.getVersion(),
+            deadline.getSchoolClasses().stream().sorted(Comparator.comparing(SchoolClass::getId))
+                .map(c -> new com.fmaking.service.dto.DeadlineClassDTO(c.getId(), c.getName(), deadline.getStartTime(),
+                    deadline.endTimeFor(c.getId()), com.fmaking.domain.DeadlineStatus.resolve(deadline, c.getId(), clock.instant()), false))
+                .toList()), emails));
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)

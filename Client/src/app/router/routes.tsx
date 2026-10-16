@@ -163,6 +163,7 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <LecturerProfilePage /> },
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
       { path: 'group-review', element: <LecturerGroupReviewPage /> },
+      { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],
   },
