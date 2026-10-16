@@ -1229,6 +1229,12 @@
     }
   },
   "groupReview": {
+    "rulePassed": "Đạt",
+    "ruleFailed": "Chưa đạt",
+    "ruleChecks": "Đạt {{passed}} / {{total}} quy định",
+    "actual": "Hiện tại",
+    "target": "Yêu cầu",
+    "noRules": "Không có quy định đang được bật.",
     "title": "Duyệt nhóm",
     "description": "Duyệt nhóm thuộc các lớp được phân công trong học kỳ đang chọn.",
     "search": "Tìm tên nhóm hoặc trưởng nhóm",

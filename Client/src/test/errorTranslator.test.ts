@@ -1,7 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { translateErrorMessage } from '../services/api/errorTranslator';
+import i18n from '@/locales/i18n';
 
 describe('errorTranslator', () => {
+  it('retranslates cached normalized errors when switching language', async () => {
+    const cached = { status: 500, message: 'Server is temporarily unavailable. Please try again later.' };
+    await i18n.changeLanguage('vi');
+    expect(translateErrorMessage(cached)).toBe(i18n.t('errors.status500'));
+    await i18n.changeLanguage('en');
+    expect(translateErrorMessage(cached)).toBe(i18n.t('errors.status500'));
+    await i18n.changeLanguage('vi');
+  });
+
+  it('preserves normalized backend keys when translating again', () => {
+    expect(translateErrorMessage({ status: 409, errorKey: 'ERR_GROUP_STATE_CONFLICT' }))
+      .toBe(i18n.t('groupLifecycle.locked'));
+    expect(translateErrorMessage({ status: 404, raw: { message: 'error.http.404' } }))
+      .toBe(i18n.t('errors.status404'));
+  });
   it('translates invalidactivationkey to friendly message', () => {
     const error = {
       response: {

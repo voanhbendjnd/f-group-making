@@ -1229,6 +1229,12 @@
     }
   },
   "groupReview": {
+    "rulePassed": "Passed",
+    "ruleFailed": "Not met",
+    "ruleChecks": "{{passed}} of {{total}} rules met",
+    "actual": "Current",
+    "target": "Required",
+    "noRules": "No active business rules.",
     "title": "Group Review",
     "description": "Review groups in your assigned classes for the selected academic term.",
     "search": "Search group or leader",

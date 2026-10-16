@@ -11,7 +11,7 @@ export function translateErrorMessage(error: any): string {
 
   // If already an ApiError with translated or custom message
   const status = error.status || error.response?.status;
-  const data = error.response?.data || error.data;
+  const data = error.response?.data || error.raw || error.data || error;
 
   // Check error key / title from Zalando Problem or custom exception
   const errorKey = data?.errorKey || data?.message || data?.title || data?.error;

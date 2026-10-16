@@ -75,6 +75,11 @@ class GroupReviewResourceTest {
 
     String action(String suffix) { return "/api/deadlines/" + deadline.getId() + "/classes/" + own.getId() + "/groups/" + group.getId() + suffix; }
 
+    @Test void missingApiReturns404InsteadOfInternalServerError() throws Exception {
+        mvc.perform(get("/api/me/group-reviews-not-deployed").with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isNotFound());
+    }
+
     @Test void searchesLeaderAndGroupWithPaginationAndRealSubmittedTime() throws Exception {
         for (String search : new String[]{"alpha", "leader search"}) {
             mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("search", search)
