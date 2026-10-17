@@ -76,13 +76,15 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
     {data && <><Link to={back}>{data.schoolClassName}</Link><span aria-hidden="true">/</span></>}
     <span aria-current="page">{t('groupBoard.title')}</span>
   </nav>;
-  if (!classId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.chooseClass')}</p><Link className="btn btn-primary" to={back}>{t('groupReview.title')}</Link></div></div>;
+  if (!classId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.chooseClass')}</p><Link className="btn btn-primary" to={back}><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div>;
   if (session.isError || workspace.isError) return <div>{breadcrumb}<ErrorState
     message={session.error instanceof AmbiguousGroupSessionError ? t('groupBoard.multipleSessions') : translateErrorMessage(session.error ?? workspace.error)} onRetry={() => { if (deadlineId) void workspace.refetch(); else void session.refetch(); }} />
-    {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to="/lecturer/deadlines">{t('nav.lecturerDeadlines')}</Link>}
-    <Link to={back}>{t('groupBoard.back')}</Link></div>;
+    <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
+      {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to="/lecturer/deadlines">{t('nav.lecturerDeadlines')}</Link>}
+      <Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link>
+    </div></div>;
   if ((!requestedDeadline && session.isPending) || (deadlineId && workspace.isPending)) return <LoadingSpinner message={t('groupWorkspace.loading')} />;
-  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link></div></div>;
+  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
   const targets = data.groups.filter(editable);
   const groups = data.groups.filter(group => !groupSearch.trim() || group.name.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()) || group.members.some(student => matches(student, groupSearch)));
   const students = (data.unassignedStudents || [])
@@ -160,7 +162,16 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   return <div className={`group-board-page ${draggedId !== null ? 'is-board-dragging' : ''}`} aria-busy={pending} onDragEnd={clearDrag}>
     {breadcrumb}
     <header className="board-heading">
-      <div><h1>{t('groupBoard.title')} <span>{data.schoolClassName}</span></h1><p>{data.deadlineName} · {t('groupBoard.subtitle')}</p></div>
+      <div className="board-heading-main">
+        <Link to={back} className="board-header-back-btn" title={t('groupBoard.back')}>
+          <ArrowLeft size={18} aria-hidden="true" />
+          <span>{t('groupBoard.back')}</span>
+        </Link>
+        <div className="board-heading-titles">
+          <h1>{t('groupBoard.title')} <span>{data.schoolClassName}</span></h1>
+          <p>{data.deadlineName} · {t('groupBoard.subtitle')}</p>
+        </div>
+      </div>
       <div className="board-toolbar">
         <span className={`board-connection ${connection === 'connected' ? 'is-live' : ''}`} title={t('groupBoard.realtimeHint')}><i />{t(connection === 'connected' ? 'groupWorkspace.live' : 'groupWorkspace.offline')}</span>
         <Button variant="secondary" size="sm" disabled={pending || workspace.isFetching} aria-label={t('groupWorkspace.refreshData')} icon={<RefreshCw size={16} />} onClick={() => { void workspace.refetch(); }} />
@@ -169,7 +180,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       </div>
     </header>
     <div className="board-context-bar">
-      <Link to={back}><ArrowLeft size={15} />{t('groupBoard.back')}</Link>
+      <Link to={back} className="board-context-back-link"><ArrowLeft size={15} aria-hidden="true" /><span>{t('groupBoard.back')}</span></Link>
       <label className="board-search"><Search size={16} /><input aria-label={t('groupBoard.searchGroups')} placeholder={t('groupBoard.searchGroups')} value={groupSearch} onChange={event => setGroupSearch(event.target.value)} /></label>
       <span className="board-count">{t('groupBoard.groupCount', { count: data.groups.length })}</span>
       <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>

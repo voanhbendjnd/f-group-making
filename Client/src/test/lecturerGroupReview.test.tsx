@@ -127,4 +127,35 @@ describe('group review', () => {
     await syncDeadlineQueries(client, { eventType: 'DEADLINE_CLOSED', deadlineId: 3 });
     expect(client.getQueryData(['group-reviews', 1])).toEqual({ result: [expect.objectContaining({ canReview: true, canReopen: false, deadlineStatus: 'EXPIRED' })] });
   });
+
+  it('renders assigned classes grid, selects a class on click, and displays the workspace banner to launch advanced grouping', async () => {
+    vi.mocked(classApi.getMyClasses).mockResolvedValue({
+      result: [
+        { id: 2, name: 'Class 2', termId: 8, lecturerId: 1, studentCount: 15 },
+        { id: 5, name: 'Class 5', termId: 8, lecturerId: 1, studentCount: 20 },
+      ],
+      meta: { total: 2, pages: 1, page: 1, pageSize: 50 },
+    });
+    mount();
+    await screen.findByText('Review fixture');
+    expect(screen.getByText('Class 2')).toBeInTheDocument();
+    expect(screen.getByText('Class 5')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /Class 2/i }));
+    await screen.findByRole('region', { name: i18n.t('groupReview.selectedClassHeading') });
+    expect(screen.getByRole('heading', { name: 'Class 2' })).toBeInTheDocument();
+
+    // Click "View All Classes" to clear class filter
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.viewAllClasses') }));
+    expect(screen.queryByRole('region', { name: i18n.t('groupReview.selectedClassHeading') })).not.toBeInTheDocument();
+
+    // Select Class 2 again and navigate to advanced grouping board
+    fireEvent.click(screen.getByRole('button', { name: /Class 2/i }));
+    await screen.findByRole('region', { name: i18n.t('groupReview.selectedClassHeading') });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.openAdvancedAction') }));
+    const output = await screen.findByTestId('board-url');
+    const url = new URL(output.textContent!, 'http://localhost');
+    expect(url.pathname).toBe('/lecturer/group-review/advanced');
+    expect(url.searchParams.get('classId')).toBe('2');
+  });
 });

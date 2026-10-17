@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input as AntInput, Select, Table } from 'antd';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock3, Info, RefreshCw, Search, Target, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, Info, Layers, RefreshCw, Search, SlidersHorizontal, Sparkles, Target, Users } from 'lucide-react';
 import { useTerm } from '@/app/providers/TermContext';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useRealtime } from '@/app/providers/realtimeContext';
@@ -77,10 +77,12 @@ function ReviewContent() {
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
   const rows = reviews.data?.result ?? [];
   const boardClassId = filters.classId ?? (classes.data?.result.length === 1 ? classes.data.result[0].id : undefined);
-  const openBoard = () => {
-    if (!boardClassId) return;
-    const deadlineId = rows.find(row => row.group.schoolClassId === boardClassId)?.group.deadlineId;
-    navigate(advancedGroupPath(boardClassId, filterQuery, deadlineId));
+  const selectedClass = classes.data?.result.find(c => c.id === filters.classId);
+  const openBoard = (targetClassId?: number) => {
+    const cid = targetClassId ?? boardClassId;
+    if (!cid) return;
+    const deadlineId = rows.find(row => row.group.schoolClassId === cid)?.group.deadlineId;
+    navigate(advancedGroupPath(cid, filterQuery, deadlineId));
   };
   const topics = [...new Set([...(classes.data?.result ?? []).map(item => item.id), ...rows.map(row => row.group.schoolClassId)])].sort((a, b) => a - b).join(',');
   useEffect(() => {
@@ -130,8 +132,70 @@ function ReviewContent() {
   ];
   return <div className="group-review-page">
     <PageHeader title={t('groupReview.title')} description={t('groupReview.description')}
-      action={<div className="review-board-entry"><Button icon={<Users size={17} />} disabled={!boardClassId || classes.isError || classes.isPending} onClick={openBoard}>{t('groupBoard.open')}</Button>
+      action={<div className="review-board-entry"><Button icon={<Users size={17} />} disabled={!boardClassId || classes.isError || classes.isPending} onClick={() => openBoard()}>{t('groupBoard.open')}</Button>
         {!boardClassId && <small>{t('groupBoard.chooseClass')}</small>}</div>} />
+    <section className="card review-classes-card" aria-label={t('groupReview.myClassesTitle')}>
+      <div className="review-classes-header">
+        <div className="review-classes-title-group">
+          <div className="review-classes-icon" aria-hidden="true"><GraduationCap size={22} /></div>
+          <div>
+            <h2 className="review-classes-title">{t('groupReview.myClassesTitle')}</h2>
+            <p className="review-classes-subtitle">{t('groupReview.selectClassHint')}</p>
+          </div>
+        </div>
+        {classes.data && <span className="badge badge-info review-classes-count">{t('groupReview.classesCount', { count: classes.data.result.length })}</span>}
+      </div>
+      {classes.isPending ? (
+        <div className="review-classes-loading"><RefreshCw size={18} className="spin" aria-hidden="true" /><span>{t('groupReview.refresh')}…</span></div>
+      ) : classes.data?.result.length === 0 ? (
+        <p className="review-classes-empty">{t('groupReview.noAssignedClasses')}</p>
+      ) : (
+        <div className="review-classes-grid">
+          <button type="button" className={`review-class-item ${!filters.classId ? 'is-active' : ''}`}
+            onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>
+            <div className="review-class-item-top">
+              <div className="review-class-badge-icon" aria-hidden="true"><Layers size={18} /></div>
+              {!filters.classId && <span className="review-active-pill"><CheckCircle2 size={12} aria-hidden="true" />{t('groupReview.activePill')}</span>}
+            </div>
+            <div className="review-class-item-name">{t('groupReview.allClassesCard')}</div>
+            <div className="review-class-item-meta"><span>{t('groupReview.allClassesMeta', { count: classes.data?.result.length ?? 0 })}</span></div>
+          </button>
+          {classes.data?.result.map(cls => {
+            const isSelected = filters.classId === cls.id;
+            return <button key={cls.id} type="button" className={`review-class-item ${isSelected ? 'is-active' : ''}`}
+              onClick={() => { setFilters(old => ({ ...old, classId: cls.id, page: 1 })); setViewId(null); }}>
+              <div className="review-class-item-top">
+                <div className="review-class-badge-icon" aria-hidden="true"><GraduationCap size={18} /></div>
+                {isSelected && <span className="review-active-pill"><CheckCircle2 size={12} aria-hidden="true" />{t('groupReview.activePill')}</span>}
+              </div>
+              <div className="review-class-item-name">{cls.name}</div>
+              <div className="review-class-item-meta"><Users size={14} aria-hidden="true" /><span>{t('groupReview.studentCount', { count: cls.studentCount })}</span></div>
+            </button>;
+          })}
+        </div>
+      )}
+    </section>
+    {selectedClass ? (
+      <div className="card review-selected-class-banner" role="region" aria-label={t('groupReview.selectedClassHeading')}>
+        <div className="selected-class-info">
+          <div className="selected-class-icon" aria-hidden="true"><Sparkles size={24} /></div>
+          <div className="selected-class-details">
+            <div className="selected-class-pretitle">{t('groupReview.managingClass')}</div>
+            <h3 className="selected-class-title">{selectedClass.name}</h3>
+            <div className="selected-class-badges">
+              <span className="badge badge-neutral"><Users size={13} aria-hidden="true" />{t('groupReview.studentCount', { count: selectedClass.studentCount })}</span>
+              {reviews.data && <span className="badge badge-info">{t('groupReview.classGroupsCount', { count: reviews.data.meta.total })}</span>}
+            </div>
+          </div>
+        </div>
+        <div className="selected-class-actions">
+          <Button variant="primary" icon={<SlidersHorizontal size={16} />} onClick={() => openBoard(selectedClass.id)} disabled={classes.isError || classes.isPending}>{t('groupReview.openAdvancedAction')}</Button>
+          <Button variant="secondary" onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>{t('groupReview.viewAllClasses')}</Button>
+        </div>
+      </div>
+    ) : (
+      <div className="review-class-prompt-banner"><Info size={18} aria-hidden="true" /><span>{t('groupReview.selectClassPrompt')}</span></div>
+    )}
     <div className="review-summary" aria-label={t('groupReview.pageSummary')}>
       {[
         { key: 'pending', count: rows.filter(row => row.group.status === 'PENDING').length, Icon: Clock3 },
