@@ -13,6 +13,7 @@ interface Props {
   deadlineId?: number | null;
   classId?: number | null;
   group: GroupDTO;
+  unassignedStudents: GroupMemberDTO[];
   targets: GroupDTO[];
   editable: boolean;
   canManage: boolean;
@@ -50,6 +51,10 @@ export function GroupBoardColumn(props: Props) {
     enabled: showRecs && !!props.deadlineId && !!props.classId && props.editable,
     staleTime: 10000,
   });
+  // Workspace updates (including optimistic moves) remove assigned students immediately,
+  // even while a recommendation request is still returning an older snapshot.
+  const unassignedIds = new Set(props.unassignedStudents.map(student => student.studentId));
+  const availableRecommendations = recommendations.filter(student => unassignedIds.has(student.studentId));
 
   return (
     <section
@@ -130,10 +135,10 @@ export function GroupBoardColumn(props: Props) {
             <div className="board-column-recommendations" data-board-scroll>
               {isRecsLoading ? (
                 <div className="board-recs-loading">{t('common.loading', 'Đang tải gợi ý...')}</div>
-              ) : recommendations.length === 0 ? (
+              ) : availableRecommendations.length === 0 ? (
                 <div className="board-recs-empty">{t('groupBoard.noSuggestions', 'Không có sinh viên phù hợp')}</div>
               ) : (
-                recommendations.map((student) => (
+                availableRecommendations.map((student) => (
                   <div
                     key={student.studentId}
                     className={`board-student draggable-student-card board-rec-student ${

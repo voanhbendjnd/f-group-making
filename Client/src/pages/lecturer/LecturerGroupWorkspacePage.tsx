@@ -233,6 +233,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       <div ref={boardRef} className="group-board-track" role="region" aria-label={t('groupBoard.columns')} tabIndex={0}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null); }}>
         {groups.map(group => <GroupBoardColumn key={group.id} deadlineId={deadlineId} classId={classId} group={group} targets={targets} editable={editable(group)} canManage={canManage} canUnlock={!!canUnlock} pending={pending}
+          unassignedStudents={data.unassignedStudents}
           dragOver={over === group.id} draggedId={draggedId} onDragStart={startDrag} onDragEnd={clearDrag}
           onDragOver={event => dragOver(event, group.id)} onDrop={event => drop(event, group.id)}
           onMove={(studentId, target) => quiet(move(studentId, group.id, target))} onRemove={studentId => remove(group, studentId)}
