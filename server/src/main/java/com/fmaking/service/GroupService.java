@@ -5,6 +5,7 @@ import com.fmaking.repository.*;
 import com.fmaking.security.AuthoritiesConstants;
 import com.fmaking.security.SecurityUtils;
 import com.fmaking.service.dto.*;
+import com.fmaking.service.event.GroupReviewNotificationEvent.Kind;
 import com.fmaking.service.projection.StudentRow;
 import com.fmaking.web.rest.errors.*;
 import org.slf4j.Logger;
@@ -44,6 +45,7 @@ public class GroupService {
     private final GroupEventPublisher eventPublisher;
     private final DeadlinePolicy deadlinePolicy;
     private final TermService termService;
+    private final GroupReviewNotificationService reviewNotifications;
 
     public GroupService(GroupRepository groupRepository,
                         GroupMemberRepository groupMemberRepository,
@@ -57,7 +59,8 @@ public class GroupService {
                         ClassRuleService classRuleService,
                         GroupRuleValidationService ruleValidationService,
                         SchoolClassAccessService accessService,
-                        GroupEventPublisher eventPublisher, DeadlinePolicy deadlinePolicy, TermService termService) {
+                        GroupEventPublisher eventPublisher, DeadlinePolicy deadlinePolicy, TermService termService,
+                        GroupReviewNotificationService reviewNotifications) {
         this.groupRepository = groupRepository;
         this.groupMemberRepository = groupMemberRepository;
         this.groupMemberHistoryRepository = groupMemberHistoryRepository;
@@ -73,6 +76,7 @@ public class GroupService {
         this.eventPublisher = eventPublisher;
         this.deadlinePolicy = deadlinePolicy;
         this.termService = termService;
+        this.reviewNotifications = reviewNotifications;
     }
 
     // ==========================================
@@ -499,7 +503,9 @@ public class GroupService {
 
         eventPublisher.publish("GROUP_SUBMITTED", groupId, deadlineId, classId, actor, null);
 
-        return getGroupDetail(groupId, classId, deadlineId);
+        GroupDTO result = getGroupDetail(groupId, classId, deadlineId);
+        reviewNotifications.publish(Kind.SUBMITTED, result, schoolClass, actor);
+        return result;
     }
 
     public GroupDTO cancelSubmitGroup(Integer deadlineId, Integer classId, Long groupId) {
@@ -674,7 +680,9 @@ public class GroupService {
 
         eventPublisher.publish("GROUP_ACCEPTED", groupId, deadlineId, classId, actor, null);
 
-        return getGroupDetail(groupId, classId, deadlineId);
+        GroupDTO result = getGroupDetail(groupId, classId, deadlineId);
+        reviewNotifications.publish(Kind.ACCEPTED, result, schoolClass, actor);
+        return result;
     }
 
     public GroupDTO rejectGroup(Integer deadlineId, Integer classId, Long groupId, RejectGroupRequest req) {
@@ -700,7 +708,9 @@ public class GroupService {
 
         eventPublisher.publish("GROUP_REJECTED", groupId, deadlineId, classId, actor, reason);
 
-        return getGroupDetail(groupId, classId, deadlineId);
+        GroupDTO result = getGroupDetail(groupId, classId, deadlineId);
+        reviewNotifications.publish(Kind.REJECTED, result, schoolClass, actor);
+        return result;
     }
 
     public GroupDTO revokeGroup(Integer deadlineId, Integer classId, Long groupId) {
