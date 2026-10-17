@@ -76,11 +76,8 @@ function ReviewContent() {
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
   const rows = reviews.data?.result ?? [];
-  const boardClassId = filters.classId ?? (classes.data?.result.length === 1 ? classes.data.result[0].id : undefined);
   const selectedClass = classes.data?.result.find(c => c.id === filters.classId);
-  const openBoard = (targetClassId?: number) => {
-    const cid = targetClassId ?? boardClassId;
-    if (!cid) return;
+  const openBoard = (cid: number) => {
     const deadlineId = rows.find(row => row.group.schoolClassId === cid)?.group.deadlineId;
     navigate(advancedGroupPath(cid, filterQuery, deadlineId));
   };
@@ -131,9 +128,7 @@ function ReviewContent() {
     </div> },
   ];
   return <div className="group-review-page">
-    <PageHeader title={t('groupReview.title')} description={t('groupReview.description')}
-      action={<div className="review-board-entry"><Button icon={<Users size={17} />} disabled={!boardClassId || classes.isError || classes.isPending} onClick={() => openBoard()}>{t('groupBoard.open')}</Button>
-        {!boardClassId && <small>{t('groupBoard.chooseClass')}</small>}</div>} />
+    <PageHeader title={t('groupReview.title')} description={t('groupReview.description')} />
     <section className="card review-classes-card" aria-label={t('groupReview.myClassesTitle')}>
       <div className="review-classes-header">
         <div className="review-classes-title-group">

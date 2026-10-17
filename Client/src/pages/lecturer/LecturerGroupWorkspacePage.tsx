@@ -180,7 +180,6 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       </div>
     </header>
     <div className="board-context-bar">
-      <Link to={back} className="board-context-back-link"><ArrowLeft size={15} aria-hidden="true" /><span>{t('groupBoard.back')}</span></Link>
       <label className="board-search"><Search size={16} /><input aria-label={t('groupBoard.searchGroups')} placeholder={t('groupBoard.searchGroups')} value={groupSearch} onChange={event => setGroupSearch(event.target.value)} /></label>
       <span className="board-count">{t('groupBoard.groupCount', { count: data.groups.length })}</span>
       <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>
