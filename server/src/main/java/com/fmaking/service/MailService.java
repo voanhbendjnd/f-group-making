@@ -21,6 +21,9 @@ import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import com.fmaking.config.Constants;
 import com.fmaking.service.dto.UserDTO;
+import com.fmaking.service.event.GroupReviewNotificationEvent;
+import com.fmaking.service.event.GroupReviewNotificationEvent.Kind;
+import org.springframework.web.util.UriComponentsBuilder;
 
 
 @Service
@@ -113,6 +116,48 @@ public class MailService {
 
     public String getClientBaseUrl() {
         return clientBaseUrl;
+    }
+
+    public void sendGroupReviewEmailSync(GroupReviewNotificationEvent.Recipient recipient, GroupReviewNotificationEvent event) {
+        if (recipient.email() == null || recipient.email().isBlank()) return;
+        Kind kind = event.kind();
+        String heading = switch (kind) {
+            case SUBMITTED -> "Có nhóm đang chờ bạn duyệt";
+            case ACCEPTED -> "Nhóm của bạn đã được duyệt";
+            case REJECTED -> "Nhóm của bạn chưa được duyệt";
+        };
+        Context context = new Context(Locale.forLanguageTag("vi"));
+        context.setVariable("notification", event);
+        context.setVariable("recipientName", recipient.name());
+        context.setVariable("heading", heading);
+        context.setVariable("statusLabel", switch (kind) {
+            case SUBMITTED -> "CHỜ DUYỆT";
+            case ACCEPTED -> "ĐÃ DUYỆT";
+            case REJECTED -> "CẦN ĐIỀU CHỈNH";
+        });
+        context.setVariable("description", switch (kind) {
+            case SUBMITTED -> "Trưởng nhóm vừa gửi danh sách thành viên. Thầy/cô có thể xem thông tin nhóm và phản hồi trên hệ thống.";
+            case ACCEPTED -> "Giảng viên đã xác nhận danh sách thành viên của nhóm. Bạn có thể mở hệ thống để xem thông tin mới nhất.";
+            case REJECTED -> "Giảng viên đã từ chối yêu cầu duyệt nhóm. Hãy xem góp ý bên dưới và trao đổi với trưởng nhóm để điều chỉnh trước khi gửi duyệt lại.";
+        });
+        context.setVariable("accentColor", kind == Kind.ACCEPTED ? "#15803d" : kind == Kind.REJECTED ? "#b45309" : "#2563eb");
+        context.setVariable("badgeBackground", kind == Kind.ACCEPTED ? "#dcfce7" : kind == Kind.REJECTED ? "#fef3c7" : "#dbeafe");
+        context.setVariable("buttonText", kind == Kind.SUBMITTED ? "Xem nhóm chờ duyệt" : "Xem nhóm của tôi");
+        context.setVariable("occurredAt", java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")
+                .withZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).format(event.occurredAt()));
+        UriComponentsBuilder target = UriComponentsBuilder.fromUriString(clientBaseUrl);
+        String targetUrl;
+        if (kind == Kind.SUBMITTED) {
+            target.path("/lecturer/group-review").queryParam("classId", event.classId()).queryParam("status", "PENDING");
+            if (event.termId() != null) target.queryParam("termId", event.termId());
+            targetUrl = target.queryParam("search", "{groupName}").encode().buildAndExpand(event.groupName()).toUriString();
+        } else {
+            targetUrl = target.path("/student/groups/select").queryParam("deadlineId", event.deadlineId())
+                    .queryParam("classId", event.classId()).build().toUriString();
+        }
+        context.setVariable("targetUrl", targetUrl);
+        String content = springTemplateEngine.process("mail/groupReviewNotificationEmail", context);
+        sendEmailSync(recipient.email(), "[F-Group Making] " + heading + " · " + event.groupName(), content, false, true);
     }
 
     public void sendDeadlineEmailSync(String toEmail, String studentName, String deadlineName, String description, String startTimeStr, String endTimeStr, String targetUrl) {

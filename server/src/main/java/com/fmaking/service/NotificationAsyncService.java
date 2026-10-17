@@ -10,6 +10,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.fmaking.service.dto.UserDTO;
+import com.fmaking.service.event.GroupReviewNotificationEvent;
 
 import java.util.List;
 
@@ -36,6 +37,18 @@ public class NotificationAsyncService {
     private static final java.time.format.DateTimeFormatter DATE_TIME_FORMATTER =
             java.time.format.DateTimeFormatter.ofPattern("HH:mm dd/MM/yyyy")
                     .withZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+
+    @Async("notificationMailActivatedAccount")
+    public void sendGroupReviewNotification(GroupReviewNotificationEvent event) {
+        for (GroupReviewNotificationEvent.Recipient recipient : event.recipients()) {
+            try {
+                mailService.sendGroupReviewEmailSync(recipient, event);
+            } catch (Exception exception) {
+                log.error("Failed to send {} notification for group {} to {}",
+                        event.kind(), event.groupId(), recipient.email(), exception);
+            }
+        }
+    }
 
     @Async
     public void sendDeadlineNotificationBatch(com.fmaking.domain.Deadline deadline, List<com.fmaking.service.dto.StudentDeadlineRow> students) {
