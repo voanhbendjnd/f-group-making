@@ -992,6 +992,41 @@
     "reload": "Tải lại",
     "otherGroups": "Các Nhóm Khác Trong Lớp",
     "availableGroups": "Danh Sách Nhóm Đang Mở",
+    "allGroups": "Tất cả",
+    "recommendedForYou": "Đề xuất cho bạn",
+    "noRecommendedGroupsTitle": "Chưa có nhóm gợi ý phù hợp",
+    "noRecommendedGroupsDesc": "Hiện chưa có nhóm nào trong lớp cần thêm chuyên ngành của bạn hoặc các nhóm đã đầy.",
+    "viewAllGroups": "Xem tất cả nhóm",
+    "role": {
+      "leader": "Trưởng nhóm",
+      "member": "Thành viên"
+    },
+    "bio": {
+      "cardTitle": "Mô tả tìm nhóm của bạn",
+      "cardSubtitle": "(Người khác hover vào tên bạn sẽ thấy mô tả này)",
+      "addBtn": "Thêm mô tả",
+      "modalTitle": "Cập nhật mô tả tìm nhóm",
+      "modalHelp": "Giới thiệu ngắn gọn các kỹ năng, công nghệ bạn thành thạo, vai trò mong muốn hoặc định hướng làm việc trong nhóm (tối đa 500 ký tự).",
+      "modalPlaceholder": "Ví dụ: Em mạnh về React/TypeScript & Tailwind. Có kinh nghiệm làm UI/UX và muốn thử sức vai trò Frontend/Leader...",
+      "quickTags": "Gợi ý tags:",
+      "tooLong": "Mô tả tối đa 500 ký tự",
+      "updatedSuccess": "Đã lưu mô tả bản thân thành công",
+      "deletedSuccess": "Đã xóa mô tả bản thân",
+      "deleteConfirmTitle": "Xóa mô tả bản thân?",
+      "deleteConfirmDesc": "Bạn có chắc muốn xóa mô tả này không?",
+      "bannerHint": "Hãy viết vài dòng giới thiệu về thế mạnh kỹ năng và vai trò bạn hướng tới để các nhóm dễ dàng liên hệ và đề xuất bạn!",
+      "title": "Mô tả bản thân",
+      "emptyPlaceholder": "Chưa cập nhật mô tả bản thân"
+    },
+    "recommendation": {
+      "sectionTitle": "Gợi ý thành viên phù hợp",
+      "neededSlots": "(Cần thêm {{count}} thành viên)",
+      "matchScore": "Độ phù hợp: {{score}}%",
+      "copiedEmail": "Đã sao chép email của {{name}}",
+      "copyEmailTooltip": "Sao chép email liên hệ",
+      "loadError": "Không thể tải danh sách gợi ý",
+      "noCandidates": "Hiện không còn sinh viên nào chưa có nhóm"
+    },
     "emptyGroupsTitle": "Chưa có nhóm nào được tạo trong lớp",
     "emptyGroupsDesc": "Hãy là người tiên phong tạo nhóm đầu tiên để mời các bạn khác cùng tham gia!",
     "createFirstGroup": "Tạo Nhóm Ngay",
@@ -1027,6 +1062,7 @@
       "tooltipNotReady": "Nhóm chưa đạt đủ các điều kiện bắt buộc của lớp để có thể nộp.",
       "tooltipSubmit": "Nộp danh sách nhóm lên Giảng viên phê duyệt",
       "submitButton": "Nộp nhóm (Submit)",
+      "inviteMemberBtn": "Mời thành viên",
       "approvedNotice": "Nhóm đã được Giảng viên phê duyệt chính thức"
     },
     "card": {
@@ -1109,6 +1145,39 @@
       "revokeError": "Không thể thu hồi",
       "lecturerCreateSuccess": "Giảng viên tạo và duyệt nhóm thành công!",
       "lecturerCreateError": "Không thể tạo nhóm"
+    },
+    "invitation": {
+      "modalTitle": "Mời thành viên vào nhóm",
+      "groupLabel": "Nhóm",
+      "searchPlaceholder": "Tìm theo email, mã số sinh viên hoặc họ tên...",
+      "groupFullWarning": "Nhóm đã đạt số lượng thành viên tối đa ({{max}}). Không thể mời thêm.",
+      "noSearchResults": "Không tìm thấy sinh viên nào phù hợp với từ khóa \"{{query}}\"",
+      "emptyClass": "Không có sinh viên trong lớp học này",
+      "hasGroupStatus": "Đã có nhóm: {{name}}",
+      "pendingStatus": "Đã gửi lời mời (Chờ duyệt)",
+      "pendingStatusShort": "Đã mời",
+      "eligibleStatus": "Chưa có nhóm (Hợp lệ)",
+      "cannotInvite": "Không thể mời",
+      "ruleViolated": "Dính quy định",
+      "ruleViolatedDesc": "Không thể mời do dính quy định lớp",
+      "cancelInviteBtn": "Hủy mời",
+      "sendInviteBtn": "Mời",
+      "inviteBtn": "Mời",
+      "sentSuccess": "Đã gửi lời mời thành công tới {{name}}!",
+      "sentError": "Không thể gửi lời mời",
+      "cancelledSuccess": "Đã hủy lời mời",
+      "cancelledError": "Không thể hủy lời mời",
+      "bannerTitle": "Bạn nhận được {{count}} lời mời tham gia nhóm",
+      "bannerDesc": "Chọn \"Đồng ý\" để gia nhập nhóm ngay lập tức",
+      "invitedBy": "Người gửi",
+      "acceptBtn": "Đồng ý",
+      "rejectBtn": "Từ chối",
+      "acceptSuccess": "Gia nhập nhóm thành công!",
+      "acceptError": "Không thể gia nhập nhóm",
+      "rejectSuccess": "Đã từ chối lời mời.",
+      "rejectError": "Không thể từ chối lời mời",
+      "receivedTitle": "Lời mời tham gia nhóm mới!",
+      "receivedDesc": "Nhóm \"{{groupName}}\" đã gửi lời mời bạn tham gia nhóm!"
     }
   },
   "studentWidget": {
@@ -1166,7 +1235,12 @@
     "savedHint": "Tự động lưu thay đổi",
     "busy": "Vui lòng chờ thao tác hiện tại hoàn tất.",
     "readOnly": "Bạn chỉ có quyền xem các nhóm của lớp này.",
-    "realtimeHint": "Dữ liệu đồng bộ realtime; khi mất kết nối, hệ thống kiểm tra lại mỗi 30 giây."
+    "realtimeHint": "Dữ liệu đồng bộ realtime; khi mất kết nối, hệ thống kiểm tra lại mỗi 30 giây.",
+    "suggestMembers": "Gợi ý thành viên",
+    "suggestForGroup": "Gợi ý cho nhóm",
+    "allPool": "Tất cả sinh viên",
+    "noSuggestions": "Không có sinh viên phù hợp",
+    "quickAddMember": "Thêm nhanh vào nhóm"
   },
   "groupWorkspace": {
     "backToClasses": "Quay lại lớp",

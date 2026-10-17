@@ -1,8 +1,8 @@
-import React from 'react';
-import { Crown, LogIn, Check, X, Undo } from 'lucide-react';
+import { Crown, LogIn, Check, X, Undo, Sparkles } from 'lucide-react';
 import { Button, Tag, Popconfirm } from 'antd';
 import { useTranslation } from 'react-i18next';
-import type { GroupDTO } from '../types/groupTypes';
+import type { GroupDTO, GroupRecommendationDTO } from '../types/groupTypes';
+import { StudentProfilePopover } from './StudentProfilePopover';
 
 interface GroupCardProps {
   group: GroupDTO;
@@ -16,6 +16,7 @@ interface GroupCardProps {
   onOpenRejectModal?: (groupId: number) => void;
   onRevoke?: (groupId: number) => void;
   isActionLoading?: boolean;
+  recommendation?: GroupRecommendationDTO;
 }
 
 export const GroupCard: React.FC<GroupCardProps> = ({
@@ -30,6 +31,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
   onOpenRejectModal,
   onRevoke,
   isActionLoading,
+  recommendation,
 }) => {
   const { t } = useTranslation();
 
@@ -85,18 +87,54 @@ export const GroupCard: React.FC<GroupCardProps> = ({
               {t('studentGroup.card.leader')} <strong style={{ color: 'var(--color-text-main)' }}>{group.leaderName}</strong>
             </div>
           </div>
-          <div style={{ flexShrink: 0 }}>
+          <div style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            {recommendation && (
+              <Tag
+                color="green"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  fontWeight: 600,
+                  margin: 0,
+                  borderRadius: 12,
+                }}
+              >
+                <Sparkles size={11} />
+                {recommendation.matchScore}%
+              </Tag>
+            )}
             {getStatusBadge()}
           </div>
         </div>
 
+        {/* Recommendation reason if available */}
+        {recommendation && recommendation.matchReasons && recommendation.matchReasons.length > 0 && (
+          <div
+            style={{
+              fontSize: '0.75rem',
+              color: '#15803d',
+              backgroundColor: '#f0fdf4',
+              border: '1px solid #bbf7d0',
+              padding: '6px 10px',
+              borderRadius: '6px',
+              margin: '8px 0',
+              lineHeight: 1.4,
+            }}
+          >
+            ✨ {recommendation.matchReasons[0]}
+          </div>
+        )}
+
         {/* Member tags preview */}
         <div style={{ margin: '0.875rem 0', display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
           {group.members.map((m) => (
-            <Tag key={m.studentId} style={{ borderRadius: '6px', fontSize: '0.75rem', padding: '2px 6px' }}>
-              {m.role === 'LEADER' && <Crown size={12} color="#eab308" style={{ marginRight: 4, verticalAlign: -1 }} />}
-              {m.fullName} ({m.majorCode || 'N/A'})
-            </Tag>
+            <StudentProfilePopover key={m.studentId} student={m} placement="top">
+              <Tag style={{ borderRadius: '6px', fontSize: '0.75rem', padding: '2px 6px', cursor: 'pointer' }}>
+                {m.role === 'LEADER' && <Crown size={12} color="#eab308" style={{ marginRight: 4, verticalAlign: -1 }} />}
+                {m.fullName} ({m.majorCode || 'N/A'})
+              </Tag>
+            </StudentProfilePopover>
           ))}
         </div>
       </div>

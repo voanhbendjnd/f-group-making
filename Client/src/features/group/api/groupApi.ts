@@ -4,10 +4,15 @@ import type {
   GroupReviewPage,
   WorkspaceDTO,
   GroupDTO,
+  GroupMemberDTO,
+  GroupRecommendationDTO,
   CreateGroupRequest,
   LecturerCreateGroupRequest,
   TransferLeaderRequest,
   RejectGroupRequest,
+  GroupInvitationDTO,
+  SendInvitationRequest,
+  StudentSearchForInviteDTO,
 } from '../types/groupTypes';
 
 export const groupApi = {
@@ -166,6 +171,107 @@ export const groupApi = {
   ): Promise<void> {
     await apiClient.delete(
       `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/lecturer-disband`
+    );
+  },
+
+  async getRecommendedStudents(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    signal?: AbortSignal
+  ): Promise<GroupMemberDTO[]> {
+    return apiClient.get<unknown, GroupMemberDTO[]>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/recommended-students`,
+      { signal }
+    );
+  },
+
+  async getRecommendedGroups(
+    deadlineId: number,
+    classId: number,
+    signal?: AbortSignal
+  ): Promise<GroupRecommendationDTO[]> {
+    return apiClient.get<unknown, GroupRecommendationDTO[]>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/recommended-groups`,
+      { signal }
+    );
+  },
+
+  async getMyPendingInvitations(
+    deadlineId: number,
+    classId: number,
+    signal?: AbortSignal
+  ): Promise<GroupInvitationDTO[]> {
+    return apiClient.get<unknown, GroupInvitationDTO[]>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/my-invitations`,
+      { signal }
+    );
+  },
+
+  async getGroupInvitations(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    signal?: AbortSignal
+  ): Promise<GroupInvitationDTO[]> {
+    return apiClient.get<unknown, GroupInvitationDTO[]>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/invitations`,
+      { signal }
+    );
+  },
+
+  async searchStudentsForInvite(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    query?: string,
+    signal?: AbortSignal
+  ): Promise<StudentSearchForInviteDTO[]> {
+    return apiClient.get<unknown, StudentSearchForInviteDTO[]>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/search-invitees`,
+      { params: query ? { query } : undefined, signal }
+    );
+  },
+
+  async sendInvitation(
+    deadlineId: number,
+    classId: number,
+    groupId: number,
+    request: SendInvitationRequest
+  ): Promise<GroupInvitationDTO> {
+    return apiClient.post<unknown, GroupInvitationDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/${groupId}/invitations`,
+      request
+    );
+  },
+
+  async acceptInvitation(
+    deadlineId: number,
+    classId: number,
+    invitationId: number
+  ): Promise<GroupDTO> {
+    return apiClient.post<unknown, GroupDTO>(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/invitations/${invitationId}/accept`
+    );
+  },
+
+  async rejectInvitation(
+    deadlineId: number,
+    classId: number,
+    invitationId: number
+  ): Promise<void> {
+    await apiClient.post(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/invitations/${invitationId}/reject`
+    );
+  },
+
+  async cancelInvitation(
+    deadlineId: number,
+    classId: number,
+    invitationId: number
+  ): Promise<void> {
+    await apiClient.delete(
+      `/api/deadlines/${deadlineId}/classes/${classId}/groups/invitations/${invitationId}`
     );
   },
 };

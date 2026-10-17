@@ -43,16 +43,19 @@ public class GroupEventPublisher {
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void handleAfterCommit(GroupDomainEvent domainEvent) {
         GroupRealtimeEvent event = domainEvent.getRealtimeEvent();
-        String destination = String.format("/topic/classes/%d/deadlines/%d/groups",
-            event.getSchoolClassId(), event.getDeadlineId());
-        log.info("Broadcasting realtime event [{}] to destination [{}] for group ID [{}]",
-            event.getEventType(), destination, event.getGroupId());
-
         try {
-            messagingTemplate.convertAndSend(destination, event);
-            messagingTemplate.convertAndSend("/topic/classes/" + event.getSchoolClassId() + "/deadlines", event);
+            if (event.getSchoolClassId() != null && event.getDeadlineId() != null) {
+                String destination = String.format("/topic/classes/%d/deadlines/%d/groups",
+                    event.getSchoolClassId(), event.getDeadlineId());
+                log.info("Broadcasting realtime event [{}] to destination [{}] for group ID [{}]",
+                    event.getEventType(), destination, event.getGroupId());
+                messagingTemplate.convertAndSend(destination, event);
+            }
+            if (event.getSchoolClassId() != null) {
+                messagingTemplate.convertAndSend("/topic/classes/" + event.getSchoolClassId() + "/deadlines", event);
+            }
         } catch (Exception e) {
-            log.error("Failed to broadcast realtime event to {}", destination, e);
+            log.error("Failed to broadcast realtime event for class ID [{}]", event.getSchoolClassId(), e);
         }
     }
 }

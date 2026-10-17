@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/common/EmptyState';
 import { useStudentProfile } from '@/features/students/hooks/useStudentProfile';
 import type { ProfileInfo } from '@/features/students/api/profileApi';
 import { getApiError } from '@/services/api/types';
+import { StudentBioCard } from '@/features/group/components/StudentBioCard';
 
 export function StudentProfilePage() {
   const { t } = useTranslation();
@@ -45,5 +46,8 @@ export function StudentProfilePage() {
         </div>)}
       </dl>
     </section>
+    <div style={{ marginTop: 20 }}>
+      <StudentBioCard initialBio={profile.selfDescription} onBioUpdated={() => void query.refetch()} />
+    </div>
   </div>;
 }

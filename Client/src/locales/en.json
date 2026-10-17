@@ -992,6 +992,41 @@
     "reload": "Refresh",
     "otherGroups": "Other Groups in Class",
     "availableGroups": "Available Groups",
+    "allGroups": "All",
+    "recommendedForYou": "Recommended For You",
+    "noRecommendedGroupsTitle": "No Recommended Groups Found",
+    "noRecommendedGroupsDesc": "Currently no groups in class need your specific major or available groups are full.",
+    "viewAllGroups": "View All Groups",
+    "role": {
+      "leader": "Leader",
+      "member": "Member"
+    },
+    "bio": {
+      "cardTitle": "Your Group Matching Bio",
+      "cardSubtitle": "(Hovering over your name reveals this bio)",
+      "addBtn": "Add Bio",
+      "modalTitle": "Update Group Matching Bio",
+      "modalHelp": "Briefly introduce your skills, technologies, desired role, or working preferences (max 500 characters).",
+      "modalPlaceholder": "e.g., Proficient in React/TypeScript, experienced in UI/UX, looking for Frontend or Leader role...",
+      "quickTags": "Quick tags:",
+      "tooLong": "Bio must not exceed 500 characters",
+      "updatedSuccess": "Bio saved successfully",
+      "deletedSuccess": "Bio deleted successfully",
+      "deleteConfirmTitle": "Delete your bio?",
+      "deleteConfirmDesc": "Are you sure you want to delete this bio?",
+      "bannerHint": "Write a short intro about your skills and preferred role so groups can easily find and invite you!",
+      "title": "Self-Description",
+      "emptyPlaceholder": "No self-description updated"
+    },
+    "recommendation": {
+      "sectionTitle": "Recommended Members",
+      "neededSlots": "(Needs {{count}} more members)",
+      "matchScore": "Match: {{score}}%",
+      "copiedEmail": "Copied email of {{name}}",
+      "copyEmailTooltip": "Copy contact email",
+      "loadError": "Unable to load recommendations",
+      "noCandidates": "No unassigned students remaining"
+    },
     "emptyGroupsTitle": "No groups formed in this class yet",
     "emptyGroupsDesc": "Be the first to create a group and invite your classmates!",
     "createFirstGroup": "Create Group Now",
@@ -1027,6 +1062,7 @@
       "tooltipNotReady": "Group does not meet all mandatory class requirements to submit.",
       "tooltipSubmit": "Submit group roster for instructor review",
       "submitButton": "Submit Group",
+      "inviteMemberBtn": "Invite Member",
       "approvedNotice": "Group has been officially approved by instructor"
     },
     "card": {
@@ -1109,6 +1145,39 @@
       "revokeError": "Failed to revoke group approval",
       "lecturerCreateSuccess": "Instructor created and approved group successfully!",
       "lecturerCreateError": "Failed to create group"
+    },
+    "invitation": {
+      "modalTitle": "Invite Member to Group",
+      "groupLabel": "Group",
+      "searchPlaceholder": "Search by email, student code, or name...",
+      "groupFullWarning": "Group has reached maximum capacity ({{max}} members). Cannot invite more.",
+      "noSearchResults": "No students found matching \"{{query}}\"",
+      "emptyClass": "No students found in this class",
+      "hasGroupStatus": "In Group: {{name}}",
+      "pendingStatus": "Invitation Sent (Pending)",
+      "pendingStatusShort": "Invited",
+      "eligibleStatus": "No Group (Eligible)",
+      "cannotInvite": "Cannot Invite",
+      "ruleViolated": "Rule Violated",
+      "ruleViolatedDesc": "Cannot invite due to active grouping rules",
+      "cancelInviteBtn": "Cancel",
+      "sendInviteBtn": "Invite",
+      "inviteBtn": "Invite",
+      "sentSuccess": "Successfully sent invitation to {{name}}!",
+      "sentError": "Failed to send invitation",
+      "cancelledSuccess": "Invitation cancelled",
+      "cancelledError": "Failed to cancel invitation",
+      "bannerTitle": "You have {{count}} group invitation(s)",
+      "bannerDesc": "Click \"Accept\" to join the group immediately",
+      "invitedBy": "Invited by",
+      "acceptBtn": "Accept",
+      "rejectBtn": "Decline",
+      "acceptSuccess": "Joined group successfully!",
+      "acceptError": "Failed to join group",
+      "rejectSuccess": "Declined invitation.",
+      "rejectError": "Failed to decline invitation",
+      "receivedTitle": "New Group Invitation!",
+      "receivedDesc": "Group \"{{groupName}}\" has invited you to join!"
     }
   },
   "studentWidget": {
@@ -1166,7 +1235,12 @@
     "savedHint": "Changes save automatically",
     "busy": "Please wait for the current action to finish.",
     "readOnly": "You have view access to this class's groups.",
-    "realtimeHint": "Data syncs in realtime; if disconnected, it refreshes every 30 seconds."
+    "realtimeHint": "Data syncs in realtime; if disconnected, it refreshes every 30 seconds.",
+    "suggestMembers": "Suggest members",
+    "suggestForGroup": "Suggest for group",
+    "allPool": "All unassigned students",
+    "noSuggestions": "No matching suggestions",
+    "quickAddMember": "Quick add to group"
   },
   "groupWorkspace": {
     "backToClasses": "Back to classes",

@@ -14,9 +14,32 @@ import org.springframework.web.bind.annotation.*;
 public class GroupResource {
 
     private final GroupService groupService;
+    private final com.fmaking.service.GroupRecommendationService recommendationService;
+    private final com.fmaking.service.GroupInvitationService invitationService;
 
-    public GroupResource(GroupService groupService) {
+    public GroupResource(GroupService groupService,
+                         com.fmaking.service.GroupRecommendationService recommendationService,
+                         com.fmaking.service.GroupInvitationService invitationService) {
         this.groupService = groupService;
+        this.recommendationService = recommendationService;
+        this.invitationService = invitationService;
+    }
+
+    @GetMapping("/{groupId}/recommended-students")
+    @ApiMessage("Lấy danh sách gợi ý sinh viên cho nhóm thành công")
+    public ResponseEntity<java.util.List<GroupMemberDTO>> getRecommendedStudents(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId) {
+        return ResponseEntity.ok(recommendationService.recommendStudentsForGroup(groupId, classId, deadlineId));
+    }
+
+    @GetMapping("/recommended-groups")
+    @ApiMessage("Lấy danh sách gợi ý nhóm phù hợp thành công")
+    public ResponseEntity<java.util.List<GroupRecommendationDTO>> getRecommendedGroups(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId) {
+        return ResponseEntity.ok(recommendationService.recommendGroupsForCurrentStudent(classId, deadlineId));
     }
 
     @GetMapping("/workspace")
@@ -192,6 +215,77 @@ public class GroupResource {
             @PathVariable("classId") Integer classId,
             @PathVariable("groupId") Long groupId) {
         groupService.lecturerDisbandGroup(deadlineId, classId, groupId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ==========================================
+    // GROUP INVITATION ENDPOINTS
+    // ==========================================
+
+    @GetMapping("/my-invitations")
+    @ApiMessage("Lấy danh sách lời mời đang chờ thành công")
+    public ResponseEntity<java.util.List<GroupInvitationDTO>> getMyPendingInvitations(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId) {
+        return ResponseEntity.ok(invitationService.getMyPendingInvitations(deadlineId, classId));
+    }
+
+    @GetMapping("/{groupId}/invitations")
+    @ApiMessage("Lấy danh sách lời mời của nhóm thành công")
+    public ResponseEntity<java.util.List<GroupInvitationDTO>> getGroupInvitations(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId) {
+        return ResponseEntity.ok(invitationService.getGroupInvitations(deadlineId, classId, groupId));
+    }
+
+    @GetMapping("/{groupId}/search-invitees")
+    @ApiMessage("Tìm kiếm sinh viên để mời vào nhóm thành công")
+    public ResponseEntity<java.util.List<StudentSearchForInviteDTO>> searchStudentsForInvite(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId,
+            @RequestParam(value = "query", required = false) String query) {
+        return ResponseEntity.ok(invitationService.searchStudentsForInvite(deadlineId, classId, groupId, query));
+    }
+
+    @PostMapping("/{groupId}/invitations")
+    @ApiMessage("Gửi lời mời tham gia nhóm thành công")
+    public ResponseEntity<GroupInvitationDTO> sendInvitation(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("groupId") Long groupId,
+            @Valid @RequestBody SendInvitationRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(invitationService.sendInvitation(deadlineId, classId, groupId, request));
+    }
+
+    @PostMapping("/invitations/{invitationId}/accept")
+    @ApiMessage("Chấp nhận lời mời tham gia nhóm thành công")
+    public ResponseEntity<GroupDTO> acceptInvitation(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("invitationId") Long invitationId) {
+        return ResponseEntity.ok(invitationService.acceptInvitation(deadlineId, classId, invitationId));
+    }
+
+    @PostMapping("/invitations/{invitationId}/reject")
+    @ApiMessage("Từ chối lời mời tham gia nhóm thành công")
+    public ResponseEntity<Void> rejectInvitation(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("invitationId") Long invitationId) {
+        invitationService.rejectInvitation(deadlineId, classId, invitationId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/invitations/{invitationId}")
+    @ApiMessage("Hủy lời mời tham gia nhóm thành công")
+    public ResponseEntity<Void> cancelInvitation(
+            @PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId,
+            @PathVariable("invitationId") Long invitationId) {
+        invitationService.cancelInvitation(deadlineId, classId, invitationId);
         return ResponseEntity.noContent().build();
     }
 }

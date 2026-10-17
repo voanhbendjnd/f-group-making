@@ -31,7 +31,8 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
     @Query(value = """
         select new com.fmaking.service.projection.StudentRow(
             s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, m.code, m.name,
-            u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate
+            u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate,
+            s.selfDescription
         )
         from Student s
         join User u on s.userId = u.id
@@ -43,7 +44,8 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
     @Query(value = """
         select new com.fmaking.service.projection.StudentRow(
             s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, m.code, m.name,
-            u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate
+            u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate,
+            s.selfDescription
         )
         from Student s
         join User u on s.userId = u.id

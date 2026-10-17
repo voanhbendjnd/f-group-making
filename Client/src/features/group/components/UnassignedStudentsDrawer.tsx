@@ -3,6 +3,7 @@ import { Drawer, Input, Tag, Empty, Button } from 'antd';
 import { Search, Users, UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { GroupMemberDTO } from '../types/groupTypes';
+import { StudentProfilePopover } from './StudentProfilePopover';
 
 interface UnassignedStudentsDrawerProps {
   open: boolean;
@@ -75,30 +76,34 @@ export const UnassignedStudentsDrawer: React.FC<UnassignedStudentsDrawerProps> =
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {filtered.map((s) => (
-            <div
-              key={s.studentId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '10px 12px',
-                borderRadius: '8px',
-                backgroundColor: '#f8fafc',
-                border: '1px solid #e2e8f0',
-              }}
-            >
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-text-main, #0f172a)' }}>
-                  {s.fullName}
+            <StudentProfilePopover key={s.studentId} student={s} placement="left">
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '10px 12px',
+                  borderRadius: '8px',
+                  backgroundColor: '#f8fafc',
+                  border: '1px solid #e2e8f0',
+                  width: '100%',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--color-text-main, #0f172a)' }}>
+                    {s.fullName}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #64748b)' }}>
+                    {s.rollNumber} • {s.memberCode}
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted, #64748b)' }}>
-                  {s.rollNumber} • {s.memberCode}
-                </div>
+                <Tag color={s.majorCode === 'SE' ? 'geekblue' : 'purple'}>
+                  {s.majorCode || 'N/A'}
+                </Tag>
               </div>
-              <Tag color={s.majorCode === 'SE' ? 'geekblue' : 'purple'}>
-                {s.majorCode || 'N/A'}
-              </Tag>
-            </div>
+            </StudentProfilePopover>
           ))}
         </div>
       )}

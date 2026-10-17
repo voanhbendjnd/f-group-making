@@ -30,10 +30,12 @@ public class StudentProfileService {
     private final GroupRepository groups;
     private final GroupMemberRepository members;
     private final DeadlineRepository deadlines;
+    private final GroupEventPublisher groupEventPublisher;
 
     public StudentProfileService(UserRepository users, StudentRepository students, MajorRepository majors,
                                  SchoolClassRepository classes, TermRepository terms, GroupRepository groups,
-                                 GroupMemberRepository members, DeadlineRepository deadlines) {
+                                 GroupMemberRepository members, DeadlineRepository deadlines,
+                                 GroupEventPublisher groupEventPublisher) {
         this.users = users;
         this.students = students;
         this.majors = majors;
@@ -42,6 +44,7 @@ public class StudentProfileService {
         this.groups = groups;
         this.members = members;
         this.deadlines = deadlines;
+        this.groupEventPublisher = groupEventPublisher;
     }
 
     public StudentProfileDTO getCurrentProfile() {
@@ -60,7 +63,51 @@ public class StudentProfileService {
                 .map(value -> available(value.getName())).orElseGet(StudentProfileService::missing);
         ProfileInfo groupInfo = currentGroup(student, schoolClass != null);
         return new StudentProfileDTO(student.getFullName(), student.getRollNumber(), user.getEmail(),
-                Boolean.TRUE.equals(user.getActivated()), major, classInfo, termInfo, groupInfo, student.getSchoolClassId());
+                Boolean.TRUE.equals(user.getActivated()), major, classInfo, termInfo, groupInfo,
+                student.getSchoolClassId(), student.getSelfDescription());
+    }
+
+    @Transactional
+    public String updateBio(String bio) {
+        var user = SecurityUtils.getCurrentUserLogin().flatMap(users::findOneByEmail)
+                .orElseThrow(StudentProfileService::notFound);
+        Student student = students.findById(user.getId()).orElseThrow(StudentProfileService::notFound);
+        String trimmed = bio != null ? bio.trim() : null;
+        if (trimmed != null && trimmed.length() > 500) {
+            throw new com.fmaking.web.rest.errors.BadRequestAlertException("Bio must not exceed 500 characters", "studentProfile", "bioTooLong");
+        }
+        student.setSelfDescription(trimmed == null || trimmed.isEmpty() ? null : trimmed);
+        students.save(student);
+        broadcastBioUpdated(student, user.getEmail());
+        return student.getSelfDescription();
+    }
+
+    @Transactional
+    public void deleteBio() {
+        var user = SecurityUtils.getCurrentUserLogin().flatMap(users::findOneByEmail)
+                .orElseThrow(StudentProfileService::notFound);
+        Student student = students.findById(user.getId()).orElseThrow(StudentProfileService::notFound);
+        student.setSelfDescription(null);
+        students.save(student);
+        broadcastBioUpdated(student, user.getEmail());
+    }
+
+    private void broadcastBioUpdated(Student student, String actorEmail) {
+        if (student.getSchoolClassId() == null) {
+            return;
+        }
+        java.util.Map<String, Object> payload = java.util.Map.of(
+            "studentId", student.getUserId(),
+            "selfDescription", student.getSelfDescription() != null ? student.getSelfDescription() : ""
+        );
+        var classDeadlines = deadlines.findAllBySchoolClassId(student.getSchoolClassId());
+        if (classDeadlines.isEmpty()) {
+            groupEventPublisher.publish("STUDENT_BIO_UPDATED", null, null, student.getSchoolClassId(), actorEmail, payload);
+        } else {
+            for (var d : classDeadlines) {
+                groupEventPublisher.publish("STUDENT_BIO_UPDATED", null, d.getId(), student.getSchoolClassId(), actorEmail, payload);
+            }
+        }
     }
 
     private ProfileInfo currentGroup(Student student, boolean hasClass) {

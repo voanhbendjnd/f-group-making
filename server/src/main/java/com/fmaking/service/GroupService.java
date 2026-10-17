@@ -1045,7 +1045,7 @@ public class GroupService {
         return SecurityUtils.getCurrentUserLogin().orElse("system");
     }
 
-    private GroupDTO getGroupDetail(Long groupId, Integer classId, Integer deadlineId) {
+    public GroupDTO getGroupDetail(Long groupId, Integer classId, Integer deadlineId) {
         Group g = groupRepository.findById(groupId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "ERR_GROUP_NOT_FOUND"));
 
@@ -1098,6 +1098,7 @@ public class GroupService {
             .majorId(student != null ? student.majorId() : null)
             .majorCode(student != null ? student.majorCode() : "")
             .majorName(student != null ? student.majorName() : "")
+            .selfDescription(student != null ? student.selfDescription() : null)
             .role(gm.getRole())
             .joinedAt(gm.getJoinedAt())
             .build();
@@ -1113,6 +1114,7 @@ public class GroupService {
             .majorId(s.majorId())
             .majorCode(s.majorCode())
             .majorName(s.majorName())
+            .selfDescription(s.selfDescription())
             .role(GroupMemberRole.MEMBER)
             .build();
     }

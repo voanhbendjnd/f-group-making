@@ -24,4 +24,21 @@ public class StudentProfileResource {
     public ResponseEntity<StudentProfileDTO> getCurrentProfile() {
         return ResponseEntity.ok(studentProfileService.getCurrentProfile());
     }
+
+    @org.springframework.web.bind.annotation.PutMapping("/bio")
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    @ApiMessage("Update student bio successfully")
+    public ResponseEntity<java.util.Map<String, String>> updateBio(
+            @jakarta.validation.Valid @org.springframework.web.bind.annotation.RequestBody com.fmaking.service.dto.UpdateStudentBioRequest request) {
+        String updated = studentProfileService.updateBio(request.bio());
+        return ResponseEntity.ok(java.util.Map.of("bio", updated != null ? updated : ""));
+    }
+
+    @org.springframework.web.bind.annotation.DeleteMapping("/bio")
+    @PreAuthorize("hasAuthority('ROLE_STUDENT')")
+    @ApiMessage("Delete student bio successfully")
+    public ResponseEntity<Void> deleteBio() {
+        studentProfileService.deleteBio();
+        return ResponseEntity.noContent().build();
+    }
 }

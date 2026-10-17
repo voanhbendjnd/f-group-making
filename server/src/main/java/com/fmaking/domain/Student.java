@@ -32,6 +32,8 @@ public class Student{
     Integer schoolClassId;
     @Column(name = "group_id")
     Long groupId;
+    @Column(name = "self_description", length = 500)
+    String selfDescription;
 //    @NotNull
 //    @Column(name = "email", nullable = false)
 //    String email;

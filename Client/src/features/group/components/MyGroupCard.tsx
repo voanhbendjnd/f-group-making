@@ -10,11 +10,15 @@ import {
   CheckCircle,
   Clock,
   ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 import { Button, Tag, Tooltip, Popconfirm } from 'antd';
 import { useTranslation } from 'react-i18next';
 import type { GroupDTO } from '../types/groupTypes';
 import { RuleChecklistCard } from './RuleChecklistCard';
+import { StudentProfilePopover } from './StudentProfilePopover';
+import { RecommendedStudentsSection } from './RecommendedStudentsSection';
+import { InviteMemberModal } from './InviteMemberModal';
 
 interface MyGroupCardProps {
   group: GroupDTO;
@@ -62,6 +66,8 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
   const isAccepted = group.status === 'ACCEPTED';
   const isOpen = group.status === 'OPEN' || group.status === 'REVOKED';
   const canModify = isOpen && !isDeadlineExpired;
+
+  const [inviteModalOpen, setInviteModalOpen] = React.useState(false);
 
   return (
     <div className="my-group-container">
@@ -144,62 +150,76 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
             {group.members.map((member) => {
               const isMemLeader = member.role === 'LEADER';
               return (
-                <div
-                  key={member.studentId}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0.75rem 1rem',
-                    borderRadius: '10px',
-                    backgroundColor: isMemLeader ? 'rgba(37, 99, 235, 0.04)' : '#f8fafc',
-                    border: `1px solid ${isMemLeader ? 'rgba(37, 99, 235, 0.2)' : '#e2e8f0'}`,
-                    gap: '8px',
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
-                    <div
-                      style={{
-                        width: '38px',
-                        height: '38px',
-                        borderRadius: '50%',
-                        backgroundColor: isMemLeader ? '#dbeafe' : '#e2e8f0',
-                        color: isMemLeader ? '#1d4ed8' : '#475569',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 700,
-                        fontSize: '0.875rem',
-                        flexShrink: 0,
-                      }}
-                    >
-                      {member.fullName.charAt(0).toUpperCase()}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
-                          {member.fullName}
-                        </span>
-                        {isMemLeader && (
-                          <Tag color="gold" icon={<Crown size={12} style={{ marginRight: 3 }} />}>
-                            Leader
-                          </Tag>
-                        )}
+                <StudentProfilePopover key={member.studentId} student={member} placement="top">
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '0.75rem 1rem',
+                      borderRadius: '10px',
+                      backgroundColor: isMemLeader ? 'rgba(37, 99, 235, 0.04)' : '#f8fafc',
+                      border: `1px solid ${isMemLeader ? 'rgba(37, 99, 235, 0.2)' : '#e2e8f0'}`,
+                      gap: '8px',
+                      flexWrap: 'wrap',
+                      width: '100%',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+                      <div
+                        style={{
+                          width: '38px',
+                          height: '38px',
+                          borderRadius: '50%',
+                          backgroundColor: isMemLeader ? '#dbeafe' : '#e2e8f0',
+                          color: isMemLeader ? '#1d4ed8' : '#475569',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontWeight: 700,
+                          fontSize: '0.875rem',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {member.fullName.charAt(0).toUpperCase()}
                       </div>
-                      <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-                        {t('studentGroup.myGroup.studentCode')} {member.rollNumber} • {member.memberCode}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                          <span style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
+                            {member.fullName}
+                          </span>
+                          {isMemLeader && (
+                            <Tag color="gold" icon={<Crown size={12} style={{ marginRight: 3 }} />}>
+                              Leader
+                            </Tag>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
+                          {t('studentGroup.myGroup.studentCode')} {member.rollNumber} • {member.memberCode}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <Tag color={member.majorCode === 'SE' ? 'geekblue' : 'purple'} style={{ margin: 0 }}>
-                    {member.majorCode || member.majorName || 'N/A'}
-                  </Tag>
-                </div>
+                    <Tag color={member.majorCode === 'SE' ? 'geekblue' : 'purple'} style={{ margin: 0 }}>
+                      {member.majorCode || member.majorName || 'N/A'}
+                    </Tag>
+                  </div>
+                </StudentProfilePopover>
               );
             })}
           </div>
+
+          {/* Smart Recommendation for Incomplete Groups */}
+          {group.status === 'OPEN' && group.memberCount < group.maxMembers && (
+            <RecommendedStudentsSection
+              deadlineId={group.deadlineId}
+              classId={group.schoolClassId}
+              groupId={group.id}
+              currentMemberCount={group.memberCount}
+              maxMembers={group.maxMembers}
+            />
+          )}
         </div>
 
         {/* Rule Evaluation Checklist */}
@@ -216,6 +236,20 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
       <div className="my-group-actions">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Member Actions */}
+          {canModify && group.memberCount < group.maxMembers && (
+            <Button
+              icon={<UserPlus size={16} />}
+              onClick={() => setInviteModalOpen(true)}
+              style={{
+                borderColor: 'var(--color-primary, #2563eb)',
+                color: 'var(--color-primary, #2563eb)',
+                fontWeight: 600,
+              }}
+            >
+              {t('studentGroup.myGroup.inviteMemberBtn', 'Mời thành viên')}
+            </Button>
+          )}
+
           {canModify && !isLeader && (
             <Popconfirm
               title={t('studentGroup.myGroup.leaveConfirmTitle')}
@@ -298,6 +332,19 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
           )}
         </div>
       </div>
+
+      {inviteModalOpen && (
+        <InviteMemberModal
+          open={inviteModalOpen}
+          onClose={() => setInviteModalOpen(false)}
+          deadlineId={group.deadlineId}
+          classId={group.schoolClassId}
+          groupId={group.id}
+          groupName={group.name}
+          currentMemberCount={group.memberCount}
+          maxMembers={group.maxMembers}
+        />
+      )}
     </div>
   );
 };

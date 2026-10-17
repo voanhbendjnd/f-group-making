@@ -11,8 +11,12 @@ import {
   Plus,
   UserPlus,
   RefreshCw,
+  Sparkles,
+  Mail,
+  Check,
+  X,
 } from 'lucide-react';
-import { message } from 'antd';
+import { message, Segmented, notification } from 'antd';
 import { useDeadlineBoundary, effectiveDeadlineStatus } from '@/features/deadline/hooks/useDeadlineBoundary';
 import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStateNotice';
 import { DeadlineStatusBadge } from '@/features/deadline/components/DeadlineStatusBadge';
@@ -26,6 +30,9 @@ import { TransferLeaderModal } from '@/features/group/components/TransferLeaderM
 import { RejectGroupModal } from '@/features/group/components/RejectGroupModal';
 import { LecturerGroupModal } from '@/features/group/components/LecturerGroupModal';
 import { UnassignedStudentsDrawer } from '@/features/group/components/UnassignedStudentsDrawer';
+import { StudentBioCard } from '@/features/group/components/StudentBioCard';
+import { useStudentProfile } from '@/features/students/hooks/useStudentProfile';
+import type { GroupRecommendationDTO, GroupInvitationDTO } from '@/features/group/types/groupTypes';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
@@ -95,14 +102,102 @@ export const SelectGroupPage: React.FC = () => {
     retry: false,
   });
 
+  // Pending group invitations for this student
+  const { data: myInvitations = [], refetch: refetchInvitations } = useQuery({
+    queryKey: ['my-invitations', deadlineId, classId],
+    queryFn: ({ signal }) => groupApi.getMyPendingInvitations(deadlineId!, classId!, signal),
+    enabled: !!deadlineId && !!classId && !workspace?.myGroup && !workspace?.isLecturer,
+  });
+
   // Realtime WebSocket sync
   const { status: wsStatus } = useGroupWebSocket({
     deadlineId,
     classId,
-    onEvent: event => {
-      if (!['DEADLINE_CLOSED', 'DEADLINE_EXPIRED', 'DEADLINE_CANCELLED'].includes(event.eventType)) return;
-      setCreateModalOpen(false); setTransferModalOpen(false); setRejectModalOpen(false);
-      setLecturerModalOpen(false); setUnassignedDrawerOpen(false);
+    onEvent: (event) => {
+      if (['DEADLINE_CLOSED', 'DEADLINE_EXPIRED', 'DEADLINE_CANCELLED'].includes(event.eventType)) {
+        setCreateModalOpen(false);
+        setTransferModalOpen(false);
+        setRejectModalOpen(false);
+        setLecturerModalOpen(false);
+        setUnassignedDrawerOpen(false);
+      }
+      if (event.eventType === 'GROUP_INVITATION_SENT') {
+        refetchInvitations();
+        queryClient.invalidateQueries({ queryKey: ['group-invitations', deadlineId, classId] });
+        const payload = event.payload as GroupInvitationDTO | undefined;
+        if (payload && payload.studentId === user?.id) {
+          notification.info({
+            message: t('studentGroup.invitation.receivedTitle', 'Lời mời tham gia nhóm mới!'),
+            description: t('studentGroup.invitation.receivedDesc', 'Nhóm "{{groupName}}" đã gửi lời mời bạn tham gia nhóm!', {
+              groupName: payload.groupName,
+            }),
+            placement: 'topRight',
+            duration: 8,
+          });
+        }
+      }
+      if (event.eventType === 'STUDENT_BIO_UPDATED') {
+        const payload = event.payload as { studentId?: number; selfDescription?: string } | undefined;
+        const targetStudentId = payload?.studentId;
+        const newBio = payload?.selfDescription ?? null;
+
+        if (targetStudentId) {
+          queryClient.setQueryData(['group-workspace', deadlineId, classId], (old: any) => {
+            if (!old) return old;
+            const updateMember = (m: any) =>
+              m.studentId === targetStudentId ? { ...m, selfDescription: newBio } : m;
+            return {
+              ...old,
+              groups: (old.groups || []).map((g: any) => ({
+                ...g,
+                members: (g.members || []).map(updateMember),
+              })),
+              myGroup: old.myGroup
+                ? {
+                    ...old.myGroup,
+                    members: (old.myGroup.members || []).map(updateMember),
+                  }
+                : null,
+              unassignedStudents: (old.unassignedStudents || []).map(updateMember),
+            };
+          });
+
+          queryClient.setQueryData(['recommended-students', deadlineId, classId], (old: any) => {
+            if (!Array.isArray(old)) return old;
+            return old.map((m: any) =>
+              m.studentId === targetStudentId ? { ...m, selfDescription: newBio } : m
+            );
+          });
+
+          queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+          queryClient.invalidateQueries({ queryKey: ['recommended-students', deadlineId, classId] });
+          queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+          queryClient.invalidateQueries({ queryKey: ['search-students-invite'] });
+
+          if (targetStudentId === user?.id) {
+            refetchProfile();
+            queryClient.invalidateQueries({ queryKey: ['student-profile', user?.id] });
+          }
+        }
+      }
+      if (
+        [
+          'GROUP_INVITATION_ACCEPTED',
+          'GROUP_INVITATION_REJECTED',
+          'GROUP_INVITATION_CANCELLED',
+          'MEMBER_JOINED',
+          'MEMBER_LEFT',
+          'GROUP_CREATED',
+          'GROUP_DISBANDED',
+          'GROUP_UPDATED',
+        ].includes(event.eventType)
+      ) {
+        queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+        queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+        queryClient.invalidateQueries({ queryKey: ['recommended-students', deadlineId, classId] });
+        queryClient.invalidateQueries({ queryKey: ['group-invitations', deadlineId, classId] });
+        refetchInvitations();
+      }
     },
   });
 
@@ -115,7 +210,17 @@ export const SelectGroupPage: React.FC = () => {
   const [unassignedDrawerOpen, setUnassignedDrawerOpen] = useState(false);
   const [actionLoadingGroupId, setActionLoadingGroupId] = useState<number | null>(null);
 
+  // Student Profile query for personal bio
+  const { data: studentProfile, refetch: refetchProfile } = useStudentProfile();
 
+  // Recommended groups query for unassigned students
+  const { data: recommendedGroups = [] } = useQuery({
+    queryKey: ['recommended-groups', deadlineId, classId],
+    queryFn: ({ signal }) => groupApi.getRecommendedGroups(deadlineId!, classId!, signal),
+    enabled: !!deadlineId && !!classId && !workspace?.myGroup && !workspace?.isLecturer,
+  });
+
+  const [groupFilter, setGroupFilter] = useState<'all' | 'recommended'>('all');
 
   // Countdown timer
   const [timeLeft, setTimeLeft] = useState<{
@@ -296,6 +401,60 @@ export const SelectGroupPage: React.FC = () => {
     },
   });
 
+  const [acceptingInvId, setAcceptingInvId] = useState<number | null>(null);
+  const [rejectingInvId, setRejectingInvId] = useState<number | null>(null);
+
+  const acceptInvitationMutation = useMutation({
+    mutationFn: (invitationId: number) => {
+      setAcceptingInvId(invitationId);
+      return groupApi.acceptInvitation(deadlineId!, classId!, invitationId);
+    },
+    onSuccess: () => {
+      message.success(t('studentGroup.invitation.acceptSuccess', 'Gia nhập nhóm thành công!'));
+      queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+    },
+    onError: (err: any) => {
+      message.error(err.message || t('studentGroup.invitation.acceptError', 'Không thể gia nhập nhóm'));
+    },
+    onSettled: () => setAcceptingInvId(null),
+  });
+
+  const rejectInvitationMutation = useMutation({
+    mutationFn: (invitationId: number) => {
+      setRejectingInvId(invitationId);
+      return groupApi.rejectInvitation(deadlineId!, classId!, invitationId);
+    },
+    onSuccess: () => {
+      message.info(t('studentGroup.invitation.rejectSuccess', 'Đã từ chối lời mời.'));
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+    },
+    onError: (err: any) => {
+      message.error(err.message || t('studentGroup.invitation.rejectError', 'Không thể từ chối lời mời'));
+    },
+    onSettled: () => setRejectingInvId(null),
+  });
+
+  const otherGroups = (workspace?.groups || []).filter(
+    (g) => !workspace?.myGroup || g.id !== workspace.myGroup.id
+  );
+
+  const recMap = React.useMemo(() => {
+    const map = new Map<number, GroupRecommendationDTO>();
+    recommendedGroups.forEach((r) => map.set(r.groupId, r));
+    return map;
+  }, [recommendedGroups]);
+
+  const displayedGroups = React.useMemo(() => {
+    if (groupFilter === 'recommended' && !workspace?.myGroup) {
+      return otherGroups
+        .filter((g) => recMap.has(g.id))
+        .sort((a, b) => (recMap.get(b.id)?.matchScore || 0) - (recMap.get(a.id)?.matchScore || 0));
+    }
+    return otherGroups;
+  }, [otherGroups, groupFilter, recMap, workspace?.myGroup]);
+
   // Missing query parameters
   if (!deadlineId || !classId) {
     if (isActivitiesLoading) {
@@ -391,10 +550,6 @@ export const SelectGroupPage: React.FC = () => {
     );
   }
 
-  const otherGroups = (workspace?.groups || []).filter(
-    (g) => !workspace?.myGroup || g.id !== workspace.myGroup.id
-  );
-
   return (
     <div className="student-group-container">
       <DeadlineStateNotice status={deadlineState} />
@@ -454,6 +609,20 @@ export const SelectGroupPage: React.FC = () => {
           </div>}
         </div>
       </div>
+
+      {/* Student Self-Description Card (Can add, edit, delete bio) */}
+      {!workspace?.isLecturer && (
+        <StudentBioCard
+          initialBio={studentProfile?.selfDescription}
+          onBioUpdated={() => {
+            refetchProfile();
+            queryClient.invalidateQueries({ queryKey: ['student-profile', user?.id] });
+            queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+            queryClient.invalidateQueries({ queryKey: ['recommended-students', deadlineId, classId] });
+            queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+          }}
+        />
+      )}
 
       {/* Main Workspace Actions Bar */}
       <div className="student-group-actions-bar">
@@ -516,15 +685,137 @@ export const SelectGroupPage: React.FC = () => {
         />
       )}
 
+      {/* PENDING INVITATIONS NOTIFICATION / CARD (For unassigned students) */}
+      {!workspace?.myGroup && myInvitations.length > 0 && (
+        <div
+          style={{
+            marginBottom: '1.75rem',
+            padding: '1.25rem 1.5rem',
+            backgroundColor: '#f0fdf4',
+            border: '1.5px solid #86efac',
+            borderRadius: '12px',
+            boxShadow: '0 4px 12px rgba(34, 197, 94, 0.08)',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+            <div
+              style={{
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                backgroundColor: '#22c55e',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Mail size={16} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.0625rem', fontWeight: 700, color: '#166534' }}>
+                {t('studentGroup.invitation.bannerTitle', 'Bạn nhận được {{count}} lời mời tham gia nhóm', {
+                  count: myInvitations.length,
+                })}
+              </h3>
+              <p style={{ margin: 0, fontSize: '0.8125rem', color: '#15803d' }}>
+                {t('studentGroup.invitation.bannerDesc', 'Chọn "Đồng ý" để gia nhập nhóm ngay lập tức')}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {myInvitations.map((inv) => (
+              <div
+                key={inv.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '12px 16px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '10px',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 700, fontSize: '1rem', color: '#0f172a' }}>
+                      {inv.groupName}
+                    </span>
+                    <span style={{ fontSize: '0.8125rem', color: '#64748b' }}>
+                      ({inv.currentMembers}/{inv.maxMembers} {t('studentGroup.members', 'thành viên')})
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8125rem', color: '#475569', marginTop: 2 }}>
+                    {t('studentGroup.invitation.invitedBy', 'Người gửi')}: <strong>{inv.inviterName}</strong>
+                    {inv.message && (
+                      <span style={{ fontStyle: 'italic', marginLeft: 8, color: '#64748b' }}>
+                        "{inv.message}"
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Button
+                    variant="primary"
+                    icon={<Check size={15} />}
+                    loading={acceptingInvId === inv.id}
+                    onClick={() => acceptInvitationMutation.mutate(inv.id)}
+                    style={{ backgroundColor: '#16a34a', borderColor: '#16a34a' }}
+                  >
+                    {t('studentGroup.invitation.acceptBtn', 'Đồng ý')}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    icon={<X size={15} />}
+                    loading={rejectingInvId === inv.id}
+                    onClick={() => rejectInvitationMutation.mutate(inv.id)}
+                    style={{ color: '#ef4444' }}
+                  >
+                    {t('studentGroup.invitation.rejectBtn', 'Từ chối')}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 2. AVAILABLE GROUPS GRID */}
       <div style={{ marginBottom: '2.5rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '8px' }}>
           <h3 style={{ fontSize: '1.125rem', fontWeight: 700, margin: 0, color: 'var(--color-text-main)' }}>
             {workspace?.myGroup ? t('studentGroup.otherGroups') : t('studentGroup.availableGroups')}
           </h3>
+
+          {!workspace?.myGroup && recommendedGroups.length > 0 && (
+            <Segmented
+              value={groupFilter}
+              onChange={(val) => setGroupFilter(val as 'all' | 'recommended')}
+              options={[
+                {
+                  label: `${t('studentGroup.allGroups', 'Tất cả')} (${otherGroups.length})`,
+                  value: 'all',
+                },
+                {
+                  label: (
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 600, color: '#16a34a' }}>
+                      <Sparkles size={13} />
+                      {t('studentGroup.recommendedForYou', 'Đề xuất cho bạn')} ({recommendedGroups.length})
+                    </span>
+                  ),
+                  value: 'recommended',
+                },
+              ]}
+            />
+          )}
         </div>
 
-        {otherGroups.length === 0 ? (
+        {displayedGroups.length === 0 ? (
           <div
             style={{
               padding: '3rem 1.5rem',
@@ -536,20 +827,30 @@ export const SelectGroupPage: React.FC = () => {
           >
             <Users size={36} color="#94a3b8" style={{ marginBottom: '8px' }} />
             <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--color-text-main)' }}>
-              {t('studentGroup.emptyGroupsTitle')}
+              {groupFilter === 'recommended'
+                ? t('studentGroup.noRecommendedGroupsTitle', 'Chưa có nhóm gợi ý phù hợp')
+                : t('studentGroup.emptyGroupsTitle')}
             </div>
             <p style={{ color: 'var(--color-text-muted)', fontSize: '0.875rem', margin: '4px 0 1rem' }}>
-              {t('studentGroup.emptyGroupsDesc')}
+              {groupFilter === 'recommended'
+                ? t('studentGroup.noRecommendedGroupsDesc', 'Hiện chưa có nhóm nào trong lớp cần thêm chuyên ngành của bạn hoặc các nhóm đã đầy.')
+                : t('studentGroup.emptyGroupsDesc')}
             </p>
-            {workspace?.canCreateGroup && !isExpired && (
-              <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
-                {t('studentGroup.createFirstGroup')}
+            {groupFilter === 'recommended' ? (
+              <Button variant="outline" onClick={() => setGroupFilter('all')}>
+                {t('studentGroup.viewAllGroups', 'Xem tất cả nhóm')}
               </Button>
+            ) : (
+              workspace?.canCreateGroup && !isExpired && (
+                <Button variant="primary" icon={<Plus size={16} />} onClick={() => setCreateModalOpen(true)}>
+                  {t('studentGroup.createFirstGroup')}
+                </Button>
+              )
             )}
           </div>
         ) : (
           <div className="student-group-grid">
-            {otherGroups.map((group) => (
+            {displayedGroups.map((group) => (
               <GroupCard
                 key={group.id}
                 group={group}
@@ -566,6 +867,7 @@ export const SelectGroupPage: React.FC = () => {
                 }}
                 onRevoke={(id) => revokeGroupMutation.mutate(id)}
                 isActionLoading={actionLoadingGroupId === group.id && joinGroupMutation.isPending}
+                recommendation={recMap.get(group.id)}
               />
             ))}
           </div>

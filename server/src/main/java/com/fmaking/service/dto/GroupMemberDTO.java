@@ -25,4 +25,7 @@ public class GroupMemberDTO {
     private String majorName;
     private GroupMemberRole role;
     private Instant joinedAt;
+    private String selfDescription;
+    private Integer matchScore;
+    private java.util.List<String> matchReasons;
 }

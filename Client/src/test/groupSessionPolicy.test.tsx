@@ -59,12 +59,13 @@ describe('group session policy UI', () => {
   });
 
   it.each(['OPEN', 'PENDING', 'ACCEPTED', 'REVOKED'] as const)('limits Student actions for %s and after expiry', state => {
+    const testClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const props = { group: { ...group, status: state }, isLeader: true, isDeadlineExpired: false,
       onSubmit: vi.fn(), onCancelSubmit: vi.fn(), onLeave: vi.fn(), onDisband: vi.fn(), onOpenTransferModal: vi.fn() };
-    const view = render(<MyGroupCard {...props} />);
+    const view = render(<QueryClientProvider client={testClient}><MyGroupCard {...props} /></QueryClientProvider>);
     expect(screen.queryByRole('button', { name: i18n.t('studentGroup.myGroup.submitButton') }) !== null).toBe(['OPEN', 'REVOKED'].includes(state));
     expect(screen.queryByRole('button', { name: i18n.t('studentGroup.myGroup.cancelSubmitButton') }) !== null).toBe(state === 'PENDING');
-    view.rerender(<MyGroupCard {...props} isDeadlineExpired />);
+    view.rerender(<QueryClientProvider client={testClient}><MyGroupCard {...props} isDeadlineExpired /></QueryClientProvider>);
     expect(screen.queryByRole('button', { name: i18n.t('studentGroup.myGroup.submitButton') })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: i18n.t('studentGroup.myGroup.cancelSubmitButton') })).not.toBeInTheDocument();
   });

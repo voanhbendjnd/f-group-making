@@ -8,7 +8,7 @@ import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
 import { groupApi } from '../api/groupApi';
-import type { GroupDTO, WorkspaceDTO } from '../types/groupTypes';
+import type { GroupDTO, GroupMemberDTO, WorkspaceDTO } from '../types/groupTypes';
 import { useGroupWebSocket } from './useGroupWebSocket';
 
 export class AmbiguousGroupSessionError extends Error {
@@ -40,7 +40,30 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     enabled: !!classId && !!deadlineId, retry: false,
     refetchInterval: 30000,
   });
-  const { status: connection } = useGroupWebSocket({ deadlineId, classId });
+  const { status: connection } = useGroupWebSocket({
+    deadlineId,
+    classId,
+    onEvent: (event) => {
+      if (event.eventType === 'STUDENT_BIO_UPDATED') {
+        const payload = event.payload as { studentId?: number; selfDescription?: string } | undefined;
+        const targetStudentId = payload?.studentId;
+        const newBio = payload?.selfDescription ?? null;
+        if (targetStudentId) {
+          client.setQueryData(queryKey, (old: WorkspaceDTO | undefined) => {
+            if (!old) return old;
+            const updateMember = (m: GroupMemberDTO) =>
+              m.studentId === targetStudentId ? { ...m, selfDescription: newBio } : m;
+            return {
+              ...old,
+              groups: old.groups.map(g => ({ ...g, members: g.members.map(updateMember) })),
+              unassignedStudents: old.unassignedStudents.map(updateMember),
+            };
+          });
+        }
+      }
+      void client.invalidateQueries({ queryKey });
+    },
+  });
   const canManage = !!workspace.data?.canManageGroups;
   const canUnlock = canManage && (user?.authorities.includes('ROLE_ADMIN') || user?.id === workspace.data?.lecturerId);
   const editable = useCallback((group: GroupDTO) => canManage && ['OPEN', 'REVOKED'].includes(group.status), [canManage]);

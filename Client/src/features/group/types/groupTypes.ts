@@ -14,6 +14,19 @@ export interface GroupMemberDTO {
   majorName: string;
   role: GroupMemberRole;
   joinedAt?: string;
+  selfDescription?: string | null;
+  matchScore?: number;
+  matchReasons?: string[];
+}
+
+export interface GroupRecommendationDTO {
+  groupId: number;
+  groupName: string;
+  currentMembers: number;
+  maxMembers: number;
+  matchScore: number;
+  matchReasons: string[];
+  isEligible: boolean;
 }
 
 export type GroupingRuleCode =
@@ -124,3 +137,53 @@ export interface GroupReviewRow {
 }
 export interface GroupReviewParams { termId: number; classId?: number; status?: GroupStatus; search?: string; page: number; size: number; }
 export interface GroupReviewPage { result: GroupReviewRow[]; meta: { page: number; pageSize: number; pages: number; total: number }; }
+
+export type GroupInvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';
+
+export interface GroupInvitationDTO {
+  id: number;
+  groupId: number;
+  groupName: string;
+  studentId: number;
+  studentName: string;
+  studentEmail: string;
+  studentRollNumber: string;
+  studentMajorCode: string;
+  inviterId: number;
+  inviterName: string;
+  deadlineId: number;
+  schoolClassId: number;
+  status: GroupInvitationStatus;
+  message?: string;
+  createdAt: string;
+  respondedAt?: string;
+  currentMembers: number;
+  maxMembers: number;
+  matchReasons?: string[];
+}
+
+export interface SendInvitationRequest {
+  studentId?: number;
+  email?: string;
+  message?: string;
+}
+
+export interface StudentSearchForInviteDTO {
+  studentId: number;
+  fullName: string;
+  email: string;
+  rollNumber: string;
+  memberCode: string;
+  majorId?: number;
+  majorCode: string;
+  majorName: string;
+  selfDescription?: string | null;
+  hasGroup: boolean;
+  currentGroupId?: number;
+  currentGroupName?: string;
+  canInvite: boolean;
+  ruleViolationReason?: string | null;
+  hasPendingInvitation: boolean;
+  pendingInvitationId?: number | null;
+}
+

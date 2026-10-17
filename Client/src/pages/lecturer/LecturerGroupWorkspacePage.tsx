@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, Plus, RefreshCw, Search, Users } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -43,12 +44,30 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   const { boardRef, startAutoScroll, stopAutoScroll } = useBoardAutoScroll();
   const [pool, setPool] = useState<'expanded' | 'collapsed' | 'hidden'>(() => window.innerWidth < 900 ? 'collapsed' : 'expanded');
   const [studentSearch, setStudentSearch] = useState(''); const [major, setMajor] = useState('');
+  const [suggestGroupId, setSuggestGroupId] = useState<number | null>(null);
   const [groupSearch, setGroupSearch] = useState(''); const [create, setCreate] = useState<number[] | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [rejectId, setRejectId] = useState<number | null>(null);
   const dragged = useRef<DragStudent | null>(null); const [draggedId, setDraggedId] = useState<number | null>(null);
   const [over, setOver] = useState<number | 'pool' | 'create' | null>(null);
   const data = workspace.data;
+
+  const { data: poolRecs = [] } = useQuery({
+    queryKey: ['recommended-students-pool', deadlineId, classId, suggestGroupId],
+    queryFn: ({ signal }) =>
+      deadlineId && classId && suggestGroupId && groupApi.getRecommendedStudents
+        ? groupApi.getRecommendedStudents(deadlineId, classId, suggestGroupId, signal)
+        : Promise.resolve([]),
+    enabled: !!suggestGroupId && !!deadlineId && !!classId,
+    staleTime: 10000,
+  });
+
+  const poolRecMap = useMemo(() => {
+    const map = new Map<number, GroupMemberDTO>();
+    poolRecs.forEach((r) => { map.set(r.studentId, r); });
+    return map;
+  }, [poolRecs]);
+
   useEffect(() => { if (!requestedDeadline && deadlineId) setDeadline(deadlineId); }, [deadlineId, requestedDeadline, setDeadline]);
   const clearDrag = () => { dragged.current = null; setDraggedId(null); setOver(null); stopAutoScroll(); };
   const back = reviewPath(params);
@@ -66,7 +85,27 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link></div></div>;
   const targets = data.groups.filter(editable);
   const groups = data.groups.filter(group => !groupSearch.trim() || group.name.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()) || group.members.some(student => matches(student, groupSearch)));
-  const students = data.unassignedStudents.filter(student => (!major || student.majorCode === major) && matches(student, studentSearch));
+  const students = (data.unassignedStudents || [])
+    .filter(student => (!major || student.majorCode === major) && matches(student, studentSearch))
+    .map(student => {
+      const rec = poolRecMap.get(student.studentId);
+      if (rec) {
+        return {
+          ...student,
+          matchScore: rec.matchScore,
+          matchReasons: rec.matchReasons,
+        };
+      }
+      return student;
+    })
+    .sort((a, b) => {
+      if (suggestGroupId) {
+        const scoreA = a.matchScore ?? -1;
+        const scoreB = b.matchScore ?? -1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+      }
+      return a.fullName.localeCompare(b.fullName);
+    });
   const majors = [...new Set(data.unassignedStudents.map(student => student.majorCode).filter(Boolean))].sort();
   const maxMembers = data.rules.find(rule => rule.status && rule.code === 'MAX_MEMBERS_PER_GROUP')?.value ?? data.groups[0]?.maxMembers ?? 2147483647;
   const readDrag = (event: DragEvent): DragStudent | null => {
@@ -149,8 +188,29 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
         </header>
         {pool === 'expanded' && <>
           <div className="board-pool-filters">
-            <label className="board-search"><Search size={16} /><input aria-label={t('groupWorkspace.searchPlaceholder')} placeholder={t('groupWorkspace.searchPlaceholder')} value={studentSearch} onChange={event => setStudentSearch(event.target.value)} /></label>
-            <select aria-label={t('groupBoard.majorFilter')} value={major} onChange={event => setMajor(event.target.value)}><option value="">{t('groupWorkspace.all')}</option>{[...new Set([...majors, ...(major ? [major] : [])])].map(code => <option key={code} value={code}>{code}</option>)}</select>
+            <label className="board-search">
+              <Search size={16} />
+              <input aria-label={t('groupWorkspace.searchPlaceholder')} placeholder={t('groupWorkspace.searchPlaceholder')} value={studentSearch} onChange={event => setStudentSearch(event.target.value)} />
+            </label>
+            <div style={{ display: 'flex', gap: '0.4rem' }}>
+              <select style={{ flex: 1 }} aria-label={t('groupBoard.majorFilter')} value={major} onChange={event => setMajor(event.target.value)}>
+                <option value="">{t('groupWorkspace.all')}</option>
+                {[...new Set([...majors, ...(major ? [major] : [])])].map(code => <option key={code} value={code}>{code}</option>)}
+              </select>
+              <select
+                style={{ flex: 1.3 }}
+                aria-label={t('groupBoard.suggestForGroup')}
+                value={suggestGroupId ?? ''}
+                onChange={event => setSuggestGroupId(event.target.value ? Number(event.target.value) : null)}
+              >
+                <option value="">{t('groupBoard.allPool')}</option>
+                {data.groups.filter(editable).map(g => (
+                  <option key={g.id} value={g.id}>
+                    ✨ {g.name} ({g.memberCount}/{g.maxMembers})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="board-pool-students" data-board-scroll>
             {students.map(student => <BoardStudentCard key={student.studentId} student={student} source={null} targets={targets} editable={canManage} pending={pending} dragging={draggedId === student.studentId}
@@ -162,11 +222,12 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       </aside>}
       <div ref={boardRef} className="group-board-track" role="region" aria-label={t('groupBoard.columns')} tabIndex={0}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null); }}>
-        {groups.map(group => <GroupBoardColumn key={group.id} group={group} targets={targets} editable={editable(group)} canManage={canManage} canUnlock={!!canUnlock} pending={pending}
+        {groups.map(group => <GroupBoardColumn key={group.id} deadlineId={deadlineId} classId={classId} group={group} targets={targets} editable={editable(group)} canManage={canManage} canUnlock={!!canUnlock} pending={pending}
           dragOver={over === group.id} draggedId={draggedId} onDragStart={startDrag} onDragEnd={clearDrag}
           onDragOver={event => dragOver(event, group.id)} onDrop={event => drop(event, group.id)}
           onMove={(studentId, target) => quiet(move(studentId, group.id, target))} onRemove={studentId => remove(group, studentId)}
           onSetLeader={studentId => quiet(run(() => groupApi.lecturerSetLeader(deadlineId, classId, group.id, studentId)))}
+          onAddMember={studentId => quiet(move(studentId, null, group.id))}
           onSubmit={() => quiet(run(() => groupApi.lecturerSubmitGroup(deadlineId, classId, group.id)))}
           onApprove={() => quiet(run(() => groupApi.acceptGroup(deadlineId, classId, group.id)))}
           onReject={() => setRejectId(group.id)} onUnlock={() => unlock(group)} onDisband={() => disband(group)} />)}
