@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { Modal, Form, Input, Select, Button, Alert } from 'antd';
 import { UserPlus } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -28,7 +28,18 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
   const requestInFlight = useRef(false);
+  const wasOpen = useRef(false);
   const selectedStudentIds = Form.useWatch('studentIds', form);
+
+  useEffect(() => {
+    // A reused Form instance retains old values even after the modal is destroyed.
+    // Initialize once per opening so workspace refreshes do not overwrite edits.
+    if (open && !wasOpen.current) {
+      form.resetFields();
+      form.setFieldsValue({ studentIds: [...initialStudentIds] });
+    }
+    wasOpen.current = open;
+  }, [open, initialStudentIds, form]);
 
   // Compute stats on currently selected students
   const selectedStudents = useMemo(() => {
@@ -89,13 +100,13 @@ export const LecturerGroupModal: React.FC<LecturerGroupModalProps> = ({
       onCancel={() => { if (!submitting && !isLoading && !requestInFlight.current) { form.resetFields(); onClose(); } }}
       footer={null}
       width={640}
-      destroyOnClose
+      destroyOnHidden
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
         {t('groupLifecycle.draftDescription')}
       </p>
 
-      <Form form={form} layout="vertical" initialValues={{ studentIds: initialStudentIds }} onFinish={handleFinish}>
+      <Form form={form} layout="vertical" onFinish={handleFinish}>
         <Form.Item
           name="name"
           label={t('groupWorkspace.createModal.nameLabel')}

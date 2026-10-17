@@ -44,7 +44,7 @@ describe('group review', () => {
     mount(row(), '/lecturer/group-review?termId=8&classId=2&status=PENDING&search=Leader');
     await screen.findByText('Review fixture');
     expect(screen.getByLabelText('Search group or leader')).toHaveValue('Leader');
-    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupBoard.open') }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.openAdvancedAction') }));
     const output = await screen.findByTestId('board-url');
     const url = new URL(output.textContent!, 'http://localhost');
     expect(url.pathname).toBe('/lecturer/group-review/advanced');
@@ -54,8 +54,9 @@ describe('group review', () => {
   it('requires a class choice when several classes are available', async () => {
     vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [2, 5].map(id => ({ id, name: `Class ${id}`, termId: 8, lecturerId: 1, studentCount: 4 })), meta: { total: 2, pages: 1, page: 1, pageSize: 50 } });
     mount(); await screen.findByText('Review fixture');
-    expect(screen.getByRole('button', { name: i18n.t('groupBoard.open') })).toBeDisabled();
-    expect(screen.getByText(i18n.t('groupBoard.chooseClass'))).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: i18n.t('groupBoard.open') })).not.toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('groupBoard.chooseClass'))).not.toBeInTheDocument();
+    expect(screen.getByText(i18n.t('groupReview.selectClassPrompt'))).toBeInTheDocument();
   });
 
   it('discards class and search filters from another term', async () => {

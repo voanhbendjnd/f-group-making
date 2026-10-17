@@ -180,7 +180,6 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       </div>
     </header>
     <div className="board-context-bar">
-      <Link to={back} className="board-context-back-link"><ArrowLeft size={15} aria-hidden="true" /><span>{t('groupBoard.back')}</span></Link>
       <label className="board-search"><Search size={16} /><input aria-label={t('groupBoard.searchGroups')} placeholder={t('groupBoard.searchGroups')} value={groupSearch} onChange={event => setGroupSearch(event.target.value)} /></label>
       <span className="board-count">{t('groupBoard.groupCount', { count: data.groups.length })}</span>
       <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>
@@ -234,6 +233,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       <div ref={boardRef} className="group-board-track" role="region" aria-label={t('groupBoard.columns')} tabIndex={0}
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null); }}>
         {groups.map(group => <GroupBoardColumn key={group.id} deadlineId={deadlineId} classId={classId} group={group} targets={targets} editable={editable(group)} canManage={canManage} canUnlock={!!canUnlock} pending={pending}
+          unassignedStudents={data.unassignedStudents}
           dragOver={over === group.id} draggedId={draggedId} onDragStart={startDrag} onDragEnd={clearDrag}
           onDragOver={event => dragOver(event, group.id)} onDrop={event => drop(event, group.id)}
           onMove={(studentId, target) => quiet(move(studentId, group.id, target))} onRemove={studentId => remove(group, studentId)}
