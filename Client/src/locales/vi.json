@@ -1,5 +1,20 @@
 {
   "allocation": {
+    "heroTitle": "Phân bổ nhóm thông minh",
+    "heroDescription": "Chia nhóm cân bằng, công bằng theo quy định của lớp. Kiểm tra từng phương án trước khi áp dụng.",
+    "chooseClassHint": "Chọn lớp được phân công để mở trang phân bổ tự động.",
+    "detailHint": "Kiểm tra lớp, chuẩn bị phương án và xác nhận khi sẵn sàng áp dụng.",
+    "overview": "Tổng quan lớp",
+    "activeRules": "{{count}} đang bật",
+    "confirmTargetHint": "Chọn mục tiêu rồi xác nhận để tạo và lưu phương án ngẫu nhiên.",
+    "suggestionDetails": "Vì sao có gợi ý này?",
+    "searchDetails": "Thông tin tìm kiếm",
+    "readyToApplyHint": "Chỉ có thể áp dụng khi phương án khả thi và dữ liệu hiện tại đã được kiểm tra.",
+    "actionsLocked": "Có yêu cầu đang xử lý hoặc chờ khôi phục. Hoàn tất yêu cầu đó trước khi thao tác tiếp.",
+    "planOwnerOnly": "Chỉ người tạo phương án còn quyền quản lý lớp mới được áp dụng phương án này.",
+    "completed": "Lớp đã hoàn tất phân nhóm",
+    "completedHint": "Tất cả nhóm đã được duyệt và không còn sinh viên chưa có nhóm. Bạn vẫn có thể xem lịch sử và chi tiết nhóm.",
+    "acceptedWithUnassigned": "Tất cả nhóm hiện có đã được duyệt nhưng vẫn còn sinh viên chưa có nhóm. Giảng viên phụ trách cần xử lý trước khi tiếp tục phân bổ.",
     "classList": "Lớp được phân công",
     "searchClasses": "Tìm kiếm lớp",
     "openClass": "Mở phân bổ",
@@ -180,6 +195,7 @@
       "other": "Hãy kiểm tra quy định và cảnh báo khả thi trước khi áp dụng."
     },
     "errors": {
+      "allocationAlreadyComplete": "Tất cả nhóm đã được duyệt và không còn sinh viên chưa có nhóm. Không cần phân bổ thêm.",
       "allocationBalanceViolation": "Phương án không đạt chênh lệch sĩ số tối đa 1 người. Hãy tạo phương án mới.",
       "allocationPlanUnavailable": "Không tìm thấy phương án trong lớp/phiên này hoặc dữ liệu phương án cũ đã bị dọn trước đó.",
       "unknown": "Chưa xác minh được kết quả. Nếu đang áp dụng, hãy thử lại cùng yêu cầu hoặc kiểm tra Lịch sử.",
@@ -1630,6 +1646,39 @@
       "MIN_GROUPS_PER_CLASS_failed": "Chưa đạt tối thiểu {{target}} nhóm trong lớp (hiện có: {{actual}})",
       "MAX_GROUPS_PER_CLASS_passed": "Đạt giới hạn tối đa {{target}} nhóm trong lớp (hiện có: {{actual}})",
       "MAX_GROUPS_PER_CLASS_failed": "Vượt tối đa {{target}} nhóm trong lớp (hiện có: {{actual}})"
-    }
+    },
+    "previewExport": "Xem trước xếp nhóm",
+    "exportExcel": "Xuất Excel (.xlsx)",
+    "exportSuccess": "Đã xuất file Excel kết quả phân nhóm thành công!",
+    "exportError": "Có lỗi khi xuất file Excel",
+    "exportSelectClassPrompt": "Vui lòng chọn một lớp học để xem trước hoặc xuất dữ liệu phân nhóm."
+  },
+  "groupExport": {
+    "modalTitle": "Xem trước kết quả phân nhóm",
+    "modalSubtitle": "Kiểm tra thông tin phân nhóm của toàn bộ sinh viên trong lớp trước khi xuất file Excel",
+    "statsTitle": "Thống kê phân nhóm",
+    "totalStudents": "Tổng số SV",
+    "assignedStudents": "Đã có nhóm",
+    "unassignedStudents": "Chưa có nhóm",
+    "totalGroups": "Số nhóm",
+    "searchPlaceholder": "Tìm theo MSSV, họ tên, email, nhóm...",
+    "filterAll": "Tất cả sinh viên",
+    "filterAssigned": "Đã có nhóm",
+    "filterUnassigned": "Chưa có nhóm",
+    "colStt": "STT",
+    "colRollNumber": "Mã SV",
+    "colFullName": "Họ và tên",
+    "colKhoa": "Khoá / Ngành",
+    "colMemberCode": "Mã TV",
+    "colEmail": "Email",
+    "colGroupMentor": "Nhóm (Group Mentor)",
+    "noGroup": "Chưa có nhóm",
+    "exportBtn": "Xuất file Excel (.xlsx)",
+    "closeBtn": "Đóng",
+    "loading": "Đang tải dữ liệu phân nhóm...",
+    "loadError": "Không thể tải dữ liệu",
+    "empty": "Không có dữ liệu sinh viên",
+    "noDataToExport": "Không có dữ liệu sinh viên để xuất file.",
+    "footerHint": "Cột Group Mentor trong file Excel sẽ lưu tên nhóm của sinh viên (để trống nếu chưa có nhóm)."
   }
 }

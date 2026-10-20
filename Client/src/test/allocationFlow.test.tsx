@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -8,7 +8,7 @@ import { LecturerAllocationPage } from '@/pages/lecturer/LecturerAllocationPage'
 import { Sidebar } from '@/components/layout/Sidebar';
 import { classApi } from '@/features/classes/api/classApi';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
-import { allocationErrorKey, newRequestKey, validTarget } from '@/features/allocation/utils';
+import { allocationErrorKey, isAllocationComplete, newRequestKey, validTarget } from '@/features/allocation/utils';
 import { overviewFixture, setupFixture, previewFixture, applyFixture, planFixture } from './allocationFixtures';
 import i18n from '@/locales/i18n';
 
@@ -57,6 +57,33 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('automatic allocation workflow', () => {
+  it('only treats nonempty accepted groups with no unassigned students as complete', () => {
+    const complete = { ...overviewFixture, groups: overviewFixture.groups.map(group => ({ ...group, status: 'ACCEPTED' as const })) };
+    expect(isAllocationComplete(complete)).toBe(true);
+    expect(isAllocationComplete({ ...complete, groups: [] })).toBe(false);
+    expect(isAllocationComplete({ ...complete, summary: { ...complete.summary, unassignedStudents: 1 } })).toBe(false);
+    expect(isAllocationComplete({ ...complete, groups: complete.groups.map(group => ({ ...group, status: 'PENDING' as const })) })).toBe(false);
+  });
+  it('disables allocation for a completed class but keeps history details available in VI/EN', async () => {
+    vi.mocked(allocationApi.overview).mockResolvedValue({ ...overviewFixture, groups: overviewFixture.groups.map(group => ({ ...group, status: 'ACCEPTED' as const })) });
+    render(pageTree());
+    await screen.findByText(i18n.t('allocation.completed'));
+    expect(screen.getByRole('button', { name: i18n.t('allocation.autoAllocate'), exact: true })).toBeDisabled();
+    expect(allocationApi.preview).not.toHaveBeenCalled(); expect(allocationApi.setup).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('allocation.viewPlan') }));
+    await screen.findByText(i18n.t('allocation.savedPlan'));
+    await act(async () => i18n.changeLanguage('vi'));
+    expect(await screen.findByText(i18n.t('allocation.completed'))).toBeInTheDocument();
+    expect(allocationApi.preview).not.toHaveBeenCalled();
+  }, 15000);
+  it('warns instead of marking the class complete if accepted groups leave students unassigned', async () => {
+    vi.mocked(allocationApi.overview).mockResolvedValue({ ...overviewFixture, groups: overviewFixture.groups.map(group => ({ ...group, status: 'ACCEPTED' as const })), summary: { ...overviewFixture.summary, unassignedStudents: 1 } });
+    const value = hook(); await waitFor(() => expect(value.result.current.overview.isSuccess).toBe(true));
+    expect(value.result.current.complete).toBe(false); expect(value.result.current.acceptedWithUnassigned).toBe(true);
+    act(() => value.result.current.start());
+    await waitFor(() => expect(value.result.current.setup.isSuccess).toBe(true));
+  });
   it('generates a valid request key on a LAN origin without native randomUUID', () => {
     const native = vi.spyOn(crypto, 'randomUUID').mockReturnValue(undefined as unknown as ReturnType<typeof crypto.randomUUID>);
     try { expect(newRequestKey()).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/); }
@@ -172,6 +199,40 @@ describe('automatic allocation workflow', () => {
     await screen.findByRole('button', { name: i18n.t('allocation.openClass') });
     expect(screen.queryByText('Fixture group 1')).not.toBeInTheDocument();
   });
+  it('shows neutral numbered process steps on the class list, not in class details', async () => {
+    render(pageTree('/lecturer/automatic-allocation'));
+    const process = screen.getByRole('region', { name: i18n.t('allocation.howItWorks') });
+    expect(within(process).getAllByRole('listitem')).toHaveLength(4);
+    for (let i = 0; i < 4; i++) {
+      expect(within(process).getByText(String(i + 1))).toBeInTheDocument();
+      expect(within(process).getByText(i18n.t(`allocation.steps.${i}.title`))).toBeInTheDocument();
+    }
+    expect(process.querySelector('[aria-current]')).toBeNull();
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('allocation.openClass') }));
+    await screen.findByText('Fixture group 1');
+    expect(screen.queryByRole('region', { name: i18n.t('allocation.howItWorks') })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Class A' })).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.applyAudit') }));
+    expect(await screen.findByRole('button', { name: 'View run #9' })).toBeInTheDocument();
+  });
+  it('uses the same card style for all statuses while retaining protected badges and member details', async () => {
+    const groups = overviewFixture.groups.map((group, index) => ({ ...group,
+      status: (['ACCEPTED', 'PENDING', 'REVOKED'] as const)[index], protectedGroup: index < 2 }));
+    vi.mocked(allocationApi.overview).mockResolvedValue({ ...overviewFixture, groups });
+    render(pageTree());
+    await screen.findByRole('heading', { name: 'Class A', level: 1 });
+    const accepted = screen.getByRole('heading', { name: groups[0].name }).closest('article')!;
+    expect(accepted).toHaveClass('allocation-group', 'is-protected');
+    expect(accepted).toHaveClass('allocation-group--enhanced');
+    expect(within(accepted).getByText(i18n.t('groupReview.statuses.ACCEPTED'))).toBeInTheDocument();
+    expect(within(accepted).getByText(i18n.t('allocation.protected'))).toBeInTheDocument();
+    fireEvent.click(within(accepted).getByText(i18n.t('allocation.members', { count: groups[0].members.length })));
+    expect(await within(accepted).findByText('S10 · SE')).toBeInTheDocument();
+    for (const group of groups.slice(1)) expect(screen.getByRole('heading', { name: group.name }).closest('article')).toHaveClass('allocation-group--enhanced');
+    expect(allocationApi.preview).not.toHaveBeenCalled();
+    expect(allocationApi.apply).not.toHaveBeenCalled();
+  });
   it('does not apply saved plans marked stale or already applied by the backend', async () => {
     const value = hook(); await waitFor(() => expect(value.result.current.overview.isSuccess).toBe(true));
     for (const status of ['INVALID', 'APPLIED'] as const) {
@@ -211,7 +272,7 @@ describe('automatic allocation workflow', () => {
     await screen.findByText(i18n.t('allocation.savedPlan'));
     expect(allocationApi.plan).toHaveBeenCalledWith(3, 2, planFixture().summary.planId, expect.anything());
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    fireEvent.click(screen.getByText(i18n.t('allocation.applyAudit')));
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.applyAudit') }));
     fireEvent.click(await screen.findByRole('button', { name: 'View run #9' }));
     await screen.findByText('Allocation run #9'); expect(allocationApi.historyDetail).toHaveBeenCalledWith(3, 2, 9, expect.anything());
     await act(async () => i18n.changeLanguage('vi')); expect(await screen.findByText('Lần phân bổ #9')).toBeInTheDocument();

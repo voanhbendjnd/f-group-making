@@ -24,7 +24,7 @@ export function AllocationRules({ rules }: { rules: RuleView[] }) {
 }
 export const AllocationGroups = memo(function AllocationGroups({ groups, proposed = false }: { groups: AllocationGroup[]; proposed?: boolean }) {
   const { t } = useTranslation();
-  return <div className="allocation-groups">{groups.length ? groups.map(group => <article className={`allocation-group ${group.protectedGroup ? 'is-protected' : ''}`} key={group.groupId}>
+  return <div className="allocation-groups">{groups.length ? groups.map(group => <article className={`allocation-group allocation-group--enhanced ${group.protectedGroup ? 'is-protected' : ''}`} key={group.groupId}>
     <div className="allocation-group-heading"><h3>{group.name}</h3><Tag color={group.status === 'ACCEPTED' ? 'success' : 'blue'}>{t(`groupReview.statuses.${group.status}`)}</Tag></div>
     <div className="allocation-tags">
       {group.protectedGroup ? <Tag icon={<LockKeyhole size={12} />}>{t('allocation.protected')}</Tag> : proposed && <Tag color="blue">{t('allocation.willApprove')}</Tag>}

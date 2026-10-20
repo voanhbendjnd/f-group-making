@@ -791,7 +791,8 @@ Live membership mâu thuẫn vẫn cho đọc lịch sử hợp lệ trong đún
   phải xác nhận lại. Chặn double-click, abort/ignore response cũ khi đổi scope/target.
 - Random History table + drawer hiển thị nguyên nhóm đã lưu, members, scores, rules, report; có View/Open/Apply.
   Trước xác nhận Apply từ history, FE GET detail mới để cập nhật eligibility; Backend Apply vẫn là nguồn quyết định cuối.
-- Audit Apply thành công nằm riêng trong collapse. Unknown outcome giữ nguyên Idempotency-Key như trước.
+- Audit Apply thành công nằm ở tab riêng, ngang hàng với Current Saved Groups và Random History (xem mục 8.8).
+  Unknown outcome giữ nguyên Idempotency-Key như trước.
 - VI/EN, Ant Design, TermScope, tokens và style hiện có; bổ sung allocation query keys vào reconnect resync,
   không patch payload lịch sử như Deadline DTO. CORS cho phép Idempotency-Key để browser direct-origin Apply.
 
@@ -839,3 +840,94 @@ Live membership mâu thuẫn vẫn cho đọc lịch sử hợp lệ trong đún
 - Tests sửa `SmartAllocationServiceTest`, `AllocationApplyServiceTest`, `AllocationResourceTest`;
   FE `allocationFixtures.ts`, `allocationFlow.test.tsx`, `allocationApi.test.ts`.
   Chỉ cập nhật tài liệu Markdown này; không thêm/sửa migration trong lần cải tiến.
+
+### 8.7. Khóa phân bổ khi lớp đã hoàn tất
+
+- Hoàn tất khi có ít nhất một nhóm không DISBANDED, tất cả đều ACCEPTED và Unassigned bằng 0.
+  Lớp rỗng, lớp còn PENDING hoặc còn Unassigned không được coi là hoàn tất.
+- Khóa Auto Allocate, Xác nhận target, Random Again và Apply mới; hiển thị thông báo VI/EN.
+  Overview, lịch sử và xem chi tiết phương án vẫn truy cập được. Tất cả nhóm ACCEPTED nhưng còn Unassigned
+  được cảnh báo cần giảng viên xử lý, không thông báo sai rằng lớp đã hoàn tất.
+- Backend POST /preview trả 409 `allocationAlreadyComplete` trước khi chạy engine/lưu phương án.
+  Apply kiểm tra lại trong transaction sau locking; History đánh dấu phương án chưa Apply không còn áp dụng được
+  khi lớp đã hoàn tất. Retry cùng Idempotency-Key của Apply đã thành công vẫn trả kết quả cũ, không bị completion chặn.
+- Dùng Overview đã có, không thêm field/endpoint/schema hoặc thay đổi quyền. Realtime invalidation hiện có
+  khiến nút cập nhật lại khi trạng thái nhóm hoặc Unassigned thay đổi.
+- Test UI/hook cho completed, empty, PENDING, accepted còn Unassigned, đọc History và VI/EN;
+  API/service test completed 409, incomplete không bị chặn nhầm, giữ History và idempotent replay.
+- Kết quả lượt sửa này: 64 Backend tests (H2 riêng) và 33 Frontend Allocation/API tests passed;
+  bootJar, TypeScript/Vite build và lint pass (còn warnings cũ). Không test bằng cách sửa nhóm thật,
+  không migration, không gửi email và không commit.
+
+### 8.8. Redesign Automatic Allocation UI/UX
+
+- Phạm vi chỉ presentation Frontend: giữ nguyên API, engine, hooks/state, Term/Class scope, permission,
+  Confirm Target, Random Again, idempotency, recovery và realtime. Không sửa Backend hoặc database trong lượt redesign.
+- Class list chứa hướng dẫn chung bằng ordered stepper: bốn vòng tròn đánh số và đường nối ngang trên desktop/tablet,
+  chuyển sang trục dọc trên mobile. Không hiển thị completed/current giả; bỏ phần hướng dẫn khỏi trang chi tiết.
+  Search và header đứng cùng khu vực, class cards dùng grid không kéo giãn một card ra toàn hàng, pagination căn phải.
+- Detail header ưu tiên tên lớp, Term, Deadline/status và actions; sáu metrics thành một dải thống nhất.
+  Rules đang bật dùng disclosure/chips; trạng thái lớp hoàn tất là thông báo gọn, vẫn giữ guard phân bổ đã có.
+  Setup tách range/suggestion/target, xác nhận target vẫn là hành động khởi tạo Random; thông tin tìm kiếm chi tiết có thể mở rộng.
+- Current Saved Groups, Random History và Successful Apply Audit là ba tab ngang hàng, không lồng audit trong collapse.
+  History table gọn hơn, ngày/giờ dễ đọc, status badges thống nhất, View/Apply phân cấp rõ và có giải thích khi bị khóa.
+  Saved-plan drawer giới hạn theo viewport; confirmation modal có footer linh hoạt trên mobile.
+- Giữ nguyên `AllocationGroups.tsx`, CSS nội bộ Group Cards, member list, score/breakdown và collapse interactions.
+  Chỉ thay wrapper/spacing bên ngoài. Report giữ nguyên dữ liệu, cải thiện phân cấp metrics và khoảng cách.
+- Files UI: `Client/src/pages/lecturer/LecturerAllocationPage.tsx` và CSS,
+  `Client/src/features/allocation/components/AllocationPlanHistory.tsx`, `AllocationHistory.tsx`,
+  `Client/src/locales/en.json`, `vi.json`; thêm kiểm tra điều hướng/stepper trong `Client/src/test/allocationFlow.test.tsx`.
+- Kiểm thử: `npm test -- --maxWorkers=2` **356 tests / 37 files passed**; riêng Allocation Flow/API **34 tests passed**
+  (là tập con của full suite, không cộng dồn). `npm run build` (TypeScript + Vite) và `npm run lint` pass;
+  lint còn 13 warnings ở code ngoài Allocation, Vite còn cảnh báo bundle lớn. jsdom còn cảnh báo pseudo-element từ Ant Design.
+- Chrome headless với Backend và dữ liệu thật: kiểm tra list → detail, stepper chỉ ở list, Random History,
+  mở lại saved-plan drawer, Apply Audit và chuyển VI/EN. Kiểm tra layout ở **1440, 1024, 768, 390px**:
+  không tràn ngang toàn trang, table scroll trong container, drawer nằm trong viewport; không có uncaught exception.
+  Đã đọc screenshot list mobile/desktop, detail laptop/desktop, history mobile và drawer mobile để kiểm tra trực quan.
+- Browser chặn Preview/Apply trước mạng và ghi nhận **0 requests** tới hai mutation này khi duyệt các màn hình trên.
+  Không chạy E2E Random → Apply trên MySQL ứng dụng. Setup/confirmation và các nhánh workflow được kiểm tra bằng
+  component tests; chưa xác nhận trực quan bằng browser thật cho mọi trạng thái setup, confirmation, lỗi mạng hoặc mọi trang pagination.
+  Không thêm dependency, không migration, không commit/push.
+
+### 8.9. UI theo hai ảnh tham khảo
+
+- Đã mở trực tiếp `Tab_automatic_allocation.png` và `automatic_class_detail.png` ở repository root.
+  Trang list dùng hero Smart Group Allocation xanh sáng, minh họa giáo dục/phân nhóm, numbered stepper có icons
+  và đường nối; trang detail dùng toolbar Back/Refresh/Auto Allocate, hero tên lớp, Term/Deadline/status,
+  sáu metrics có semantic accent/icon và Business Rules disclosure. Không đưa stepper hoặc dữ liệu lớp cụ thể vào hero list.
+- Minh họa là SVG decorative trong `features/allocation/components/AllocationIllustration.tsx`, dùng CSS tokens,
+  không có thông tin sinh viên và không thêm dependency. Class cards chỉ dùng tên lớp, Term, studentCount từ API;
+  không hardcode groupCount hoặc tên Deadline trong ảnh vì Class DTO chưa hỗ trợ hai field này.
+- Tabs có icon; Setup, Confirm Target, Preview actions, Before/After Report, Random History, Apply Audit,
+  saved-plan drawer và confirmation modal được đồng bộ border/radius/spacing. Button primary dùng `--color-primary`,
+  secondary trắng/viền trung tính; hover/focus/disabled scoped trong Allocation, không đổi global Ant Design theme.
+- Card `ACCEPTED` giữ nguyên DOM/classes, layout, typography, màu, members/Leader, score/rules và collapse.
+  `AllocationGroups.tsx` chỉ thêm class `allocation-group--draft` khi status khác ACCEPTED; toàn bộ style card mới
+  được giới hạn trong variant đó. PENDING vẫn hiển thị protected flag; không thay đổi quyền hay trạng thái.
+- Source thay đổi: `LecturerAllocationPage.tsx` và CSS; thêm `AllocationIllustration.tsx`; chỉnh presentation
+  trong `AllocationGroups.tsx`, `AllocationPlanHistory.tsx`, `AllocationHistory.tsx`; thêm ba keys VI/EN
+  cho hero/description/class hint; thêm regression test cho variant ACCEPTED so với PENDING/REVOKED.
+  Không sửa hook/API/types/engine/lifecycle/TermContext/routing hoặc Backend trong lượt này.
+- `npm run build` (TypeScript + Vite) và `npm run lint` pass; full regression **357 tests / 37 files passed**.
+  35 tests Allocation Flow/API là tập con của full suite, không cộng dồn.
+  Vẫn có 13 lint warnings ngoài Allocation và cảnh báo bundle lớn khoảng 2.42 MB; không refactor ngoài phạm vi.
+- Chrome headless với fixtures **chỉ phục vụ kiểm thử**, lấy từ `Client/src/test/allocationFixtures.ts` theo DTO thật:
+  list/detail/setup tại **1440/1024/768/390px**, Preview desktop/mobile, confirmation mobile, Random History,
+  saved-plan drawer, Apply Audit và chuyển VI/EN. Đã chụp/đọc screenshots đối chiếu hai reference; không overflow toàn trang,
+  stepper ngang từ tablet trở lên, bảng cuộn trong container, drawer/modal dùng được trên mobile.
+- Kiểm tra tự động computed styles của toàn bộ card ACCEPTED khi mở Members, Rules và Score Breakdown,
+  thay CSS cũ/mới trên cùng DOM: width/height, typography, colors, border, spacing và shadow không đổi.
+  Browser regression Confirm Target → Random → Auto Again → Apply confirmation → History pass với API fixtures,
+  không có uncaught exception. Mọi API request được intercept trong browser test, không chạy Random/Apply hoặc ghi MySQL thật.
+  Chưa xác nhận E2E với Backend/database thật cho lượt UI này; unit tests vẫn bao phủ validation, permissions,
+  stale preview, idempotency/recovery và scope hiện có. Không migration, không email, không commit/push.
+
+### 8.10. Đồng bộ giao diện card ACCEPTED
+
+- Theo yêu cầu tiếp theo, card ACCEPTED dùng chung style mới với OPEN/PENDING/REVOKED, thay cho ngoại lệ giữ giao diện cũ ở mục 8.9.
+  Đổi modifier presentation thành `allocation-group--enhanced`, áp dụng cho mọi card trong Current Groups, Preview và History.
+- Giữ badge trạng thái, protected/khóa, dữ liệu Leader/members, score/rules và collapse; không thay đổi trạng thái hay quyền chỉnh sửa nhóm.
+- Cập nhật regression test để kiểm tra style dùng chung, badge protected và mở danh sách thành viên của nhóm ACCEPTED.
+  Chỉ sửa component/CSS/test và tài liệu, không sửa Backend hoặc database.
+- Kiểm tra lượt đồng bộ này: 35 Allocation Flow/API tests pass, TypeScript/Vite build và lint pass;
+  còn 13 lint warnings cũ ngoài Allocation và cảnh báo bundle lớn. Chưa chụp lại browser cho thay đổi nhỏ này.
