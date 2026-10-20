@@ -979,6 +979,97 @@ public class GroupService {
         return lecturerAddMember(deadlineId, classId, targetId, studentId);
     }
 
+    /** Invitation mutations serialize with membership/review/allocation on the class row. */
+    public void lockStudentSession(Integer deadlineId, Integer classId, boolean active) {
+        schoolClassRepository.findByIdForUpdate(classId)
+            .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
+        getCurrentStudent(classId);
+        Deadline deadline = lockDeadlineForMutation(deadlineId, classId);
+        if (active) deadlinePolicy.requireStudentWrite(deadline, classId);
+    }
+
+    /** Internal atomic allocation path: domain checks precede writes and ordinary submit/accept enforce completion. */
+    public List<Long> applyAllocationPlan(Integer deadlineId, Integer classId, List<AllocationPreviewDTO.GroupView> plan) {
+        validateManagementDeadline(deadlineId, classId);
+        List<Group> existing = groupRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId).stream()
+            .filter(group -> group.getStatus() != GroupStatus.DISBANDED).toList();
+        Map<Long, Group> byId = existing.stream().collect(Collectors.toMap(Group::getId, Function.identity()));
+        Map<Long, StudentRow> students = studentRepository.findStudentsBySchoolClassId(classId).stream()
+            .collect(Collectors.toMap(StudentRow::userId, Function.identity()));
+        Set<Long> seen = new HashSet<>(), kept = new HashSet<>();
+        Map<Long, GroupMember> current = groupMemberRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId).stream()
+            .collect(Collectors.toMap(GroupMember::getStudentId, Function.identity()));
+        for (var proposed : plan) {
+            Group group = byId.get(proposed.groupId());
+            if (group == null || !kept.add(group.getId()) || group.getStatus() != proposed.status()) throw allocationConflict();
+            boolean fixed = group.getStatus() == GroupStatus.PENDING || group.getStatus() == GroupStatus.ACCEPTED;
+            if (fixed != proposed.protectedGroup() || proposed.members().isEmpty()) throw allocationConflict();
+            long leaders = 0;
+            List<GroupMemberDTO> actualMembers = new ArrayList<>();
+            for (var member : proposed.members()) {
+                if (!students.containsKey(member.getStudentId()) || !seen.add(member.getStudentId())) throw allocationConflict();
+                if (member.getRole() == GroupMemberRole.LEADER) {
+                    leaders++;
+                    if (!Objects.equals(member.getStudentId(), proposed.leaderId())) throw allocationConflict();
+                } else if (member.getRole() != GroupMemberRole.MEMBER) throw allocationConflict();
+                GroupMember old = current.get(member.getStudentId());
+                if (fixed && (old == null || !old.getGroupId().equals(group.getId()) || old.getRole() != member.getRole())) throw allocationConflict();
+                if (!fixed && old != null && byId.containsKey(old.getGroupId())
+                    && (byId.get(old.getGroupId()).getStatus() == GroupStatus.PENDING || byId.get(old.getGroupId()).getStatus() == GroupStatus.ACCEPTED)) throw allocationConflict();
+                actualMembers.add(toMemberDTOFromRow(students.get(member.getStudentId()), classId, deadlineId));
+            }
+            if (leaders != 1) throw allocationConflict();
+            if (fixed) {
+                if (!Objects.equals(group.getLeaderId(), proposed.leaderId())
+                    || groupMemberRepository.countByGroupId(group.getId()) != proposed.members().size()) throw allocationConflict();
+            } else {
+                requireStaffEditable(group);
+                if (!ruleValidationService.areAllRulesPassed(ruleValidationService.evaluateGroup(classId, actualMembers))) throw allocationConflict();
+            }
+        }
+        if (!seen.equals(students.keySet())) throw allocationConflict();
+        for (var rule : ruleValidationService.getClassRules(classId)) {
+            if (rule.status() && ((rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS && plan.size() < rule.value())
+                || (rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS && plan.size() > rule.value()))) throw allocationConflict();
+        }
+        for (var group : existing) if (!kept.contains(group.getId())) requireStaffEditable(group);
+
+        String actor = getCurrentUserLogin();
+        for (var proposed : plan) {
+            if (proposed.protectedGroup()) continue;
+            Group group = byId.get(proposed.groupId());
+            for (var member : proposed.members()) {
+                GroupMember row = current.get(member.getStudentId());
+                if (row == null) {
+                    row = new GroupMember(); row.setStudentId(member.getStudentId()); row.setSchoolClassId(classId);
+                    row.setDeadlineId(deadlineId); row.setJoinedAt(Instant.now());
+                    saveMemberHistory(group.getId(), member.getStudentId(), deadlineId, GroupMemberAction.ASSIGNED_BY_LECTURER, actor, "Automatic allocation");
+                } else if (!row.getGroupId().equals(group.getId())) {
+                    saveMemberHistory(row.getGroupId(), member.getStudentId(), deadlineId, GroupMemberAction.REMOVED_BY_LECTURER, actor, "Automatic allocation transfer");
+                    saveMemberHistory(group.getId(), member.getStudentId(), deadlineId, GroupMemberAction.ASSIGNED_BY_LECTURER, actor, "Automatic allocation transfer");
+                    row.setJoinedAt(Instant.now());
+                }
+                row.setGroupId(group.getId()); row.setRole(member.getRole()); groupMemberRepository.save(row);
+            }
+            if (!Objects.equals(group.getLeaderId(), proposed.leaderId())) saveMemberHistory(group.getId(), proposed.leaderId(), deadlineId,
+                GroupMemberAction.TRANSFERRED_LEADER, actor, "Automatic allocation leader");
+            group.setLeaderId(proposed.leaderId()); groupRepository.save(group);
+        }
+        groupMemberRepository.flush();
+        for (var group : existing) if (!kept.contains(group.getId())) lecturerDisbandGroup(deadlineId, classId, group.getId());
+        List<Long> approved = new ArrayList<>();
+        for (var proposed : plan) if (!proposed.protectedGroup()) {
+            lecturerSubmitGroup(deadlineId, classId, proposed.groupId());
+            acceptGroup(deadlineId, classId, proposed.groupId());
+            approved.add(proposed.groupId());
+        }
+        return List.copyOf(approved);
+    }
+
+    private ConflictAlertException allocationConflict() {
+        return new ConflictAlertException("Allocation plan no longer satisfies domain rules", "allocation", "allocationPlanConflict");
+    }
+
     private Deadline validateDeadlineExists(Integer deadlineId, Integer classId) {
         Deadline deadline = deadlineRepository.findById(deadlineId)
             .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy đợt hạn này", "deadline", "ERR_DEADLINE_NOT_FOUND"));

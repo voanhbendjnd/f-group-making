@@ -13,6 +13,16 @@ import java.util.Optional;
 @Repository
 public interface GroupMemberRepository extends JpaRepository<GroupMember, Long> {
 
+    /** Include mis-scoped memberships so allocation refuses corrupt data instead of silently dropping it. */
+    @Query("""
+        select gm from GroupMember gm
+        where (gm.schoolClassId = :classId and gm.deadlineId = :deadlineId)
+           or gm.groupId in :groupIds
+           or (gm.studentId in :studentIds and gm.deadlineId = :deadlineId)
+        """)
+    List<GroupMember> findAllocationMemberships(@Param("classId") Integer classId, @Param("deadlineId") Integer deadlineId,
+        @Param("groupIds") List<Long> groupIds, @Param("studentIds") List<Long> studentIds);
+
     List<GroupMember> findByGroupId(Long groupId);
 
     List<GroupMember> findByStudentId(Long studentId);

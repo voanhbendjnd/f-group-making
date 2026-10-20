@@ -1,4 +1,5 @@
 import { LecturerGroupReviewPage } from '@/pages/lecturer/LecturerGroupReviewPage';
+import { LecturerAllocationPage } from '@/pages/lecturer/LecturerAllocationPage';
 import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
@@ -163,6 +164,7 @@ export const router = createBrowserRouter([
       { path: 'profile', element: <LecturerProfilePage /> },
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
       { path: 'group-review', element: <LecturerGroupReviewPage /> },
+      { path: 'automatic-allocation', element: <LecturerAllocationPage /> },
       { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],
