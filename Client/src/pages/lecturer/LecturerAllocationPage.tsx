@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Alert, Button, ConfigProvider, Empty, Input, Modal, Select, Skeleton, Tabs, Tag } from 'antd';
+import { Alert, Button, ConfigProvider, Empty, Input, Modal, Pagination, Skeleton, Tabs, Tag } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import enUS from 'antd/locale/en_US';
-import { Eye, Layers, RefreshCw, ShieldCheck, Sparkles, Target } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, Eye, Layers, RefreshCw, ShieldCheck, Sparkles, Target, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useTerm } from '@/app/providers/TermContext';
@@ -16,7 +16,7 @@ import { positiveId } from '@/features/group/navigation';
 import { useAllocationFlow } from '@/features/allocation/hooks/useAllocationFlow';
 import { AllocationGroups, AllocationReasons } from '@/features/allocation/components/AllocationGroups';
 import { AllocationReport } from '@/features/allocation/components/AllocationReport';
-import { AllocationHistory } from '@/features/allocation/components/AllocationHistory';
+import { AllocationPlanHistory } from '@/features/allocation/components/AllocationPlanHistory';
 import { allocationErrorKey } from '@/features/allocation/utils';
 import './LecturerAllocationPage.css';
 
@@ -27,8 +27,9 @@ export function LecturerAllocationPage() {
 }
 function AllocationClassSelection() {
   const { t } = useTranslation(); const { user, isAdmin } = useAuth(); const { selectedTermId, isLocked } = useTerm();
-  const [params, setParams] = useSearchParams();
-  const requestedClass = !params.has('termId') || positiveId(params.get('termId')) === selectedTermId ? positiveId(params.get('classId')) : null;
+  const [params] = useSearchParams(); const route = useParams(); const navigate = useNavigate();
+  const [search, setSearch] = useState(''); const [page, setPage] = useState(1);
+  const requestedClass = positiveId(route.classId ?? null);
   const classes = useQuery({ queryKey: ['my-school-classes', user?.id, selectedTermId, 'allocation'], retry: false,
     queryFn: async ({ signal }) => {
       const first = await classApi.getMyClasses({ termId: selectedTermId!, size: 50 }, signal);
@@ -37,21 +38,30 @@ function AllocationClassSelection() {
       return result.filter(value => value.termId === selectedTermId && (isAdmin || value.lecturerId === user?.id));
     } });
   const selected = classes.data?.find(value => value.id === requestedClass);
+  const filtered = classes.data?.filter(value => value.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())) ?? [];
+  // Preserve old bookmarked query URLs while using the new list/detail routes.
+  const legacyClass = positiveId(params.get('classId'));
+  if (!route.classId && legacyClass && (!params.has('termId') || positiveId(params.get('termId')) === selectedTermId))
+    return <Navigate replace to={`/lecturer/automatic-allocation/${legacyClass}`} />;
   return <div className="allocation-page">
+    {route.classId && <Button className="allocation-back" disabled={isLocked} icon={<ArrowLeft size={16} />} onClick={() => navigate('/lecturer/automatic-allocation')}>{t('allocation.backToClasses')}</Button>}
     <PageHeader title={t('allocation.title')} description={t('allocation.description')} />
-    <ol className="allocation-steps" aria-label={t('allocation.howItWorks')}>
+    {route.classId && <ol className="allocation-steps" aria-label={t('allocation.howItWorks')}>
       {[Eye, Target, Layers, ShieldCheck].map((Icon, index) => <li key={index}><span className="allocation-step-icon"><Icon size={20} aria-hidden="true" /></span>
         <div><strong>{t(`allocation.steps.${index}.title`)}</strong><p>{t(`allocation.steps.${index}.description`)}</p></div></li>)}
-    </ol>
-    <section className="allocation-panel allocation-class-picker">
-      <div><label htmlFor="allocation-class">{t('allocation.class')}</label><p>{t('allocation.classHint')}</p></div>
-      <Select id="allocation-class" aria-label={t('allocation.class')} disabled={isLocked} loading={classes.isPending} showSearch optionFilterProp="label"
-        value={selected?.id} placeholder={t('allocation.chooseClass')} options={classes.data?.map(value => ({ value: value.id, label: value.name }))}
-        onChange={id => setParams({ termId: String(selectedTermId), classId: String(id) })} />
-    </section>
+    </ol>}
+    {!route.classId && <section className="allocation-class-search"><div><h2>{t('allocation.classList')}</h2><p className="allocation-muted">{t('allocation.classHint')}</p></div>
+      <Input.Search aria-label={t('allocation.searchClasses')} placeholder={t('allocation.searchClasses')} value={search} allowClear onChange={event => { setSearch(event.target.value); setPage(1); }} />
+    </section>}
     {classes.isError && <AllocationError error={classes.error} retry={() => void classes.refetch()} />}
-    {classes.isPending ? <Skeleton active /> : !classes.isError && !selected ? <Empty description={t(classes.data?.length ? 'allocation.chooseClass' : 'allocation.noClasses')} /> : selected &&
-      <AllocationSession key={selected.id} classId={selected.id} />}
+    {classes.isPending ? <Skeleton active /> : !classes.isError && (route.classId
+      ? selected ? <AllocationSession key={selected.id} classId={selected.id} /> : <Empty description={t('allocation.classUnavailable')} />
+      : filtered.length ? <><div className="allocation-class-grid">{filtered.slice((page - 1) * 9, page * 9).map(value => <article className="allocation-panel allocation-class-card" key={value.id}>
+        <div className="allocation-class-icon"><BookOpen size={24} aria-hidden="true" /></div><h3>{value.name}</h3>
+        <div className="allocation-tags"><Tag>{value.termName || t('allocation.missing')}</Tag><span className="allocation-muted"><Users size={14} aria-hidden="true" /> {t('allocation.members', { count: value.studentCount })}</span></div>
+        <Button type="primary" disabled={isLocked} icon={<ArrowRight size={16} />} onClick={() => navigate(`/lecturer/automatic-allocation/${value.id}`)}>{t('allocation.openClass')}</Button>
+      </article>)}</div><Pagination current={page} pageSize={9} total={filtered.length} showSizeChanger={false} onChange={setPage} /></>
+      : <Empty description={t('allocation.noClasses')} />)}
   </div>;
 }
 function AllocationSession({ classId }: { classId: number }) {
@@ -115,27 +125,27 @@ function AllocationWorkspace({ classId, deadlineId }: { classId: number; deadlin
               aria-invalid={!!flow.target && flow.parsedTarget === null} aria-describedby="allocation-target-help"
               onChange={event => flow.changeTarget(event.target.value)} />
             <small id="allocation-target-help" className="allocation-block">{t(flow.target && flow.parsedTarget === null ? 'allocation.invalidTarget' : 'allocation.targetHint', { min: setup.range.minimum, max: setup.range.maximum })}</small>
+            <Button type="primary" className="allocation-confirm-target" disabled={flow.parsedTarget === null || !!flow.attempt || flow.applying || flow.previewLoading} loading={flow.previewLoading} onClick={() => void flow.confirmTarget()}>{t('allocation.confirmTarget')}</Button>
           </div>
         </div>
         <AllocationReasons reasons={[...setup.range.reasons, ...setup.warnings]} />
+        <p className="allocation-muted">{t('allocation.balanceHint')}</p>
         <p className="allocation-muted">{t('allocation.searchLimits', { nodes: setup.limits.maximumSearchNodes, depth: setup.limits.maximumSearchDepth })}</p>
         {flow.previewLoading && <div role="status" aria-label={t('allocation.calculating')}><Skeleton active /><p>{t('allocation.calculating')}</p></div>}
         {flow.previewError !== null && <AllocationError error={flow.previewError} retry={flow.autoAgain} />}
         {flow.preview && <div className="allocation-preview" aria-label={t('allocation.previewData')}>
-          <div className="allocation-heading"><div><h2>{t('allocation.previewData')}</h2><p>{t('allocation.notSaved')}</p></div>
+          <div className="allocation-heading"><div><h2>{t('allocation.previewData')}</h2><p>{t('allocation.planSavedHint')}</p></div>
             <Tag color={flow.preview.result.status === 'FEASIBLE' ? 'success' : 'warning'}>{t(`allocation.status.${flow.preview.result.status}`)}</Tag></div>
           <AllocationReasons reasons={flow.preview.result.warnings} />
           {flow.preview.sameAsPreviousPlan && <Alert type="info" title={t('allocation.samePlan')} />}
           {flow.stale && <Alert type="warning" title={t('allocation.errors.allocationPreviewStale')} />}
+          {flow.savedPlan && <Alert type={flow.savedPlan.status === 'INVALID' ? 'warning' : 'info'} title={t(`allocation.planStatuses.${flow.savedPlan.status}`)} />}
           {flow.preview.result.status === 'FEASIBLE' && <>
-            <p className={`allocation-expiration ${flow.secondsLeft === 0 ? 'is-expired' : ''}`} role="timer" aria-label={t('allocation.expiration')}>
-              {flow.secondsLeft > 0 ? t('allocation.expiresIn', { time: `${Math.floor(flow.secondsLeft / 60)}:${String(flow.secondsLeft % 60).padStart(2, '0')}` }) : t('allocation.errors.allocationPreviewExpired')}
-            </p>
-            <AllocationGroups groups={flow.preview.groups} proposed />
+            <AllocationGroups groups={flow.preview.groups} proposed={flow.savedPlan?.status !== 'APPLIED'} />
             {report && <><h3>{t('allocation.beforeAfter')}</h3><AllocationReport report={report} /></>}
           </>}
           <div className="allocation-actions allocation-preview-actions">
-            <Button disabled={!!flow.attempt || flow.applying} onClick={flow.autoAgain}>{t('allocation.autoAgain')}</Button>
+            <Button disabled={!!flow.attempt || flow.applying || flow.previewLoading} onClick={flow.autoAgain}>{t('allocation.autoAgain')}</Button>
             <Button type="primary" disabled={!flow.canApply} loading={flow.applying} onClick={() => setConfirming(true)}>{t('allocation.apply')}</Button>
           </div>
         </div>}
@@ -143,7 +153,8 @@ function AllocationWorkspace({ classId, deadlineId }: { classId: number; deadlin
     </section>}
     <Tabs items={[
       { key: 'current', label: t('allocation.currentData'), children: <section className="allocation-panel"><div className="allocation-heading"><div><h2>{t('allocation.currentData')}</h2><p>{t('allocation.scoreHint')}</p></div></div><AllocationGroups groups={data.groups} /></section> },
-      { key: 'history', label: t('allocation.history'), children: <AllocationHistory classId={classId} deadlineId={deadlineId} /> },
+      { key: 'history', label: t('allocation.randomHistory'), children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} disabled={flow.applying || !!flow.attempt}
+        onSelect={flow.restorePlan} onApply={detail => { flow.restorePlan(detail); setConfirming(true); }} /> },
     ]} />
     <Modal open={confirming} title={t('allocation.confirmTitle')} okText={t('allocation.confirmApply')} cancelText={t('allocation.cancel')}
       confirmLoading={flow.applying} okButtonProps={{ disabled: !flow.canApply }} cancelButtonProps={{ disabled: flow.applying }}

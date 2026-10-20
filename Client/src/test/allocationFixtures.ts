@@ -1,5 +1,5 @@
 // Test-only fixtures shaped after the actual Phase 3–4 Java DTOs. Never imported by production UI.
-import type { AllocationGroup, AllocationReportData, ApplyResult, Overview, Preview, Score, Setup } from '@/features/allocation/types';
+import type { AllocationGroup, AllocationReportData, ApplyResult, Overview, PlanDetail, Preview, Score, Setup } from '@/features/allocation/types';
 const score: Score = { scorePercent: 100, applicable: true, compositionRulesPassed: true, breakdown: [
   { code: 'MEMBERS', baseWeight: 40, effectiveWeightPercent: 40, fulfillmentPercent: 100, contributionPercent: 40,
     rules: [{ code: 'MIN_MEMBERS_PER_GROUP', actualValue: 4, targetValue: 4, passed: true, fulfillmentPercent: 100 }] },
@@ -39,7 +39,12 @@ export function previewFixture(): Preview {
     result: { status: 'FEASIBLE', targetGroupCount: 2, seed: 17, range: setupFixture.range, warnings: [], visitedNodes: 15, searchComplete: true,
       optimization: { validGroupsPreserved: 0, leadersPreserved: 1, movedStudents: 2, compatibilityUtility: 100 } },
     groups: [overviewFixture.groups[0], group(2, [20, 21, 30, 31])], report: reportFixture,
-    previewId: '11111111-1111-4111-8111-111111111111', createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 900000).toISOString() };
+    previewId: '11111111-1111-4111-8111-111111111111', createdAt: new Date().toISOString(), expiresAt: null };
+}
+export function planFixture(): PlanDetail {
+  const preview = previewFixture();
+  return { summary: { planId: preview.previewId!, actorId: 1, actorName: 'Teacher', createdAt: preview.createdAt!, appliedAt: null,
+    targetGroupCount: 2, seed: 17, totalStudents: 8, status: 'UNAPPLIED', available: true, canApply: true, invalidReason: null }, preview };
 }
 export function applyFixture(): ApplyResult {
   return { runId: 9, previewId: previewFixture().previewId!, actorId: 1, classId: 2, deadlineId: 3, targetGroupCount: 2, seed: 17,

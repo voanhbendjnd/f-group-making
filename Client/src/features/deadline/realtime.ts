@@ -18,6 +18,7 @@ const recommendationKeys = new Set([
 const keys = new Set([
   'admin-deadlines', 'lecturer-deadlines', 'lecturer-deadlines-for-workspace',
   'student-deadline-activities', 'validate-deadline', 'group-workspace', 'deadline-detail', 'student-profile', 'group-reviews',
+  'allocation', 'allocation-sessions',
   ...recommendationKeys,
 ]);
 export const isRealtimeQuery = (key: QueryKey) => keys.has(String(key[0]));
@@ -37,7 +38,7 @@ export async function syncDeadlineQueries(client: QueryClient, event?: RealtimeE
   if (lifecycle && event && (event.version === undefined || event.version >= (known.get(event.deadlineId) ?? -1))) {
     for (const [key, data] of client.getQueriesData<any>({ predicate })) {
       // Recommendation items describe students/groups, not deadline DTOs.
-      if (recommendationKeys.has(String(key[0]))) continue;
+      if (recommendationKeys.has(String(key[0])) || String(key[0]).startsWith('allocation')) continue;
       const patch = (item: any): any => {
         if (!item) return item;
         const id = item.group?.deadlineId ?? item.deadlineId ?? item.id;

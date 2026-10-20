@@ -91,6 +91,14 @@ public class AllocationPreviewService {
         Loaded loaded = load(deadlineId, classId);
         return new Captured(overview(loaded), loaded.snapshot());
     }
+
+    public Optional<Captured> captureForHistory(Integer deadlineId, Integer classId) {
+        // Catch data conflicts inside this transactional boundary. Catching them in a calling service
+        // after the proxy returns would mark its joined transaction rollback-only.
+        // Authentication, authorization and missing-scope exceptions still propagate normally.
+        try { return Optional.of(capture(deadlineId, classId)); }
+        catch (ConflictAlertException exception) { return Optional.empty(); }
+    }
     public String planFingerprint(String snapshotFingerprint, List<GroupView> proposed) {
         return hash(new PlanIdentity(snapshotFingerprint, proposed.stream().sorted(Comparator.comparing(GroupView::groupId)).map(group ->
             new Assignment(group.groupId(), group.status(), group.leaderId(), group.members().stream().map(GroupMemberDTO::getStudentId).sorted().toList())).toList()));

@@ -1,5 +1,25 @@
 {
   "allocation": {
+    "classList": "Lớp được phân công",
+    "searchClasses": "Tìm kiếm lớp",
+    "openClass": "Mở phân bổ",
+    "backToClasses": "Quay lại danh sách lớp",
+    "classUnavailable": "Lớp không thuộc học kỳ đang chọn hoặc ngoài phạm vi được phân công.",
+    "confirmTarget": "Xác nhận mục tiêu và chia ngẫu nhiên",
+    "balanceHint": "Sĩ số giữa các nhóm chênh lệch tối đa 1 sinh viên, tính cả nhóm được bảo vệ.",
+    "planSavedHint": "Phương án đã được lưu vào lịch sử. Nhóm thực tế chỉ thay đổi sau khi áp dụng thành công.",
+    "randomHistory": "Lịch sử chia ngẫu nhiên",
+    "randomHistoryHint": "Mỗi lần Random và Random Again thành công đều được lưu. Mở lại để xem đúng phương án hoặc áp dụng sau khi kiểm tra.",
+    "noRandomHistory": "Chưa có phương án đã lưu. Xác nhận mục tiêu để tạo phương án.",
+    "randomAt": "Thời gian chia",
+    "planStatusLabel": "Trạng thái phương án",
+    "planStatuses": { "UNAPPLIED": "Chưa áp dụng", "APPLIED": "Đã áp dụng", "INVALID": "Không còn hợp lệ" },
+    "viewPlan": "Xem phương án",
+    "applyPlan": "Áp dụng phương án",
+    "savedPlan": "Phương án ngẫu nhiên đã lưu",
+    "savedPlanHint": "Đây là kết quả được lưu lúc Random. Chỉ xem không thay đổi nhóm hoặc chạy ngẫu nhiên lại.",
+    "openPlan": "Mở trong màn hình phân bổ",
+    "applyAudit": "Lịch sử áp dụng thành công",
     "applying": "Đang áp dụng phân bổ…",
     "waitForApply": "Vui lòng chờ máy chủ kiểm tra và lưu yêu cầu này.",
     "deadlineStatus": {
@@ -9,7 +29,7 @@
       "CANCELLED": "Đã hủy"
     },
     "title": "Phân bổ tự động",
-    "description": "Xem nhóm trong lớp, kiểm tra phương án cân bằng và chỉ lưu sau khi xác nhận.",
+    "description": "Xem nhóm theo lớp, lưu phương án ngẫu nhiên và xác nhận trước khi áp dụng.",
     "howItWorks": "Cách phân bổ tự động hoạt động",
     "steps": [
       {
@@ -18,11 +38,11 @@
       },
       {
         "title": "Chọn mục tiêu",
-        "description": "Chọn số nhóm dựa trên gợi ý đã kiểm chứng."
+        "description": "Chọn số nhóm và xác nhận để chia ngẫu nhiên."
       },
       {
         "title": "Xem phương án",
-        "description": "So sánh phân bổ trước khi lưu."
+        "description": "Xem phương án đã lưu trước khi áp dụng."
       },
       {
         "title": "Áp dụng và duyệt",
@@ -135,6 +155,7 @@
       "MIN_SE_MEMBERS_PER_GROUP": "Số sinh viên SE tối thiểu"
     },
     "reasons": {
+      "BALANCED_SIZE_CONFLICT": "Mục tiêu không thể giữ chênh lệch sĩ số tối đa 1 người khi giữ nguyên nhóm được bảo vệ và các giới hạn thành viên đang bật.",
       "TARGET_MUST_BE_POSITIVE": "Mục tiêu phải là số nguyên dương.",
       "TARGET_BELOW_PROTECTED": "Mục tiêu không được nhỏ hơn số nhóm được bảo vệ ({{required}}).",
       "NEW_GROUPS_NOT_ALLOWED": "Phiên bản này chỉ giữ hoặc gộp nhóm hiện có (tối đa {{required}}).",
@@ -159,6 +180,8 @@
       "other": "Hãy kiểm tra quy định và cảnh báo khả thi trước khi áp dụng."
     },
     "errors": {
+      "allocationBalanceViolation": "Phương án không đạt chênh lệch sĩ số tối đa 1 người. Hãy tạo phương án mới.",
+      "allocationPlanUnavailable": "Không tìm thấy phương án trong lớp/phiên này hoặc dữ liệu phương án cũ đã bị dọn trước đó.",
       "unknown": "Chưa xác minh được kết quả. Nếu đang áp dụng, hãy thử lại cùng yêu cầu hoặc kiểm tra Lịch sử.",
       "other": "Không thể tải hoặc xử lý dữ liệu phân bổ. Vui lòng thử lại.",
       "http400": "Yêu cầu không hợp lệ. Kiểm tra mục tiêu và phạm vi đã chọn.",
