@@ -90,6 +90,7 @@ export function GroupPreviewExportModal({
           r.email.toLowerCase().includes(q) ||
           r.memberCode.toLowerCase().includes(q) ||
           (r.groupMentor && r.groupMentor.toLowerCase().includes(q)) ||
+          (r.groupCode && r.groupCode.toLowerCase().includes(q)) ||
           r.khoa.toLowerCase().includes(q)
       );
     }
@@ -150,6 +151,13 @@ export function GroupPreviewExportModal({
       dataIndex: 'email',
       key: 'email',
       width: 220,
+    },
+    {
+      title: t('groupExport.colGroupCode', 'Mã nhóm'),
+      dataIndex: 'groupCode',
+      key: 'groupCode',
+      width: 90,
+      render: (value?: string) => value || '—',
     },
     {
       title: t('groupExport.colGroupMentor', 'Nhóm (Group Mentor)'),

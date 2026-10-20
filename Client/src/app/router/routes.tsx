@@ -157,7 +157,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/lecturer/classes" replace /> },
+      { index: true, element: <Navigate to="/lecturer/group-review" replace /> },
       { path: 'classes', element: <LecturerClassListPage /> },
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
       { path: 'deadlines', element: <LecturerDeadlinePage /> },

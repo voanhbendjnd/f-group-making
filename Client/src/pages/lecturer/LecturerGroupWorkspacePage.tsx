@@ -18,6 +18,7 @@ import { RejectGroupModal } from '@/features/group/components/RejectGroupModal';
 import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
 import { positiveId, reviewPath } from '@/features/group/navigation';
 import type { GroupDTO, GroupMemberDTO } from '@/features/group/types/groupTypes';
+import { compareGroupSequence, groupCode } from '@/features/group/utils/groupSequence';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
 import './LecturerGroupWorkspacePage.css';
 
@@ -87,8 +88,11 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
     </div></div>;
   if ((!requestedDeadline && session.isPending) || (deadlineId && workspace.isPending)) return <LoadingSpinner message={t('groupWorkspace.loading')} />;
   if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
-  const targets = data.groups.filter(editable);
-  const groups = data.groups.filter(group => !groupSearch.trim() || group.name.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()) || group.members.some(student => matches(student, groupSearch)));
+  const orderedGroups = [...data.groups].sort(compareGroupSequence);
+  const targets = orderedGroups.filter(editable);
+  const groups = orderedGroups.filter(group => !groupSearch.trim()
+    || `${groupCode(group)} ${group.name}`.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase())
+    || group.members.some(student => matches(student, groupSearch)));
   const students = (data.unassignedStudents || [])
     .filter(student => (!major || student.majorCode === major) && matches(student, studentSearch))
     .map(student => {

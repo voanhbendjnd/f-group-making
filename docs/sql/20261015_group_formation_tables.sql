@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS `groups` (
     `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
     `deadline_id` INT NOT NULL,
     `school_class_id` INT NOT NULL,
+    `sequence_no` INT NULL,
     `name` VARCHAR(100) NOT NULL,
     `leader_id` BIGINT NOT NULL,
     `status` VARCHAR(20) NOT NULL DEFAULT 'OPEN',
@@ -23,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `groups` (
     `last_modified_date` DATETIME(6),
     CONSTRAINT `fk_groups_deadline` FOREIGN KEY (`deadline_id`) REFERENCES `deadlines` (`id`),
     CONSTRAINT `fk_groups_school_class` FOREIGN KEY (`school_class_id`) REFERENCES `school_classes` (`id`),
+    CONSTRAINT `uk_groups_class_deadline_sequence` UNIQUE (`school_class_id`, `deadline_id`, `sequence_no`),
     INDEX `idx_groups_class_deadline` (`school_class_id`, `deadline_id`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

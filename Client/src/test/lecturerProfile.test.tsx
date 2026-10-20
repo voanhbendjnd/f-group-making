@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LecturerProfilePage } from '@/pages/lecturer/LecturerProfilePage';
 import { AccountPopover } from '@/components/layout/AccountPopover';
 import { Sidebar } from '@/components/layout/Sidebar';
+import { TopNavbar } from '@/components/layout/TopNavbar';
 import { lecturerProfileApi } from '@/features/lecturers/api/lecturerProfileApi';
 import { classApi } from '@/features/classes/api/classApi';
 import i18n from '@/locales/i18n';
@@ -17,9 +18,9 @@ vi.mock('@/features/lecturers/api/lecturerProfileApi', () => ({ lecturerProfileA
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), getClasses: vi.fn() } }));
 const data = { name: 'Lecturer Example', code: 'GV42', email: 'lecturer@example.test', activated: true, profileComplete: true };
 let client: QueryClient;
-function mount(content = <LecturerProfilePage />) {
+function mount(content = <LecturerProfilePage />, entry = '/lecturer/profile') {
   client = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 60000 } } });
-  return render(<MemoryRouter initialEntries={['/lecturer/profile']}><QueryClientProvider client={client}>{content}</QueryClientProvider></MemoryRouter>);
+  return render(<MemoryRouter initialEntries={[entry]}><QueryClientProvider client={client}>{content}</QueryClientProvider></MemoryRouter>);
 }
 beforeEach(async () => {
   vi.clearAllMocks(); auth.roles = ['ROLE_LECTURE']; await i18n.changeLanguage('en');
@@ -67,12 +68,27 @@ describe('Lecturer Profile', () => {
     expect(screen.getByText(i18n.t('lecturerProfile.incomplete'))).toBeInTheDocument();
   });
 
-  it('uses active profile navigation and makes the footer accessible', async () => {
+  it('prioritizes group review, puts classes last and hides the lecturer profile menu', async () => {
     const closed = vi.fn();
     mount(<><Sidebar area="lecturer" onClose={closed} /><Routes><Route path="/lecturer/profile" element={<LecturerProfilePage />} /></Routes></>);
-    expect(screen.getByRole('link', { name: i18n.t('studentProfile.title') })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getAllByRole('link').map(link => link.textContent)).toEqual([
+      i18n.t('groupReview.title'), i18n.t('nav.lecturerDeadlines'), i18n.t('allocation.title'), i18n.t('lecturer.classesAndRules'),
+    ]);
+    expect(screen.queryByRole('link', { name: i18n.t('studentProfile.title') })).not.toBeInTheDocument();
     const footer = screen.getByRole('button', { name: i18n.t('studentProfile.open') }); footer.focus(); expect(footer).toHaveFocus();
     fireEvent.click(footer); expect(closed).toHaveBeenCalledOnce(); await screen.findByText('GV42');
+  });
+
+  it.each(['ROLE_LECTURE', 'ROLE_LECTURE_MASTER'])('opens the profile when %s clicks their name in the top bar', async role => {
+    auth.roles = [role];
+    mount(<><TopNavbar area="lecturer" /><Routes>
+      <Route path="/lecturer/profile" element={<LecturerProfilePage />} />
+      <Route path="/lecturer/group-review" element={<p>Review page</p>} />
+    </Routes></>, '/lecturer/group-review');
+    expect(screen.getByText('Review page')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('studentProfile.open') }));
+    await screen.findByRole('heading', { level: 1, name: i18n.t('studentProfile.title') });
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('shares profile cache with hover preview and preserves hover/focus/touch behavior', async () => {

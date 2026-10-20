@@ -718,6 +718,7 @@
   },
   "lecturer": {
     "myClasses": "Lớp của tôi",
+    "classesAndRules": "Lớp học và quy định",
     "allClasses": "Tất cả lớp học",
     "masterRole": "Trưởng bộ môn",
     "allListDescription": "Xem toàn bộ lớp học, giảng viên phụ trách và quy định nhóm của từng lớp.",
@@ -1672,6 +1673,7 @@
     "colMemberCode": "Mã TV",
     "colEmail": "Email",
     "colGroupMentor": "Nhóm (Group Mentor)",
+    "colGroupCode": "Mã nhóm",
     "noGroup": "Chưa có nhóm",
     "exportBtn": "Xuất file Excel (.xlsx)",
     "closeBtn": "Đóng",

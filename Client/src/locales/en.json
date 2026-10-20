@@ -718,6 +718,7 @@
   },
   "lecturer": {
     "myClasses": "My classes",
+    "classesAndRules": "Classes and rules",
     "allClasses": "All classes",
     "masterRole": "Department head",
     "allListDescription": "View all classes, assigned lecturers and class grouping rules.",
@@ -1672,6 +1673,7 @@
     "colMemberCode": "Member Code",
     "colEmail": "Email",
     "colGroupMentor": "Group (Group Mentor)",
+    "colGroupCode": "Group code",
     "noGroup": "No Group",
     "exportBtn": "Export to Excel (.xlsx)",
     "closeBtn": "Close",

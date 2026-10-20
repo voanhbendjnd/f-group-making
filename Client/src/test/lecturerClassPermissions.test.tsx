@@ -100,7 +100,7 @@ describe('Class permissions in lecturer pages', () => {
     auth.user.authorities = [role];
     renderPage();
     await screen.findByText('Other class');
-    expect(screen.getByRole('heading', { name: 'Tất cả lớp học' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: i18n.t('lecturer.classesAndRules') })).toBeInTheDocument();
     expect(classApi.getClasses).toHaveBeenCalledTimes(1);
     expect(classApi.getMyClasses).not.toHaveBeenCalled();
   });

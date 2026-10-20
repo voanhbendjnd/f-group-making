@@ -151,6 +151,7 @@ public class GroupService {
                 .id(g.getId())
                 .deadlineId(g.getDeadlineId())
                 .schoolClassId(g.getSchoolClassId())
+                .sequenceNo(g.getSequenceNo())
                 .name(g.getName())
                 .leaderId(g.getLeaderId())
                 .leaderName(leaderName)
@@ -310,6 +311,7 @@ public class GroupService {
         Group group = new Group();
         group.setDeadlineId(deadlineId);
         group.setSchoolClassId(classId);
+        group.setSequenceNo(compactGroupSequence(classId, deadlineId) + 1);
         group.setName(cleanName);
         group.setLeaderId(studentId);
         group.setStatus(GroupStatus.OPEN);
@@ -413,6 +415,7 @@ public class GroupService {
                 GroupStatus previousStatus = group.getStatus();
                 group.setStatus(GroupStatus.DISBANDED);
                 groupRepository.save(group);
+                compactGroupSequence(classId, deadlineId);
 
                 String actor = getCurrentUserLogin();
                 saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.LEFT, actor, "Rời nhóm (nhóm bị giải tán)");
@@ -559,8 +562,9 @@ public class GroupService {
 
         groupMemberRepository.deleteByGroupId(groupId);
         GroupStatus previousStatus = group.getStatus();
-                group.setStatus(GroupStatus.DISBANDED);
+        group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
+        compactGroupSequence(classId, deadlineId);
 
         String actor = getCurrentUserLogin();
         saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.LEFT, actor, "Leader giải tán nhóm");
@@ -624,6 +628,7 @@ public class GroupService {
         Group group = new Group();
         group.setDeadlineId(deadlineId);
         group.setSchoolClassId(classId);
+        group.setSequenceNo(compactGroupSequence(classId, deadlineId) + 1);
         group.setName(cleanName);
         group.setLeaderId(leaderId);
         group.setStatus(GroupStatus.OPEN);
@@ -869,6 +874,7 @@ public class GroupService {
         GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
+        compactGroupSequence(classId, deadlineId);
 
         saveStatusHistory(groupId, previousStatus, GroupStatus.DISBANDED, actor, "Giảng viên giải tán nhóm");
         eventPublisher.publish("GROUP_DISBANDED", groupId, deadlineId, classId, actor, null);
@@ -1081,6 +1087,25 @@ public class GroupService {
         return deadline;
     }
 
+    /** Caller holds the class write lock. Release changed slots before reusing them, because
+     * Hibernate may flush updates by entity ID rather than by sequence number. */
+    private int compactGroupSequence(Integer classId, Integer deadlineId) {
+        List<Group> groups = groupRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId);
+        Map<Group, Integer> changes = new LinkedHashMap<>();
+        int sequence = 0;
+        for (Group group : groups) {
+            Integer target = group.getStatus() == GroupStatus.DISBANDED ? null : ++sequence;
+            if (!Objects.equals(group.getSequenceNo(), target)) changes.put(group, target);
+        }
+        if (!changes.isEmpty()) {
+            changes.keySet().forEach(group -> group.setSequenceNo(null));
+            groupRepository.flush();
+            changes.forEach(Group::setSequenceNo);
+            groupRepository.flush();
+        }
+        return sequence;
+    }
+
     private Group findScopedGroupForUpdate(Long groupId, Integer deadlineId, Integer classId) {
         Group group = groupRepository.findByIdForUpdate(groupId)
             .orElseThrow(() -> new NotFoundAlertException("Group not found", "group", "ERR_GROUP_NOT_FOUND"));
@@ -1169,6 +1194,7 @@ public class GroupService {
             .id(g.getId())
             .deadlineId(g.getDeadlineId())
             .schoolClassId(g.getSchoolClassId())
+            .sequenceNo(g.getSequenceNo())
             .name(g.getName())
             .leaderId(g.getLeaderId())
             .leaderName(leaderName)

@@ -17,8 +17,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   isSidebarCollapsed = false,
 }) => {
-  const { isAdmin: hasAdminRole, logout } = useAuth();
+  const { user, isAdmin: hasAdminRole, logout } = useAuth();
   const isAdmin = area ? area === 'admin' : hasAdminRole;
+  const canOpenLecturerProfile = area === 'lecturer' && user?.authorities.some(role => role === 'ROLE_LECTURE' || role === 'ROLE_LECTURE_MASTER');
   const navigate = useNavigate();
   const { t } = useTranslation();
 
@@ -66,7 +67,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       <div className="top-navbar-actions">
         <LanguageSwitcher size="sm" />
 
-        <AccountPopover />
+        <AccountPopover onOpenProfile={canOpenLecturerProfile ? () => navigate('/lecturer/profile') : undefined} />
 
         <button
           type="button"

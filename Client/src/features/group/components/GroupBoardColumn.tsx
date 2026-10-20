@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { CheckCircle2, ChevronDown, ChevronUp, LockKeyhole, MoreHorizontal, AlertTriangle, Sparkles, Plus, GripVertical } from 'lucide-react';
 import { Dropdown } from 'antd';
 import { useQuery } from '@tanstack/react-query';
+import { groupCode } from '../utils/groupSequence';
 import { Button } from '@/components/common/Button';
 import { groupApi } from '../api/groupApi';
 import type { GroupDTO, GroupMemberDTO } from '../types/groupTypes';
@@ -66,6 +67,7 @@ export function GroupBoardColumn(props: Props) {
     >
       <header className="board-column-header">
         <div className="board-column-title">
+          {groupCode(group) && <span className="board-group-code">{groupCode(group)}</span>}
           <h2>{group.name}</h2>
           <span className="board-member-count">
             {group.memberCount}
