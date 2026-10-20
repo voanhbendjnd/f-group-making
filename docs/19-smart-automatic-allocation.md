@@ -10,20 +10,25 @@ Mục tiêu là hỗ trợ giảng viên đánh giá nhóm và phân bổ toàn 
 
 Luồng sản phẩm đã chốt (không đồng nghĩa toàn bộ đã triển khai):
 
+**Cập nhật nghiệp vụ mới sau Phase 6A:** mục 8 thay thế cơ chế tự Preview khi nhập target,
+TTL Preview 15 phút và retention payload ở các mục Phase 1–5 bên dưới. Các kết quả test cũ được giữ
+như bằng chứng lịch sử, không phải mô tả chính sách hiện hành.
+
 ```text
-Chọn lớp/phiên → xem nhóm, rules và Group Score
-→ Auto Allocate → xem range/suggestion, nhập target
-→ tự động Preview không ghi dữ liệu → xem Before/After report
-→ Auto Again hoặc đổi target nếu cần
+Danh sách lớp theo Selected Term (mặc định Current Term) → chọn lớp/phiên → xem nhóm, rules và Group Score
+→ Auto Allocate → xem range/suggestion, nhập target → Xác nhận
+→ Random lưu phương án vào history, không sửa nhóm thực tế → xem Before/After report
+→ Random Again lưu phương án mới, hoặc đổi target và xác nhận lại
+→ có thể mở phương án đã lưu trong History mà không Random lại
 → Apply → xác nhận → kiểm tra lại dữ liệu/quyền/rules
 → lưu nguyên tử, auto-approve draft tham gia phương án
 → history và realtime sau commit
 ```
 
 Hiện đã triển khai foundation Phase 1–2, Overview/Setup/Preview Phase 3, Backend Apply/History Phase 4
-và Frontend Automatic Allocation Phase 5. Chưa triển khai Phase 6.
-Chưa có Automatic Allocation Page, Apply, auto-approval hoặc allocation history.
-Không tự chạy phân bổ khi mở trang; Preview và Auto Again không được mutation dữ liệu thật.
+và Frontend Automatic Allocation Phase 5. Phase 6A đã audit read-only môi trường local ngày 20/10/2026;
+chưa chạy E2E Apply trên ứng dụng thật. Kết quả readiness được ghi ở mục 7.
+Không tự chạy phân bổ khi mở trang hoặc nhập target; Random/Random Again chỉ lưu phương án, không sửa dữ liệu nhóm thực tế.
 
 ## 2. Quyết định nghiệp vụ và giới hạn phiên bản đầu
 
@@ -33,7 +38,7 @@ Không tự chạy phân bổ khi mở trang; Preview và Auto Again không đư
 - Nhóm tái phân bổ phải đạt toàn bộ rules đang bật trước khi auto-approve.
 - Không thay đổi rules, Compatibility Score hoặc lifecycle của các luồng hiện tại.
 
-- Không có Undo ở phiên bản đầu; chỉ ghi allocation history khi Apply thành công.
+- Không có Undo ở phiên bản đầu. Random History lưu mỗi FEASIBLE; audit Apply chỉ ghi khi Apply thành công.
 - Không dùng Group Score thấp làm lý do duy nhất để giải tán nhóm; phải có phương án hợp lệ toàn lớp.
 
 ## 3. Phase 1 — Group Score Foundation
@@ -586,3 +591,251 @@ Invitation mutations đã dùng cùng class/session locking với Apply; domain 
 - Phase 4 kiểm tra lại toàn bộ snapshot và quyền trước ghi; không Apply bằng nhiều mutation HTTP riêng lẻ.
 - Các kết quả test ghi ở Phase 1–3 là bằng chứng ở thời điểm triển khai các phase đó, không phải xác nhận
   lại production/runtime hoặc các phase chưa triển khai. Không gửi email thật trong kiểm thử.
+
+## 7. Phase 6A — Integration Readiness Audit (20/10/2026)
+
+### 7.1. Phạm vi và bằng chứng môi trường
+
+- Đối chiếu source hiện tại tại HEAD `c4f11fe`; working tree sạch tại lần kiểm tra cuối trước cập nhật tài liệu này.
+  Không sửa Backend/Frontend/configuration/SQL, không khởi động lại Backend, không chạy Preview/Apply/migration.
+- Java runtime Temurin 21.0.6, source Spring Boot 3.5.14/toolchain 21; Java process đang nghe cổng 8080.
+  Frontend Vite đang nghe 3000, Node 24.12.0; source React 19.2.8, TypeScript ~6.0.2, Ant Design 6.6.6.
+- Docker `mysql-fgroup-making-local`, MySQL **8.0.46**, host 3307, database `fgroup-making`;
+  Redis `redis-fgroup-making-local` cổng 6379 trả `PONG`. FE GET `/` trả 200; SockJS `/ws/info` trả 200.
+  Đây là bằng chứng reachability, không chứng minh authenticated subscription hay nghiệp vụ hoạt động end-to-end.
+- GET allocation Overview không đăng nhập trả 401 đúng kỳ vọng; không đăng nhập lấy JWT trong audit này.
+  Chưa xác minh response JSON có quyền trên runtime hoặc active profile/environment của Java process.
+- Source `application.properties` vẫn có `ddl-auto=update`, `createDatabaseIfNotExist=true`,
+  `hibernate.schema_management_tool.halt_on_error=false`. Command line Java không có override DDL/profile tường minh;
+  không suy ra toàn bộ cấu hình hiệu lực từ source hoặc command line. Không restart ứng dụng mặc định để audit.
+- MySQL InnoDB, schema/server utf8mb4 / utf8mb4_0900_ai_ci, thời gian DB hiện là UTC;
+  isolation mặc định REPEATABLE-READ, lock wait timeout 50 giây. Apply khai báo READ_COMMITTED riêng.
+- `mysqldump` 8.0.46 có sẵn; ổ F còn khoảng 153 GiB. Chưa tạo backup, checksum hoặc restore-test ở Phase 6A.
+  Dữ liệu MySQL là bind mount `server/mysql_data`; copy thư mục đang chạy không thay thế logical backup nhất quán.
+
+### 7.2. Migration readiness: chưa được chạy script nguyên bản
+
+Ba bảng đã tồn tại, mỗi bảng có **0 bản ghi** tại thời điểm SELECT. Không khẳng định ai/cơ chế nào đã tạo bảng.
+
+| Hạng mục | MySQL local thực tế | Script `20261020_allocation_storage.sql` |
+| --- | --- | --- |
+| Bảng/index | Đủ 3 bảng, PK, các index/unique chính đã có | Ba CREATE TABLE, không IF NOT EXISTS |
+| Foreign key | Không có FK trên cả 3 bảng | 12 FK; run → request có ON DELETE SET NULL |
+| CHECK | Không có CHECK trên cả 3 bảng | 4 CHECK: target Preview/Run, expiry, request status |
+| UUID/hash | VARCHAR utf8mb4_0900_ai_ci | ASCII/ascii_bin |
+| Request status | Native ENUM | VARCHAR(20) + CHECK |
+| Defaults | version và format_version không có DEFAULT tương ứng | version=0, format_version=1 |
+
+Khóa cha tương thích: `users.id` BIGINT signed, `school_classes.id` và `deadlines.id` INT signed,
+đều có PK và dùng InnoDB. MySQL 8.0.46 hỗ trợ CHECK thực thi. Unique idempotency theo
+owner/class/deadline/key_hash và unique run theo preview/request hiện có; không thay thế các FK còn thiếu.
+
+**NO-GO chạy nguyên bản:** CREATE TABLE sẽ gặp bảng đã tồn tại. Cần phê duyệt phương án reconciliation riêng,
+ưu tiên ALTER giữ dữ liệu; không tự DROP/tạo lại dù hiện bảng trống. Kiểm tra lại dữ liệu/orphans/index/collation
+ngay trước thay đổi vì runtime vẫn có thể ghi staging/retention. Chuyển collation khóa tham chiếu phải đồng bộ
+cả cột cha/con trước khi thêm FK. Native ENUM cũng cần được đối chiếu khi chọn DDL override cho Hibernate.
+
+MySQL DDL implicit commit: không hứa ROLLBACK transaction sẽ hoàn tác toàn bộ migration nhiều bảng.
+Cần backup nhất quán, checksum, rehearsal trên bản restore riêng, kế hoạch khôi phục và xác minh từng constraint.
+Trước restart/deployment phải duyệt cấu hình ngăn Hibernate tự sửa schema (ví dụ override ddl-auto=none;
+không tự dùng validate khi chưa kiểm tra mapping ENUM/VARCHAR). Không thay đổi các cấu hình này trong audit.
+
+### 7.3. API integration contracts và các điểm cần xử lý
+
+Prefix chung: `/api/deadlines/{deadlineId}/classes/{classId}/allocation`.
+
+| API | Contract BE ↔ FE đã đối chiếu source | Runtime xác minh trong Phase 6A |
+| --- | --- | --- |
+| GET /overview | Scope, fingerprint, summary, rules, groups, Unassigned khớp types FE | Anonymous 401; chưa đọc có quyền |
+| GET /setup | seed optional; range/suggestion/limits/reasons khớp | Chưa gọi |
+| POST /preview | targetGroupCount, seed?, previousPlanFingerprint?; result/groups/report/previewId/timestamps khớp | Không gọi vì FEASIBLE ghi staging |
+| POST /apply | Chỉ previewId + Idempotency-Key; ApplyDTO khớp; retry trả 200 | Chỉ OPTIONS, không POST |
+| GET /history | page 1-based, size 10; wrapper meta/result khớp | Chưa gọi có quyền |
+| GET /history/{runId} | ApplyDTO chứa report chi tiết khớp | Chưa gọi có quyền |
+
+- Wrapper thành công `statusCode/message/data` được Axios unwrap; lỗi >=400 xử lý riêng. Resource gate
+  ADMIN/LECTURE/LECTURE_MASTER không thay thế `SchoolClassAccessService.requireWriteAccess`: chỉ Admin hoặc
+  giảng viên thực sự được phân công có quyền; Master không mặc nhiên có quyền lớp. Preview còn ràng buộc owner.
+- TTL 15 phút do Backend tạo; FE đọc expiresAt, giữ cùng key khi outcome unknown/busy, không gửi assignments.
+  Date/time DTO dùng Instant; cần E2E kiểm tra serialization ISO và UTC → giờ địa phương thực tế.
+  Countdown FE dùng Date.now nên lệch đồng hồ client có thể lệch UI; Backend vẫn kiểm tra expiry độc lập.
+- **CORS mismatch đã xác minh runtime:** preflight từ localhost:3000 yêu cầu
+  authorization/content-type/idempotency-key trả 200 nhưng Allow-Headers chỉ authorization/content-type.
+  `CorsConfig` chưa cho phép Idempotency-Key. Browser gọi trực tiếp khác origin sẽ chặn Apply;
+  Vite proxy cùng origin hiện tại tránh preflight này. Cần sửa tối thiểu sau phê duyệt, không sửa trong audit.
+- **Reconnect recovery gap:** hook allocation có invalidate khi nhận group/deadline events, nhưng
+  `features/deadline/realtime.ts` chưa đưa `allocation`/`allocation-sessions` vào danh sách resync dùng bởi
+  RealtimeProvider khi reconnect/focus/online; QueryProvider tắt refetchOnWindowFocus. Có thể giữ Overview cũ
+  sau khi bỏ lỡ event. Fingerprint khi Apply vẫn bảo vệ dữ liệu, nhưng cần kiểm thử/sửa recovery UX trước demo.
+- History summary chỉ có actorId và metadata cơ bản, không có actorName hay counts; FE lấy counts trong detail
+  và không bịa tên người khác. Đây là giới hạn contract đã có, không phải lỗi field mapping.
+- HTTP timeout FE 30 giây ngắn hơn DB lock timeout 50 giây: test outcome-unknown/retry cùng key bắt buộc.
+  AFTER_COMMIT realtime là best-effort, không có outbox đảm bảo phát lại sau lỗi transport.
+
+### 7.4. Dữ liệu hiện tại và an toàn khi E2E
+
+- SELECT đếm chính xác: 652 Student, 17 Class, 1 Deadline; 3 Group gồm 1 OPEN và 2 DISBANDED;
+  2 GroupMember, 0 invitation, không có PENDING/ACCEPTED. Không thấy Student thiếu User/Class/Major,
+  membership sai lớp/phiên hoặc leader ngoài membership trong các kiểm tra integrity đã thực hiện.
+- Chỉ class 17 `EXE101_G102` có phiên (deadline 3), thuộc FALL26, 2 Student (ENG=1, SE=1),
+  lecturer User 141 có ROLE_LECTURE và activated=true. Chưa test đăng nhập/quyền bằng account runtime.
+- Deadline 3 lưu ACTIVE nhưng effective end là **16/10/2026 17:10 giờ Việt Nam**, override NULL;
+  tại thời điểm audit 20/10 đã hết hạn theo thời gian. Không dùng stored status để kết luận còn mở.
+- Class 17 bật cả 7 rules: members 4–6, majors 2–6, SE tối thiểu 1, groups 1–50.
+  Chỉ 2 Student nên không có happy-path phân bổ hợp lệ với rule hiện tại; các lớp khác chưa có phiên.
+  Cần fixture riêng, không giảm rule hoặc thêm Student vào ứng dụng thật để ép demo thành công.
+- **Apply auto-approval có thể gửi email thật:** GroupReviewNotificationService AFTER_COMMIT gọi
+  NotificationAsyncService → MailService cho thành viên nhóm ACCEPTED. Source SMTP đang dùng Gmail.
+  E2E phải cô lập mail transport/mock/test recipients trước khi Apply; audit không gửi email.
+
+### 7.5. E2E test matrix chuẩn bị — chưa thực thi ở Phase 6A
+
+| Kịch bản | Kiểm chứng cần đạt | Cách chạy tiếp theo |
+| --- | --- | --- |
+| Lecturer đúng/sai lớp; Master assigned/unassigned; Admin; Student/anonymous | Đúng quyền từng endpoint, không lộ Preview owner khác | API integration + MySQL test riêng |
+| Term/Class/Deadline sai scope, không có phiên, nhiều phiên legacy | Không fallback scope; FE empty/conflict rõ | API + component + browser |
+| Rules bật/tắt, thiếu Major/SE/chỗ; target ngoài range | Validation không đổi; FEASIBLE có witness; không nhầm range với feasibility | Unit engine + API |
+| OPEN/REVOKED, PENDING/ACCEPTED, Unassigned | Draft được tái cơ cấu; protected bất biến; đủ đúng một membership | Integration + SQL assertions test DB |
+| ACTIVE/EXPIRED và override theo lớp | Lecturer được phân bổ đúng lifecycle; Student không mở quyền ngoài hạn | Integration regression |
+| Preview/Auto Again/cùng seed/đổi target nhanh | Không đổi domain; staging riêng; response cũ bị bỏ; phương án trùng có cảnh báo | API + component + browser |
+| TTL, sai owner, preview used/missing; browser clock skew | Lỗi riêng; Backend expiry chuẩn; countdown phù hợp | Clock tests + API + browser |
+| Happy Apply và auto-approval | Draft đạt rules ACCEPTED, audit đúng một lần; protected không đổi | MySQL integration + browser test riêng |
+| Invitation bị ảnh hưởng/không ảnh hưởng/protected | Chỉ PENDING bị ảnh hưởng bị hủy; audit cùng transaction | MySQL integration |
+| Cùng key retry/khác payload; hai key/cùng Preview; hai giảng viên | Một run, không duplicate membership/history; conflict/replay đúng | MySQL concurrent requests |
+| Stale membership/Leader/Major/rules/deadline/status/invitation | 409, không Apply một phần, yêu cầu Preview lại | MySQL concurrent integration |
+| Lỗi giữa move/approval/history; timeout/mất response | Rollback toàn bộ; không realtime/email thành công trước commit; retry cùng key | Failure injection test DB + browser network |
+| Retention 30 ngày | Retry đúng contract; Preview đã dùng không Apply lại sau cleanup; Run giữ lâu dài | Controlled-clock MySQL integration |
+| History pagination/detail, scope, Before/After | Summary/detail khớp dữ liệu đã commit, không ghi run cho Preview | API + browser |
+| Realtime 2 tabs, disconnect/reconnect/focus/online | Workspace/Review/Allocation đồng bộ; không sót refresh sau mất kết nối | Browser thủ công/automation |
+| CORS same-origin proxy và direct API | Authorization và Idempotency-Key được browser chấp nhận | OPTIONS + browser |
+| VI/EN, keyboard, dialogs, responsive | Không lộ translation key; focus/loading/empty/error đúng; không tràn layout | Component + kiểm tra trực quan desktop/tablet/mobile |
+
+Các tests/build ở Phase 1–5 là bằng chứng lịch sử, không được coi là rerun Phase 6A.
+Lượt này chỉ SELECT/metadata, source/diff, Redis PING, GET/OPTIONS không mutation; không chạy suite ghi test DB
+hoặc trình duyệt E2E, không chứng nhận responsive hay Apply runtime đã pass.
+
+### 7.6. Các bước cần phê duyệt trước khi tiếp tục
+
+1. Duyệt sửa CORS và recovery invalidation trong phạm vi nhỏ, rồi chạy lại regression FE/BE phù hợp.
+2. Duyệt chuẩn bị SQL reconciliation theo schema thực tế và runtime DDL override; review script trước khi áp dụng,
+   không chạy lại ba CREATE nguyên bản. Không thay đổi Group Lifecycle/rules hay các bảng nghiệp vụ khác.
+3. Duyệt cửa sổ dừng writer/scheduler, logical backup `mysqldump --single-transaction` kèm routines/triggers/events,
+   kiểm tra exit code/nội dung/checksum và restore rehearsal trên MySQL 8 riêng. Chưa có backup đã xác thực.
+4. Duyệt migration đã rehearsal cho đúng MySQL local 3307, kiểm tra lại bảng trước thao tác, hậu kiểm 12 FK,
+   4 CHECK, indexes/collations và dữ liệu không đổi. MySQL production không thuộc phạm vi.
+5. Duyệt môi trường E2E riêng với fixture Class/Deadline/Student/protected/invitation và SMTP cô lập;
+   chạy các ca có ghi/Apply/concurrency tại đó. Không dùng MySQL ứng dụng thật cho test mutation.
+6. Sau khi các blocker được xử lý, kiểm tra browser với Backend thật, report từng ca pass/fail và giới hạn;
+   mọi Apply lên dữ liệu ứng dụng thật vẫn cần phê duyệt riêng. Dừng sau Phase 6A.
+
+## 8. Cải tiến Allocation — cân bằng, lịch sử Random và list/detail
+
+### 8.1. Quyết định được xác nhận
+
+- **Chênh lệch tối đa 1 sinh viên**, áp dụng toàn bộ nhóm kết quả, bao gồm PENDING/ACCEPTED.
+  6/7 hợp lệ; 5/7 không hợp lệ. Đây là ràng buộc riêng của Allocation, không sửa rule tạo/join thủ công.
+- PENDING/ACCEPTED bất biến; chỉ giữ/gộp OPEN/REVOKED, không tạo nhóm mới. Giữ ưu tiên tối ưu và Group Score.
+- Nhập target không chạy Random. Chỉ nút Xác nhận hoặc Random Again mới tạo phương án.
+- Mỗi kết quả FEASIBLE lưu một bản riêng, kể cả trùng assignments lần trước; infeasible/search-limit không lưu
+  như phương án thành công. Xem lịch sử không tính toán lại assignments, không mutation nghiệp vụ.
+- **Bỏ hoàn toàn cửa sổ Apply/countdown 15 phút.** Phương án và payload lưu lâu dài; mọi Apply vẫn kiểm tra
+  quyền, owner, scope, fingerprints, trạng thái, rules, balance và dữ liệu thực tế trong transaction.
+- Danh sách đầu là **lớp được phân công theo Term**, không phải danh sách nhóm. Current Term mặc định
+  và lựa chọn Term dùng chung tiếp tục do TermContext quản lý; không ép ghi đè lựa chọn đã lưu.
+
+### 8.2. Feasibility và search
+
+Với S tổng Student (gồm cả protected) và T target: mọi nhóm phải có sĩ số floor(S/T) hoặc ceil(S/T).
+Protected có kích thước ngoài hai giá trị này làm target không khả thi ngay trước search.
+Bounds cho draft là giao của khoảng cân bằng với MIN/MAX_MEMBERS và các minimum suy ra từ Major/SE.
+Kiểm tra tổng sức chứa/thiếu người, coverage ngành và số SE như trước; khoảng sơ bộ tiếp tục không phải
+cam kết mọi target bên trong khả thi. Search dùng bounds cân bằng ngay lúc thêm người và pruning canComplete.
+Mã lý do `BALANCED_SIZE_CONFLICT` có bản dịch VI/EN; hết budget vẫn là SEARCH_LIMIT_REACHED.
+Apply kiểm tra lại `AllocationBalancePolicy` trước khi hủy invitation hay ghi membership/approval.
+
+### 8.3. Storage, API, retention và tương thích
+
+Không cần migration/bảng/cột mới: tái sử dụng `allocation_previews` làm kho phương án Random lâu dài.
+`allocation_runs` tiếp tục là audit Apply thành công riêng; unique(preview_id), row lock và applied_at
+ngăn áp dụng hai lần kể cả sau khi idempotency records bị dọn. Idempotency retention vẫn 30 ngày.
+
+Cột legacy NOT NULL `expires_at` giữ cách ghi cũ để tương thích schema/script đã có, nhưng **không còn được
+dùng làm điều kiện Apply hay dọn dữ liệu**. DTO mới trả expiresAt=null; Frontend không đọc countdown.
+Không sửa DDL hoặc script migration nền trong đợt này. Payload đã bị phiên bản cũ dọn không thể khôi phục
+từ không khí: history list đánh dấu available=false, giữ nguyên Apply audit nếu có.
+
+Prefix: `/api/deadlines/{deadlineId}/classes/{classId}/allocation`.
+
+| Endpoint | Hành vi |
+| --- | --- |
+| POST /preview | Contract input giữ nguyên; FEASIBLE lưu bản Random mới, trả previewId/createdAt và expiresAt=null |
+| GET /plans?page=1&size=10 | Random history: planId, actorId/actorName, createdAt/appliedAt, targetGroupCount, seed, totalStudents, status, available, canApply, invalidReason |
+| GET /plans/{planId} | `{summary, preview}`; khôi phục đúng payload có nhóm/thành viên/Leader/score/rules/report đã lưu |
+| POST /apply | Giữ previewId + Idempotency-Key; không nhận assignments, không giới hạn tuổi phương án |
+| GET /history và /history/{runId} | Giữ nguyên audit Apply cũ, không thay endpoint hoặc xóa dữ liệu |
+
+Trạng thái phương án là APPLIED nếu applied_at đã có, INVALID nếu live fingerprint không khớp,
+dữ liệu live mâu thuẫn, payload không đọc được hoặc vi phạm cân bằng; còn lại UNAPPLIED.
+canApply còn yêu cầu đúng owner và quyền quản lý hiện tại. Trạng thái live được tính khi đọc, không ghi
+đè payload lịch sử; Apply kiểm tra lại nên kết quả đọc không phải bảo đảm tránh race.
+Danh sách tải một snapshot live cho cả page và bulk load actor names, không Random lại hay N+1 theo từng phương án.
+Live membership mâu thuẫn vẫn cho đọc lịch sử hợp lệ trong đúng scope, nhưng không cho Apply.
+
+### 8.4. Frontend và navigation
+
+- `/lecturer/automatic-allocation`: class cards, search, pagination 9 lớp/trang; chỉ hiện lớp assigned theo Term.
+  Dùng Class API hiện có (tên/Term/studentCount); chưa có groupCount hoặc allocation status trong Class DTO nên không bịa số.
+- `/lecturer/automatic-allocation/:classId`: trực tiếp/refresh được, kiểm tra lại catalog và session; Back trở về list.
+  Giữ tương thích link query classId/termId cũ bằng redirect khi Term khớp, không đổi Group Management/Review routes.
+- Setup chỉ gợi ý/validate range; input không tự gọi Preview. Xác nhận chạy Random; thay target xóa lựa chọn phương án,
+  phải xác nhận lại. Chặn double-click, abort/ignore response cũ khi đổi scope/target.
+- Random History table + drawer hiển thị nguyên nhóm đã lưu, members, scores, rules, report; có View/Open/Apply.
+  Trước xác nhận Apply từ history, FE GET detail mới để cập nhật eligibility; Backend Apply vẫn là nguồn quyết định cuối.
+- Audit Apply thành công nằm riêng trong collapse. Unknown outcome giữ nguyên Idempotency-Key như trước.
+- VI/EN, Ant Design, TermScope, tokens và style hiện có; bổ sung allocation query keys vào reconnect resync,
+  không patch payload lịch sử như Deadline DTO. CORS cho phép Idempotency-Key để browser direct-origin Apply.
+
+### 8.5. Kiểm thử và giới hạn
+
+- Engine tests: 4/4/5, disabled rules, protected 6 làm target 3 không thể cân bằng, protected-only 6/4 bị từ chối,
+  protected 3 + draft 4 vẫn có thể giữ protected cũ chưa đạt minimum; exhaustive oracle kiểm tra thêm balance.
+- Apply tests: phương án hơn 31 ngày vẫn Apply khi snapshot không đổi, payload không bị retention xóa,
+  phương án đã dùng không replay sau cleanup, bản lưu 6/2 bị từ chối trước mutation, protected/rollback/concurrency regression.
+- API tests: mỗi Random có ID riêng, list/detail khôi phục đúng groups/report, đọc không gọi engine.allocate,
+  stale/unauthorized được kiểm tra; FE tests có Confirm Target, hủy response cũ, load saved không Random,
+  Apply từ History, list → detail → back, Term scope, VI/EN và same-key recovery.
+- Backend `test bootJar`: **384 tests/38 suites**, 0 failure/error/skipped. Sau bổ sung trường hợp live data
+  mâu thuẫn khi đọc History, chạy lại 3 suites Allocation cuối: **91 tests**, 0 failure/error.
+  Các lần chạy có test trùng nhau, không cộng thành số test riêng biệt.
+- MySQL **8.4** disposable `mysql-allocation-improve-test`, `127.0.0.1:33318/fmaking_allocation_test`:
+  **23 Apply integration tests passed**, dùng script storage chỉ trong test container; có transaction, concurrent
+  Apply, stale, rollback, invitation, retention và kiểm tra cân bằng trước mutation. Container đã dọn sau test.
+  Case fallback đọc History khi live data lỗi được bổ sung sau lượt MySQL và kiểm thử bằng transaction thật trên H2;
+  không khẳng định case bổ sung đó đã được rerun MySQL.
+- Frontend full regression: **352 tests/37 files passed**, `npm test -- --maxWorkers=2`.
+  `npm run build` (tsc -b + Vite) pass; `npm run lint` pass, còn 13 warnings ở code cũ.
+  Bundle lớn khoảng 2.41 MB vẫn có cảnh báo, không tối ưu ngoài phạm vi.
+- Chrome headless dùng Master fixture với Backend/Frontend thật: list chỉ có lớp được phân công, list → detail,
+  History empty state; không tràn ngang tại 1280×900, 768×1024, 390×844; không có uncaught exception.
+  Screenshot list desktop và detail mobile đã được đọc trực quan. VI/EN được test bằng component/i18n;
+  screenshot runtime là VI. Browser chặn Preview/Apply trước mạng để bảo vệ DB; thực tế không phát request nào.
+- Backend local được mở lại với runtime `ddl-auto=none`, SMTP localhost port 1; không ghi đè config file.
+  CORS OPTIONS thực tế xác nhận Idempotency-Key được cho phép. Không gửi email thật hay migration/Apply
+  lên MySQL ứng dụng; chưa chạy E2E Random → Apply có ghi trên database đó. Không commit/push.
+- Chưa kiểm tra trực quan tất cả modal/history nhiều trang trên mobile. Class DTO chưa có groupCount/trạng thái
+  allocation nên list không hiện số giả. Payload cũ đã bị dọn không khôi phục được. Thiếu FK/CHECK đã audit ở
+  mục 7 vẫn cần xử lý riêng; bộ dữ liệu audit mục 7 là trước lần reset fixture, không phải live counts sau reset.
+
+### 8.6. Files liên quan trong lần cải tiến
+
+- Backend thêm `service/AllocationBalancePolicy.java`, `service/AllocationPlanHistoryService.java`.
+  Sửa `SmartAllocationService`, `AllocationPreviewService`, `AllocationPreviewStore`, `AllocationApplyService`,
+  `AllocationRetentionService`, `dto/AllocationResultDTO`, `repository/AllocationPreviewRepository`,
+  `web/rest/AllocationResource`, `config/CorsConfig` trong `server/src/main/java/com/fmaking`.
+- Frontend thêm `features/allocation/components/AllocationPlanHistory.tsx`; sửa `AllocationHistory.tsx`
+  (giữ component audit Apply riêng), `hooks/useAllocationFlow.ts`, `api/allocationApi.ts`, `types.ts`,
+  `pages/lecturer/LecturerAllocationPage.tsx` và CSS, `app/router/routes.tsx`, `features/deadline/realtime.ts`,
+  `locales/en.json`, `locales/vi.json` trong `Client/src`.
+- Tests sửa `SmartAllocationServiceTest`, `AllocationApplyServiceTest`, `AllocationResourceTest`;
+  FE `allocationFixtures.ts`, `allocationFlow.test.tsx`, `allocationApi.test.ts`.
+  Chỉ cập nhật tài liệu Markdown này; không thêm/sửa migration trong lần cải tiến.

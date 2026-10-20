@@ -116,6 +116,9 @@ public class SmartAllocationService {
         if (lower > upper) {
             reasons.addAll(targetFailures(c, lower));
         } else {
+            while (lower <= upper && !balancedTarget(c, lower)) lower++;
+            while (upper >= lower && !balancedTarget(c, upper)) upper--;
+            if (lower > upper) reasons.add(reason(BALANCED_SIZE_CONFLICT, c.students.size(), 1));
             // This is intentionally not a claim that all intermediate targets are feasible.
             reasons.add(reason(PRELIMINARY_ONLY, lower, upper));
         }
@@ -132,6 +135,7 @@ public class SmartAllocationService {
         if (target < c.minimumGroups || target > c.maximumGroups) reasons.add(reason(CLASS_GROUP_BOUND, target,
             target < c.minimumGroups ? c.minimumGroups : c.maximumGroups));
         if (c.minimumMembers > c.maximumMembers || c.minimumMajors > c.maximumMajors) reasons.add(reason(RULE_BOUNDS_CONFLICT, 0, 0));
+        if (target > 0 && !balancedTarget(c, target)) reasons.add(reason(BALANCED_SIZE_CONFLICT, c.students.size(), target));
         if (editable == 0 && !c.pool.isEmpty()) reasons.add(reason(NO_EDITABLE_GROUP, c.pool.size(), 0));
         if (editable > 0) {
             if ((long) editable * c.maximumMembers < c.pool.size()) reasons.add(reason(MEMBER_CAPACITY, c.pool.size(), (long) editable * c.maximumMembers));
@@ -144,6 +148,17 @@ public class SmartAllocationService {
             if (coverage < (long) editable * c.minimumMajors) reasons.add(reason(INSUFFICIENT_MAJORS, coverage, (long) editable * c.minimumMajors));
         }
         return reasons;
+    }
+
+    private boolean balancedTarget(Context c, int target) {
+        int low = AllocationBalancePolicy.minimumSize(c.students.size(), target);
+        int high = AllocationBalancePolicy.maximumSize(c.students.size(), target);
+        if (c.protectedGroups.stream().anyMatch(g -> g.members().size() < low || g.members().size() > high)) return false;
+        int editable = target - c.protectedGroups.size();
+        if (editable < 0 || low < 1) return false;
+        int minimum = Math.max(c.minimumMembers, low), maximum = Math.min(c.maximumMembers, high);
+        return editable == 0 ? c.pool.isEmpty()
+            : minimum <= maximum && (long) minimum * editable <= c.pool.size() && (long) maximum * editable >= c.pool.size();
     }
 
     private final class Context {
@@ -230,11 +245,14 @@ public class SmartAllocationService {
     private final class Search {
         final Context c; final int target; final SearchLimits limits; final Random random;
         final List<ExistingGroup> candidates; final List<GroupMemberDTO> ordered;
+        final int minimumMembers, maximumMembers;
         long nodes; boolean limited;
         List<PlannedGroup> best; List<Long> disbanded; Optimization bestObjective;
 
         Search(Context c, int target, long seed, SearchLimits limits) {
             this.c = c; this.target = target; this.limits = limits;
+            minimumMembers = Math.max(c.minimumMembers, AllocationBalancePolicy.minimumSize(c.students.size(), target));
+            maximumMembers = Math.min(c.maximumMembers, AllocationBalancePolicy.maximumSize(c.students.size(), target));
             // Mix nearby seeds before Random's first shuffle (small adjacent seeds otherwise correlate).
             random = new Random(new SplittableRandom(seed).nextLong());
             candidates = new ArrayList<>(c.drafts); candidates.sort(Comparator.comparing(ExistingGroup::id));
@@ -281,7 +299,7 @@ public class SmartAllocationService {
                 .thenComparing(Comparator.comparingInt((Integer i) -> admissionUtility(c, slots.get(i), student)).reversed()));
             for (int position : positions) {
                 var members = slots.get(position);
-                if (members.size() >= c.maximumMembers) continue;
+                if (members.size() >= maximumMembers) continue;
                 Set<Integer> majors = majors(members);
                 if (student.getMajorId() != null) majors.add(student.getMajorId());
                 if (majors.size() > c.maximumMajors) continue;
@@ -300,8 +318,8 @@ public class SmartAllocationService {
             }
             long missingPeople = 0, capacity = 0, missingSe = 0, missingMajors = 0;
             for (var members : slots) {
-                missingPeople += Math.max(0, c.minimumMembers - members.size());
-                capacity += (long) c.maximumMembers - members.size();
+                missingPeople += Math.max(0, minimumMembers - members.size());
+                capacity += (long) maximumMembers - members.size();
                 long se = members.stream().filter(SmartAllocationService::isSe).count();
                 missingSe += Math.max(0, c.minimumSe - se);
                 Set<Integer> majors = majors(members);

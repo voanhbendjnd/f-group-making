@@ -66,9 +66,9 @@ class SmartAllocationServiceTest {
     }
 
     @Test void protectedGroupWithOldRuleViolationIsPreservedAndWarnedInsteadOfRepaired() {
-        var students = students(6);
-        var fixed = group(1, GroupStatus.ACCEPTED, students.subList(0, 2));
-        var input = snapshot(students, List.of(fixed, group(2, GroupStatus.OPEN, students.subList(2, 4))), List.of());
+        var students = students(7);
+        var fixed = group(1, GroupStatus.ACCEPTED, students.subList(0, 3));
+        var input = snapshot(students, List.of(fixed, group(2, GroupStatus.OPEN, students.subList(3, 5))), List.of());
         var result = allocate(input, 2);
         assertValid(input, result);
         assertThat(result.reasons()).extracting(Reason::code).contains(PROTECTED_RULE_WARNING);
@@ -88,6 +88,38 @@ class SmartAllocationServiceTest {
         var input = snapshot(students, List.of(group(1, GroupStatus.PENDING, students.subList(0, 4)),
             group(2, GroupStatus.ACCEPTED, students.subList(4, 8))), List.of());
         assertReason(allocate(input, 1), TARGET_BELOW_PROTECTED);
+    }
+
+    @Test void balancesAnUnevenClassUsingOnlyExistingGroups() {
+        var students = students(13);
+        var input = snapshot(students, List.of(group(1, GroupStatus.OPEN, students.subList(0, 6)),
+            group(2, GroupStatus.OPEN, students.subList(6, 9)), group(3, GroupStatus.OPEN, students.subList(9, 12))), List.of());
+        var result = allocate(input, 3);
+        assertValid(input, result);
+        assertThat(result.groups().stream().map(g -> g.members().size()).sorted().toList()).containsExactly(4, 4, 5);
+    }
+
+    @Test void protectedSizesCanProveBalanceImpossibleBeforeSearch() {
+        var students = students(12);
+        var input = snapshot(students, List.of(group(1, GroupStatus.ACCEPTED, students.subList(0, 6)),
+            group(2, GroupStatus.OPEN, students.subList(6, 9)), group(3, GroupStatus.OPEN, students.subList(9, 12))), List.of());
+        var result = allocate(input, 3);
+        assertReason(result, BALANCED_SIZE_CONFLICT);
+        assertThat(result.visitedNodes()).isZero();
+        assertThat(engine.preliminaryRange(input).maximum()).isEqualTo(2);
+    }
+
+    @Test void balanceAlsoAppliesWithCompositionRulesDisabledAndProtectedOnlyPlans() {
+        var students = students(10);
+        var rules = Arrays.stream(GroupingRuleCode.values()).map(code -> rule(code, code.getSuggestedValue(), false)).toList();
+        var input = snapshot(students, List.of(group(1, GroupStatus.OPEN, students.subList(0, 7)),
+            group(2, GroupStatus.OPEN, students.subList(7, 10))), rules);
+        assertThat(allocate(input, 2).groups()).allSatisfy(g -> assertThat(g.members()).hasSize(5));
+        var protectedInput = snapshot(students, List.of(group(1, GroupStatus.ACCEPTED, students.subList(0, 6)),
+            group(2, GroupStatus.PENDING, students.subList(6, 10))), rules);
+        assertReason(allocate(protectedInput, 2), BALANCED_SIZE_CONFLICT);
+        assertThat(AllocationBalancePolicy.isBalanced(List.of(6, 7))).isTrue();
+        assertThat(AllocationBalancePolicy.isBalanced(List.of(5, 7))).isFalse();
     }
 
     @ParameterizedTest @ValueSource(ints = {0, -1, Integer.MIN_VALUE})
@@ -301,7 +333,7 @@ class SmartAllocationServiceTest {
             for (int mask = 1; mask < 63 && !witness; mask++) {
                 var left = new ArrayList<GroupMemberDTO>(); var right = new ArrayList<GroupMemberDTO>();
                 for (int i = 0; i < 6; i++) ((mask & (1 << i)) == 0 ? left : right).add(students.get(i));
-                witness = oracleValid(left, minimumMajors, maximumMajors, minimumSe)
+                witness = Math.abs(left.size() - right.size()) <= 1 && oracleValid(left, minimumMajors, maximumMajors, minimumSe)
                     && oracleValid(right, minimumMajors, maximumMajors, minimumSe);
             }
             var result = allocate(input, 2);

@@ -8,7 +8,7 @@ import { allocationApi } from '../api/allocationApi';
 import { AllocationReport } from './AllocationReport';
 import { allocationErrorKey } from '../utils';
 
-export function AllocationHistory({ classId, deadlineId }: { classId: number; deadlineId: number }) {
+export function AllocationApplyHistory({ classId, deadlineId }: { classId: number; deadlineId: number }) {
   const { t, i18n } = useTranslation(); const { user } = useAuth(); const { selectedTermId } = useTerm();
   const [page, setPage] = useState(1); const [runId, setRunId] = useState<number | null>(null);
   const key = ['allocation', user?.id, selectedTermId, classId, deadlineId, 'history'];
