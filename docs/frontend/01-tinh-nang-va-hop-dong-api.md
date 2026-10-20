@@ -10,15 +10,15 @@ Các đường dẫn bên dưới là mapping trong ứng dụng, chưa cộng c
 
 | Nguồn trong repository | Nội dung đối chiếu |
 | --- | --- |
-| [AccountResource.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/AccountResource.java) | Ba POST đăng nhập và yêu cầu kích hoạt |
-| [StudentResource.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/StudentResource.java) | POST nhập sinh viên và `ROLE_ADMIN` |
-| [StudentService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/StudentService.java) | Đọc Excel, kiểm tra và lưu toàn bộ hoặc từ chối |
-| [UserService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/UserService.java) | Sinh khóa kích hoạt, kiểm tra tài khoản và xử lý hàng loạt |
-| [AuthService.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/AuthService.java) | Thông tin đăng nhập, access token, refresh token, session |
-| [SecurityConfiguration.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/config/SecurityConfiguration.java) | API public và yêu cầu xác thực |
-| [ResFormatResponse.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/util/ResFormatResponse.java) | Bao gói phản hồi thành công |
-| [ExceptionTranslator.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/web/rest/errors/ExceptionTranslator.java) | Phản hồi Problem và lỗi kiểm tra dữ liệu |
-| [SmartAuthenticationEntryPoint.java](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/config/SmartAuthenticationEntryPoint.java) | Một dạng phản hồi lỗi xác thực khác |
+| [AccountResource.java](../../server/src/main/java/com/fmaking/web/rest/AccountResource.java) | Ba POST đăng nhập và yêu cầu kích hoạt |
+| [StudentResource.java](../../server/src/main/java/com/fmaking/web/rest/StudentResource.java) | POST nhập sinh viên và `ROLE_ADMIN` |
+| [StudentService.java](../../server/src/main/java/com/fmaking/service/StudentService.java) | Đọc Excel, kiểm tra và lưu toàn bộ hoặc từ chối |
+| [UserService.java](../../server/src/main/java/com/fmaking/service/UserService.java) | Sinh khóa kích hoạt, kiểm tra tài khoản và xử lý hàng loạt |
+| [AuthService.java](../../server/src/main/java/com/fmaking/service/AuthService.java) | Thông tin đăng nhập, access token, refresh token, session |
+| [SecurityConfiguration.java](../../server/src/main/java/com/fmaking/config/SecurityConfiguration.java) | API public và yêu cầu xác thực |
+| [ResFormatResponse.java](../../server/src/main/java/com/fmaking/util/ResFormatResponse.java) | Bao gói phản hồi thành công |
+| [ExceptionTranslator.java](../../server/src/main/java/com/fmaking/web/rest/errors/ExceptionTranslator.java) | Phản hồi Problem và lỗi kiểm tra dữ liệu |
+| [SmartAuthenticationEntryPoint.java](../../server/src/main/java/com/fmaking/config/SmartAuthenticationEntryPoint.java) | Một dạng phản hồi lỗi xác thực khác |
 
 Ưu tiên hành vi trong thân hàm hơn comment. Ví dụ comment cũ chỉ nói ba cột Excel và một dòng tiêu đề; thân hàm thực tế đọc năm cột B–F và bỏ hai dòng đầu.
 
@@ -215,3 +215,11 @@ Import trả tổng số và lỗi, không trả ID người dùng, email đã l
 7. CORS, base URL email và cấu hình mail hoạt động trong môi trường kiểm thử.
 
 Việc thực hiện các kiểm chứng trên thuộc giai đoạn triển khai, chưa được thực hiện trong lần viết tài liệu này.
+
+
+Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutureOnly=false for history) and GET /api/terms/current support ROLE_ADMIN, ROLE_STUDENT, ROLE_LECTURE, ROLE_LECTURE_MASTER. POST /api/terms remains Admin-only. See [Academic Term Filter](11-academic-term-filter.md) for supported screens and explicitly unfiltered Deadline/Student screens.
+
+
+> 16/10/2026: [Group session / deadline / reapproval policy](../15-group-session-deadline-approval.md) supersedes conflicting earlier lifecycle rules. Shared deadline updates require confirmedClassIds; EXPIRED may reopen, CANCELLED may not. Lecturer-created groups are drafts; member moves use one atomic request.
+
+> M2: Lecturer Group Review at `/lecturer/group-review` uses `GET /api/me/group-reviews` with required termId, optional classId/status/search and server pagination. Only personally assigned classes are listed, including for Lecturer Master. Approve/reject/revoke reuse the existing scoped endpoints. See the M2 section in the policy above for the response and realtime behavior.

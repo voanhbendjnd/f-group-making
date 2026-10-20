@@ -1,5 +1,11 @@
 # Đặc tả frontend React — F Group Making
 
+> [Student Profile](12-student-profile.md): API, UI, VI/EN and testing.
+
+> [Add Student thủ công](13-add-student.md): Modal, API, transaction và kiểm thử.
+
+> [Add Lecturer thủ công](14-add-lecturer.md): Modal, duplicate, transaction và activation.
+
 > **Cập nhật 12/10/2026:** Đã triển khai Academic Term Filter ([11 — Academic Term Filter](11-academic-term-filter.md)) và khu vực giảng viên, quản lý lớp/Rule cùng kiểm tra quyền theo lớp ([11 — Giảng viên và quy định nhóm](11-giang-vien-va-quy-dinh-nhom.md)). Các mục rà soát 29/09 bên dưới là tài liệu lịch sử.
 
 
@@ -10,7 +16,7 @@ Bộ tài liệu này là căn cứ triển khai frontend, thiết kế giao di�
 ## 1. Phạm vi và mức độ xác minh
 
 - Rà soát ngày **29/09/2026**, tại mã nguồn có HEAD `0679187` và các tệp trong working tree.
-- Backend được đọc tại `jumpln-app-backend-java-spring/`. Chưa có ứng dụng frontend hoặc `package.json` trong phạm vi đã kiểm tra.
+- Backend được đọc tại `server/`. Chưa có ứng dụng frontend hoặc `package.json` trong phạm vi đã kiểm tra.
 - Có **4 endpoint nghiệp vụ do ứng dụng khai báo**, trong `AccountResource` và `StudentResource`. Các endpoint tự động của framework, nếu được bật, không phải tính năng người dùng trong đặc tả này.
 - Hợp đồng API được suy ra từ controller, service, DTO và security. **Chưa kiểm thử HTTP thực tế**; không xem ví dụ trong tài liệu là phản hồi đã thu được từ máy chủ.
 - Đường dẫn xuất hiện trong whitelist, entity, repository hoặc hàm service không đồng nghĩa với API đã tồn tại.

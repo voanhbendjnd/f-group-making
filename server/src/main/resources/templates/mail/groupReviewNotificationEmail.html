@@ -1,0 +1,56 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="${heading}">Thông báo duyệt nhóm</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f1f5f9; color:#0f172a; font-family:Arial,Helvetica,sans-serif; -webkit-text-size-adjust:100%;">
+<div style="display:none; max-height:0; overflow:hidden; opacity:0;" th:text="${heading + ' · ' + notification.groupName + ' · ' + notification.className}">Cập nhật mới về nhóm của bạn.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9; table-layout:fixed;">
+    <tr><td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; table-layout:fixed;">
+            <tr><td style="padding:0 8px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    <td width="40" height="40" align="center" style="border-radius:12px; background-color:#2563eb; color:#ffffff; font-size:22px; font-weight:bold;">F</td>
+                    <td style="padding-left:12px;"><strong style="font-size:17px;">F-Group Making</strong><br /><span style="font-size:12px; color:#64748b;">Kết nối thành viên, cùng nhau tạo giá trị</span></td>
+                </tr></table>
+            </td></tr>
+            <tr><td style="border:1px solid #e2e8f0; border-radius:16px; background-color:#ffffff; overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;">
+                    <tr><td height="5" th:style="${'height:5px; background-color:' + accentColor + ';'}" style="height:5px; background-color:#2563eb;"></td></tr>
+                    <tr><td style="padding:28px 24px;">
+                        <span th:text="${statusLabel}" th:style="${'display:inline-block; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px; color:' + accentColor + '; background-color:' + badgeBackground + ';'}" style="display:inline-block; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#2563eb; background-color:#dbeafe;">CHỜ DUYỆT</span>
+                        <h1 th:text="${heading}" style="margin:16px 0; font-size:24px; line-height:1.35; letter-spacing:-0.5px;">Có nhóm đang chờ bạn duyệt</h1>
+                        <p style="margin:0 0 8px; font-size:14px; line-height:1.7;">Xin chào <strong th:text="${recipientName}">bạn</strong>,</p>
+                        <p th:text="${description}" style="margin:0 0 22px; color:#475569; font-size:14px; line-height:1.7;">Nhóm vừa được cập nhật trên hệ thống.</p>
+
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; line-height:1.6; table-layout:fixed;">
+                            <tr><td style="padding:14px 16px 4px; color:#64748b; width:112px; vertical-align:top;">Tên nhóm</td><td th:text="${notification.groupName}" style="padding:14px 16px 4px 0; font-weight:bold; overflow-wrap:anywhere; word-break:break-word;">Nhóm sáng tạo</td></tr>
+                            <tr><td style="padding:4px 16px; color:#64748b; vertical-align:top;">Lớp học</td><td th:text="${notification.className}" style="padding:4px 16px 4px 0;">EXE102_G02</td></tr>
+                            <tr th:if="${notification.deadlineName != null and !notification.deadlineName.isBlank()}"><td style="padding:4px 16px; color:#64748b; vertical-align:top;">Đợt chọn nhóm</td><td th:text="${notification.deadlineName}" style="padding:4px 16px 4px 0;">Đăng ký nhóm học kỳ</td></tr>
+                            <tr><td style="padding:4px 16px; color:#64748b; vertical-align:top;">Thực hiện bởi</td><td th:text="${notification.actorName}" style="padding:4px 16px 4px 0;">Nguyễn Văn An</td></tr>
+                            <tr><td style="padding:4px 16px 14px; color:#64748b; vertical-align:top;">Thời gian</td><td th:text="${occurredAt + ' (GMT+7)'}" style="padding:4px 16px 14px 0;">09:30 18/10/2026 (GMT+7)</td></tr>
+                        </table>
+
+                        <table th:if="${notification.reason != null and !notification.reason.isBlank()}" role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:18px; background-color:#fffbeb; border:1px solid #fde68a; border-radius:10px; table-layout:fixed;">
+                            <tr><td style="padding:14px 16px;"><strong style="color:#92400e; font-size:13px;">Lý do từ chối</strong><p th:text="${notification.reason}" style="margin:8px 0 0; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; font-size:14px; color:#78350f; line-height:1.7;">Vui lòng bổ sung thành viên theo quy định của lớp.</p></td></tr>
+                        </table>
+
+                        <h2 style="margin:24px 0 12px; font-size:14px;">Danh sách thành viên <span th:text="${'(' + notification.members.size() + ')'}" style="font-weight:normal; color:#64748b;">(4)</span></h2>
+                        <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse; font-size:12px; line-height:1.6; text-align:left; table-layout:fixed; overflow-wrap:anywhere; word-break:break-word;">
+                            <thead><tr style="background-color:#f8fafc;"><th scope="col" style="padding:9px 8px; color:#64748b; border-bottom:1px solid #e2e8f0;">Họ tên</th><th scope="col" style="padding:9px 8px; color:#64748b; border-bottom:1px solid #e2e8f0;">MSSV</th><th scope="col" style="padding:9px 8px; color:#64748b; border-bottom:1px solid #e2e8f0;">Vai trò</th></tr></thead>
+                            <tbody><tr th:each="member : ${notification.members}"><td th:text="${member.fullName}" style="padding:10px 8px; border-bottom:1px solid #f1f5f9; overflow-wrap:anywhere; word-break:break-word;">Nguyễn Văn An</td><td th:text="${member.rollNumber}" style="padding:10px 8px; border-bottom:1px solid #f1f5f9; color:#475569;">SE190001</td><td th:text="${member.leader ? 'Trưởng nhóm' : 'Thành viên'}" style="padding:10px 8px; border-bottom:1px solid #f1f5f9; color:#475569;">Trưởng nhóm</td></tr></tbody>
+                        </table>
+
+                        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px auto 20px;"><tr><td align="center" style="background-color:#2563eb; border-radius:8px;"><a th:href="${targetUrl}" th:text="${buttonText}" style="display:inline-block; padding:13px 24px; color:#ffffff; text-decoration:none; font-size:14px; font-weight:bold;">Xem nhóm chờ duyệt</a></td></tr></table>
+                        <p style="margin:0; font-size:12px; line-height:1.7; color:#64748b;">Nếu nút không mở được, bạn có thể sao chép liên kết này:<br /><a th:href="${targetUrl}" th:text="${targetUrl}" style="color:#2563eb; text-decoration:none; overflow-wrap:anywhere; word-break:break-all;">Liên kết đến nhóm</a></p>
+                    </td></tr>
+                </table>
+            </td></tr>
+            <tr><td align="center" style="padding:20px 12px 0; font-size:11px; color:#64748b; line-height:1.8;">Đây là thông báo tự động từ F-Group Making. Vui lòng không trả lời email này.<br />Thông báo phản ánh thời điểm thao tác; hãy mở hệ thống để xem trạng thái mới nhất.</td></tr>
+        </table>
+    </td></tr>
+</table>
+</body>
+</html>

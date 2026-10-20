@@ -1,5 +1,7 @@
-jumpln-app-backend-java-spring/src/main/resources/application.properties
-jumpln-app-backend-java-spring/src/main/resources
+server/src/main/resources/application.properties
+server/src/main/resources/*
+!server/src/main/resources/i18n/
+!server/src/main/resources/templates/
 
 # Gradle cache and build outputs
 .gradle/
@@ -26,6 +28,6 @@ mysql_data/
 node_modules/
 **/dist/
 dist/
-/jumpln-app-frontend-react-vite/.idea
+/Client/.idea
 ~$*
 **/~$*

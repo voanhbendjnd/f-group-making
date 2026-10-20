@@ -32,7 +32,7 @@ Danh sách này xuất phát từ việc đọc mã nguồn, chưa phải kết 
 | BE-16 — SỬA MỘT PHẦN | Cron nay dùng `lastModifiedDate` thay cho `createdDate`, nên cấp lại key sẽ bắt đầu lại cửa sổ dọn ba ngày | Tránh xóa ngay tài khoản cũ vừa được gửi mail; vẫn có thể lệch nếu pending User được sửa vì lý do khác | Không hứa expiry chính xác như token chuyên biệt | Chốt lifecycle, cân nhắc trường expiry riêng và kiểm thử quan hệ Student khi xóa |
 | BE-17 — ĐÃ SỬA | Batch từng gọi `@Async` lồng qua MailService, khiến executor batch không kiểm soát từng mail và catch ngoài không thấy lỗi xử lý | Nguy cơ tăng tác vụ ngoài hàng đợi dự kiến và khó quan sát lỗi | Không ảnh hưởng contract frontend | Batch nay xử lý từng mail đồng bộ bên trong executor chuyên dụng; API đơn vẫn async |
 
-Các dẫn chiếu chính: [UserService](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/UserService.java), [StudentService](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/StudentService.java), [User](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/domain/User.java), [MailService](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/service/MailService.java), [SessionManager](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/security/SessionManager.java), [UserRepository](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/repository/UserRepository.java), [SecurityConfiguration](../../jumpln-app-backend-java-spring/src/main/java/tech/djnd/sample/app/config/SecurityConfiguration.java).
+Các dẫn chiếu chính: [UserService](../../server/src/main/java/com/fmaking/service/UserService.java), [StudentService](../../server/src/main/java/com/fmaking/service/StudentService.java), [User](../../server/src/main/java/com/fmaking/domain/User.java), [MailService](../../server/src/main/java/com/fmaking/service/MailService.java), [SessionManager](../../server/src/main/java/com/fmaking/security/SessionManager.java), [UserRepository](../../server/src/main/java/com/fmaking/repository/UserRepository.java), [SecurityConfiguration](../../server/src/main/java/com/fmaking/config/SecurityConfiguration.java).
 
 Không kết luận mọi nguy cơ trong bảng chắc chắn đã phát sinh ở production. Những điểm phụ thuộc JPA/cache/mail/proxy cần tái hiện bằng kiểm thử tích hợp; những mapping thiếu và đoạn không lưu key là phát hiện trực tiếp từ nguồn đã đọc.
 
@@ -104,3 +104,9 @@ Chỉ sau khi có nghiệp vụ và API mới thêm menu “Nhóm của tôi”,
 ## 6. Quy trình cập nhật một phụ thuộc
 
 Khi một mục BE được xử lý: gắn thay đổi backend và hợp đồng mới → ghi fixture thực tế đã làm sạch → cập nhật 01 → cập nhật 02/05 → thêm ca kiểm thử 06 → mới đổi capability để mở UI. Việc chỉ sửa một endpoint không tự động làm cả hành trình hoàn chỉnh; cần kiểm thử từ đầu đến cuối theo mục 3.
+
+
+Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutureOnly=false for history) and GET /api/terms/current support ROLE_ADMIN, ROLE_STUDENT, ROLE_LECTURE, ROLE_LECTURE_MASTER. POST /api/terms remains Admin-only. See [Academic Term Filter](11-academic-term-filter.md) for supported screens and explicitly unfiltered Deadline/Student screens.
+
+
+> 16/10/2026: [Group session / deadline / reapproval policy](../15-group-session-deadline-approval.md) supersedes conflicting earlier lifecycle rules. Shared deadline updates require confirmedClassIds; EXPIRED may reopen, CANCELLED may not. Lecturer-created groups are drafts; member moves use one atomic request.

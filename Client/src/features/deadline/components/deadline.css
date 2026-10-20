@@ -1,0 +1,49 @@
+.deadline-list { box-shadow: none; }
+.deadline-list .table { table-layout: fixed; }
+.deadline-list .table th, .deadline-list .table td { white-space: normal; overflow-wrap: anywhere; }
+.deadline-list .deadline-name-column { width: 30%; }
+.deadline-list .deadline-status-column { width: 18%; }
+.deadline-list .deadline-end-column { width: 22%; }
+.deadline-list .deadline-actions-column { width: 30%; text-align: right; }
+.deadline-list-name { color: var(--color-text-main); font-weight: 600; }
+.deadline-list-summary { color: var(--color-text-muted); font-size: 0.875rem; }
+.deadline-list-actions, .deadline-detail-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.deadline-list-actions .btn { white-space: normal; }
+.deadline-detail .modal-card { max-height: min(90dvh, 900px); }
+.deadline-detail .modal-header, .deadline-detail .modal-footer { flex-shrink: 0; }
+.deadline-detail .modal-body { min-height: 0; overscroll-behavior: contain; }
+.deadline-detail-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1rem; }
+.deadline-detail-heading h2 { margin: 0; font-size: 1.375rem; overflow-wrap: anywhere; }
+.deadline-detail-description { color: var(--color-text-muted); white-space: pre-wrap; overflow-wrap: anywhere; margin-bottom: 1rem; }
+.deadline-detail-meta { display: flex; flex-wrap: wrap; gap: 1rem 3rem; padding: 1rem; background: var(--color-bg); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 1.5rem; }
+.deadline-detail-meta dt { display: flex; align-items: center; gap: 0.375rem; }
+.deadline-detail dt { color: var(--color-text-muted); font-size: 0.8125rem; }
+.deadline-detail dd { margin: 0.25rem 0 0; font-weight: 500; color: var(--color-text-main); }
+.deadline-detail-section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.deadline-detail-section-heading h3 { display: flex; align-items: center; gap: 0.5rem; margin: 0; font-size: 1rem; }
+.deadline-detail-section-heading > span, .deadline-detail-hint, .deadline-detail-feedback { color: var(--color-text-muted); font-size: 0.8125rem; }
+.deadline-detail-hint { margin: 0.5rem 0 1rem; }
+.deadline-detail-feedback { margin-bottom: 1rem; }
+.deadline-detail-error { display: flex; align-items: center; flex-wrap: wrap; justify-content: space-between; gap: 0.5rem; margin-bottom: 1rem; padding: 0.75rem; }
+.deadline-class-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.875rem; }
+.deadline-class-card { min-width: 0; border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 1rem; }
+.deadline-class-card-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; justify-content: space-between; margin-bottom: 1rem; }
+.deadline-class-card h4 { margin: 0; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.deadline-class-card dl { display: grid; gap: 0.75rem; margin: 0 0 1rem; }
+.deadline-class-card dd { font-size: 0.875rem; overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .deadline-list { overflow: visible; border: 0; border-radius: 0; }
+  .deadline-list .table, .deadline-list tbody { display: block; }
+  .deadline-list thead { display: none; }
+  .deadline-list .table tr { display: block; padding: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: 0.75rem; }
+  .deadline-list .table td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; border: 0; width: auto; }
+  .deadline-list .table td[data-label]::before { content: attr(data-label); color: var(--color-text-muted); font-size: 0.8125rem; flex-shrink: 0; }
+  .deadline-list .table .deadline-list-name { display: block; padding-top: 0; padding-bottom: 0.875rem; }
+  .deadline-list .table .deadline-list-action-cell { display: block; padding: 0.875rem 0 0; }
+  .deadline-list-actions .btn { flex: 1; }
+  .deadline-class-grid { grid-template-columns: minmax(0, 1fr); }
+  .deadline-detail .modal-overlay { padding: 0.75rem; }
+  .deadline-detail .modal-header, .deadline-detail .modal-body, .deadline-detail .modal-footer { padding: 1rem; }
+  .deadline-detail-actions { width: 100%; }
+  .deadline-detail-actions .btn { flex: 1 1 auto; white-space: normal; }
+}

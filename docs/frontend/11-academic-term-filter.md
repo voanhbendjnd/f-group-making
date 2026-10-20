@@ -45,3 +45,14 @@ Ngày cập nhật: 12/10/2026. Đối chiếu source Backend và kiểm thử F
 7. Student Import dùng kỳ chung và giữ kỳ cho cả bước xác nhận Major; Lecturer Import không gửi/gán termId.
 
 Chạy `npm run build`, `npm test`, `npm run lint`. Test dùng fixture và mock chỉ trong `src/test`; giao diện thực tế luôn gọi API.
+
+
+## Student / Lecturer / Lecturer Master term selector (15/10/2026)
+
+- All three areas reuse the Admin Sidebar `TermSelect` and per-user `TermProvider`. Current Term is the initial default; a valid saved selection takes precedence after refresh. VI label: **Học kỳ**; EN: **Academic Term**.
+- `GET /api/terms` and `GET /api/terms/current` allow Admin, Student, Lecturer and Lecturer Master to read the catalog. `POST /api/terms` remains Admin-only. Class ownership and other data permissions are unchanged.
+- Lecturer Class List sends `termId` to `/api/me/school-classes`. Master retains existing all-class read scope through `/api/school-classes`, filtered by the selected Term. Keys include user, term and filters. `TermScope` resets search and pagination; no previous-term placeholder data is used.
+- Lecturer Class Detail fetches the existing ID endpoint without unsupported params. A class outside the selected Term shows a warning and back link; student/rule panels are not mounted.
+- Student Dashboard is introductory/account content; Student and Lecturer Profile remain personal information, independent of Selected Term. Student group-selection links use server validation against the actual assigned class; the current API does not support selecting historical enrollment.
+- Deadline APIs currently have no `termId` parameter. No filtering is simulated and no unsupported parameter is sent. Notices explicitly identify unfiltered screens; deadline operations and assigned-class options keep their existing authorized scope.
+- No schema, enrollment, authentication, import or email changes. Automated FE tests use fixtures; BE tests use H2. Live browser/MySQL verification remains separate.
