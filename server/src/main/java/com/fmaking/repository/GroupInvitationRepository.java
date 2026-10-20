@@ -10,6 +10,7 @@ import java.util.Optional;
 
 @Repository
 public interface GroupInvitationRepository extends JpaRepository<GroupInvitation, Long> {
+    List<GroupInvitation> findBySchoolClassIdAndDeadlineIdAndStatus(Integer classId, Integer deadlineId, GroupInvitationStatus status);
 
     List<GroupInvitation> findByStudentIdAndDeadlineIdAndStatus(Long studentId, Integer deadlineId, GroupInvitationStatus status);
 

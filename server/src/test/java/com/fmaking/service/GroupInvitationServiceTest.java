@@ -162,7 +162,7 @@ class GroupInvitationServiceTest {
     }
 
     @Test
-    @WithMockUser(username = "leader@test.com")
+    @WithMockUser(username = "leader@test.com", roles = "STUDENT")
     void testSearchStudentsForInvite() {
         List<StudentSearchForInviteDTO> results = groupInvitationService.searchStudentsForInvite(
                 testDeadline.getId(), testClass.getId(), testGroup.getId(), "student1"
@@ -177,7 +177,7 @@ class GroupInvitationServiceTest {
     }
 
     @Test
-    @WithMockUser(username = "leader@test.com")
+    @WithMockUser(username = "leader@test.com", roles = "STUDENT")
     void testSendAndAcceptInvitation() {
         SendInvitationRequest request = SendInvitationRequest.builder()
                 .studentId(student1.getUserId())
@@ -194,7 +194,8 @@ class GroupInvitationServiceTest {
 
         // Target student accepts invitation
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("student1@test.com", "pass")
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("student1@test.com", "pass",
+                        List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT")))
         );
 
         GroupDTO updatedGroup = groupInvitationService.acceptInvitation(
@@ -208,7 +209,7 @@ class GroupInvitationServiceTest {
     }
 
     @Test
-    @WithMockUser(username = "leader@test.com")
+    @WithMockUser(username = "leader@test.com", roles = "STUDENT")
     void testRejectInvitation() {
         SendInvitationRequest request = SendInvitationRequest.builder()
                 .studentId(student1.getUserId())
@@ -219,7 +220,8 @@ class GroupInvitationServiceTest {
         );
 
         org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("student1@test.com", "pass")
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken("student1@test.com", "pass",
+                        List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_STUDENT")))
         );
 
         groupInvitationService.rejectInvitation(testDeadline.getId(), testClass.getId(), invitation.getId());
@@ -229,7 +231,7 @@ class GroupInvitationServiceTest {
     }
 
     @Test
-    @WithMockUser(username = "leader@test.com")
+    @WithMockUser(username = "leader@test.com", roles = "STUDENT")
     void testCannotInviteStudentAlreadyInGroup() {
         // Place student1 into another group
         Group otherGroup = new Group();
