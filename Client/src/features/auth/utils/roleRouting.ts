@@ -13,7 +13,7 @@ export function canManageClassRules(user: StoredUser | null, lecturerId: number 
 
 export function getHomeRoute(authorities: string[]): string {
   if (authorities.includes('ROLE_ADMIN')) return '/admin/dashboard';
-  if (authorities.includes('ROLE_LECTURE') || authorities.includes('ROLE_LECTURE_MASTER')) return '/lecturer/classes';
+  if (authorities.includes('ROLE_LECTURE') || authorities.includes('ROLE_LECTURE_MASTER')) return '/lecturer/group-review';
   if (authorities.includes('ROLE_STUDENT')) return '/student/dashboard';
   return '/unauthorized';
 }

@@ -8,7 +8,7 @@ import { useLecturerProfile } from '@/features/lecturers/hooks/useLecturerProfil
 import type { ProfileInfo } from '@/features/students/api/profileApi';
 import { getApiError } from '@/services/api/types';
 
-export function AccountPopover() {
+export function AccountPopover({ onOpenProfile }: { onOpenProfile?: () => void }) {
   const { user } = useAuth();
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
@@ -81,9 +81,9 @@ export function AccountPopover() {
   ];
   return <>
     <button ref={trigger} type="button" className="top-navbar-profile account-popover-trigger"
-      aria-label={t('studentProfile.accountDetails')} aria-expanded={open} aria-describedby={open ? id : undefined}
+      aria-label={t(onOpenProfile ? 'studentProfile.open' : 'studentProfile.accountDetails')} aria-expanded={open} aria-describedby={open ? id : undefined}
       onMouseEnter={show} onMouseLeave={closeSoon} onFocus={show} onBlur={closeSoon}
-      onClick={show}
+      onClick={onOpenProfile ? () => { cancelClose(); setOpen(false); onOpenProfile(); } : show}
       onKeyDown={(event) => { if (event.key === 'Escape') { cancelClose(); setOpen(false); } }}>
       <User size={16} aria-hidden="true" /><span>{user?.name || user?.email || t('studentProfile.account')}</span>
     </button>

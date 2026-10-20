@@ -14,7 +14,6 @@ import {
   Clock,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
-import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
 import { TermSelect } from '@/features/terms/components/TermSelect';
 
 export interface SidebarProps {
@@ -38,7 +37,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const profilePath = isStudentArea ? '/student/profile' : lecturerProfile ? '/lecturer/profile' : null;
   const FooterProfile = profilePath ? 'button' : 'div';
   const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
-  const allClasses = canViewAllClasses(user?.authorities || []);
 
   const navigate = useNavigate();
   const { t } = useTranslation();
@@ -87,10 +85,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
       ]
     : isLecturer ? [
-        { to: '/lecturer/classes', label: t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses'), icon: <Layers size={18} /> },
-        { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
         { to: '/lecturer/group-review', label: t('groupReview.title'), icon: <Users size={18} /> },
+        { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
         { to: '/lecturer/automatic-allocation', label: t('allocation.title'), icon: <Sparkles size={18} /> },
+        { to: '/lecturer/classes', label: t('lecturer.classesAndRules'), icon: <Layers size={18} /> },
       ] : [
         {
           to: '/student/dashboard',
@@ -105,7 +103,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
 
   if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
-  if (lecturerProfile) navItems.push({ to: '/lecturer/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
 
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
