@@ -66,6 +66,7 @@ class AllocationApplyServiceTest {
     @Autowired AllocationApplyCoordinator apply;
     @Autowired AllocationRetentionService retention;
     @Autowired AllocationHistoryService history;
+    @Autowired AllocationPlanHistoryService planHistory;
     @Autowired GroupInvitationService invitationService;
     @Autowired AllocationPreviewRepository storedPreviews;
     @Autowired AllocationApplyRequestRepository requests;
@@ -138,7 +139,7 @@ class AllocationApplyServiceTest {
     }
 
     @Test void applyCommitsMembershipApprovalHistoryAndIdempotentResult() {
-        var p = preview(); assertThat(p.previewId()).isNotNull(); assertThat(p.expiresAt()).isEqualTo(p.createdAt().plusSeconds(900));
+        var p = preview(); assertThat(p.previewId()).isNotNull(); assertThat(p.expiresAt()).isNull();
         assertThat(members.findByGroupId(groupIds.getFirst())).hasSize(2); verifyNoInteractions(realtime);
         var result = apply(p, "happy"); assertThat(result.approvedGroupIds()).hasSize(2);
         assertThat(runCount()).isEqualTo(1);
@@ -152,10 +153,57 @@ class AllocationApplyServiceTest {
         conflict(() -> apply(p, "other-key"), "allocationPreviewUsed"); assertThat(runCount()).isEqualTo(1);
         verify(realtime, atLeastOnce()).convertAndSend(anyString(), any(Object.class)); verifyNoInteractions(mail);
     }
-    @Test void expiredPreviewCannotApply() { var p = preview(); now = now.plusSeconds(900); conflict(() -> apply(p, "expired"), "allocationPreviewExpired"); assertThat(runCount()).isZero(); }
+    @Test void savedPlanCanApplyAfterThirtyOneDaysIfSourceIsUnchanged() {
+        var p = preview(); now = now.plus(Duration.ofDays(31)); retention.clean();
+        assertThat(storedPreviews.findById(p.previewId()).orElseThrow().getPayload()).isNotNull();
+        var saved = planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId());
+        assertThat(saved.summary().canApply()).isTrue();
+        assertThat(saved.preview().groups()).isEqualTo(p.groups());
+        assertThat(apply(p, "durable").approvedGroupIds()).hasSize(2);
+    }
+
+    @Test void completedClassRejectsNewRandomAndOtherSavedPlansButKeepsHistoryAndIdempotentReplay() {
+        var selected = preview(); var alternative = preview();
+        var result = apply(selected, "complete-class");
+        assertThat(apply(selected, "complete-class")).isEqualTo(result);
+        conflict(() -> preview(), "allocationAlreadyComplete");
+        conflict(() -> apply(alternative, "alternative"), "allocationAlreadyComplete");
+        var saved = planHistory.detail(deadline.getId(), schoolClass.getId(), alternative.previewId());
+        assertThat(saved.summary().canApply()).isFalse();
+        assertThat(saved.summary().invalidReason()).isEqualTo("allocationAlreadyComplete");
+        assertThat(saved.preview().groups()).isEqualTo(alternative.groups());
+        assertThat(runCount()).isEqualTo(1);
+    }
     @Test void staleMembershipCannotApply() {
         var p = preview(); var m = members.findByStudentIdAndDeadlineId(ids.getFirst(), deadline.getId()).orElseThrow(); m.setRole(GroupMemberRole.MEMBER); members.saveAndFlush(m);
         assertThatThrownBy(() -> apply(p, "stale")).isInstanceOf(ConflictAlertException.class); assertThat(runCount()).isZero();
+    }
+
+    @Test void savedHistoryRemainsReadableWithBrokenLiveDataOutsideAnyTestTransaction() {
+        var p = preview();
+        var other = new SchoolClass(); other.setName("Other history scope"); other = classes.saveAndFlush(other);
+        var member = members.findByGroupId(groupIds.getFirst()).getFirst(); member.setSchoolClassId(other.getId()); members.saveAndFlush(member);
+        var saved = planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId());
+        assertThat(saved.summary().status()).isEqualTo(AllocationPlanHistoryService.Status.INVALID);
+        assertThat(saved.summary().canApply()).isFalse();
+        assertThat(saved.preview().groups()).isEqualTo(p.groups());
+    }
+
+    @Test void unbalancedStoredPlanIsRejectedBeforeAnyMembershipOrInvitationWrite() throws Exception {
+        var p = preview();
+        var first = p.groups().getFirst(); var second = p.groups().get(1);
+        var six = new ArrayList<>(first.members()); six.addAll(second.members().subList(0, 2));
+        var two = second.members().subList(2, 4);
+        var changedGroups = List.of(
+            new AllocationPreviewDTO.GroupView(first.groupId(), first.name(), first.status(), first.leaderId(), first.leaderName(), false, six, first.score(), first.rules(), true),
+            new AllocationPreviewDTO.GroupView(second.groupId(), second.name(), second.status(), second.leaderId(), second.leaderName(), false, two, second.score(), second.rules(), true));
+        String fingerprint = previews.planFingerprint(p.snapshotFingerprint(), changedGroups);
+        var changed = new AllocationPreviewDTO(p.scope(), p.snapshotFingerprint(), fingerprint, false, p.result(), changedGroups, p.report(), null, null, null);
+        var stored = storedPreviews.findById(p.previewId()).orElseThrow(); stored.setPlanFingerprint(fingerprint); stored.setPayload(mapper.writeValueAsString(changed)); storedPreviews.saveAndFlush(stored);
+        long before = members.count();
+        conflict(() -> apply(p, "unbalanced"), "allocationBalanceViolation");
+        assertThat(members.count()).isEqualTo(before); assertThat(runCount()).isZero();
+        verifyNoInteractions(realtime, mail);
     }
     @Test void staleDeadlineCannotApply() { var p = preview(); deadline.setEndTime(now.plusSeconds(3600)); deadlines.saveAndFlush(deadline); conflict(() -> apply(p, "stale-time"), "allocationPreviewStale"); }
     @Test void pendingInvitationChangeInvalidatesSnapshot() { var p = preview(); invite(groupIds.getFirst(), ids.getLast()); conflict(() -> apply(p, "invite-stale"), "allocationPreviewStale"); }
@@ -202,12 +250,19 @@ class AllocationApplyServiceTest {
     @Test void consumedPreviewCannotReplayAfterIdempotencyRetention() {
         var p = preview(); var result = apply(p, "retained"); now = now.plus(Duration.ofDays(31)); retention.clean();
         assertThat(runs.findById(result.runId()).orElseThrow().getApplyRequestId()).isNull();
+        assertThat(storedPreviews.findById(p.previewId()).orElseThrow().getPayload()).isNotNull();
+        assertThat(planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId()).summary().status()).isEqualTo(AllocationPlanHistoryService.Status.APPLIED);
         conflict(() -> apply(p, "retained"), "allocationPreviewUsed"); assertThat(runCount()).isEqualTo(1);
     }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(value = GroupStatus.class, names = {"PENDING", "ACCEPTED"})
     void protectedGroupAndInvitationRemainUntouched(GroupStatus status) {
         var group = groups.findById(groupIds.getFirst()).orElseThrow(); group.setStatus(status); groups.saveAndFlush(group);
+        // Protected sizes participate in balance: keep four fixed students and allocate the other four.
+        for (Long id : ids.subList(6, 8)) {
+            var member = new GroupMember(); member.setGroupId(group.getId()); member.setStudentId(id); member.setDeadlineId(deadline.getId());
+            member.setSchoolClassId(schoolClass.getId()); member.setRole(GroupMemberRole.MEMBER); member.setJoinedAt(now); members.saveAndFlush(member);
+        }
         var invitation = invite(group.getId(), ids.getLast());
         var before = members.findByGroupId(group.getId()).stream().map(m -> List.of(m.getId(), m.getStudentId(), m.getRole())).toList();
         var result = apply(preview(), "protected"); assertThat(result.approvedGroupIds()).doesNotContain(group.getId());

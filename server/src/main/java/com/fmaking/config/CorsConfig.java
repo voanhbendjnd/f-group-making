@@ -22,7 +22,7 @@ public class CorsConfig {
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH")); // Allowed methods
         configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization", "Content-Type", "Accept", "x-no-retry", "delay"));
+                "Authorization", "Content-Type", "Accept", "Idempotency-Key", "x-no-retry", "delay"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
         // How long the response from a pre-flight request can be cached by clients

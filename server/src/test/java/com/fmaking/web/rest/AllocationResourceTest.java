@@ -162,6 +162,58 @@ class AllocationResourceTest {
             .andExpect(jsonPath("$.data.limits.createsNewGroups").value(false));
     }
 
+    @ParameterizedTest @org.junit.jupiter.params.provider.CsvSource({"ACCEPTED,true,409", "ACCEPTED,false,200", "PENDING,true,200"})
+    void onlyBlocksCompletedClassesWithNoUnassignedStudents(GroupStatus groupStatus, boolean assignEveryone, int expectedStatus) throws Exception {
+        for (Long id : groupIds) { var group = groups.findById(id).orElseThrow(); group.setStatus(groupStatus); groups.saveAndFlush(group); }
+        if (assignEveryone) for (Long id : studentIds.subList(6, 8)) {
+            var member = new GroupMember(); member.setGroupId(groupIds.getFirst()); member.setStudentId(id); member.setSchoolClassId(own.getId());
+            member.setDeadlineId(deadline.getId()); member.setRole(GroupMemberRole.MEMBER); member.setJoinedAt(Instant.now()); members.saveAndFlush(member);
+        }
+        em.clear(); clearInvocations(engine);
+        mvc.perform(get(path("overview")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk());
+        mvc.perform(get(path("plans")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk());
+        mvc.perform(post(path("preview")).contentType(MediaType.APPLICATION_JSON).content("{\"targetGroupCount\":3}")
+            .with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().is(expectedStatus));
+        if (expectedStatus == 409) verify(engine, never()).allocate(any(), anyInt(), anyLong());
+    }
+
+    @Test void randomHistoryListsEverySuccessfulPreviewAndRestoresExactAssignmentsWithoutRandomizing() throws Exception {
+        var first = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        var second = preview("{\"targetGroupCount\":2,\"seed\":43}");
+        assertThat(first.path("previewId").asText()).isNotEqualTo(second.path("previewId").asText());
+        clearInvocations(engine);
+        mvc.perform(get(path("plans")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.meta.total").value(2))
+            .andExpect(jsonPath("$.data.result[0].status").value("UNAPPLIED"))
+            .andExpect(jsonPath("$.data.result[0].canApply").value(true));
+        var restored = mvc.perform(get(path("plans/" + first.path("previewId").asText())).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andReturn();
+        var detail = mapper.readTree(restored.getResponse().getContentAsString()).path("data");
+        assertThat(detail.path("preview").path("groups")).isEqualTo(first.path("groups"));
+        assertThat(detail.path("preview").path("report")).isEqualTo(first.path("report"));
+        verify(engine, never()).allocate(any(), anyInt(), anyLong());
+        verifyNoInteractions(events, notifications, mail);
+    }
+
+    @Test void randomHistoryShowsStalePlansAndRefusesOtherClassAccess() throws Exception {
+        var saved = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        own.setRulesVersion(own.getRulesVersion() + 1); classes.saveAndFlush(own);
+        mvc.perform(get(path("plans/" + saved.path("previewId").asText())).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.summary.status").value("INVALID"))
+            .andExpect(jsonPath("$.data.summary.canApply").value(false));
+        mvc.perform(get(path("plans")).with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles("LECTURE_MASTER")))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test void brokenLiveMembershipDoesNotHideTheSavedPlanButDisablesApply() throws Exception {
+        var saved = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        var member = members.findByGroupId(groupIds.getFirst()).getFirst(); member.setSchoolClassId(other.getId()); members.saveAndFlush(member);
+        var response = mvc.perform(get(path("plans/" + saved.path("previewId").asText())).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.summary.status").value("INVALID"))
+            .andExpect(jsonPath("$.data.summary.canApply").value(false)).andReturn();
+        assertThat(mapper.readTree(response.getResponse().getContentAsString()).path("data").path("preview").path("groups")).isEqualTo(saved.path("groups"));
+    }
+
     @Test void previewBuildsBeforeAfterReportAndDoesNotApproveOrWriteAnything() throws Exception {
         long statusCount = statusHistory.count(), historyCount = memberHistory.count();
         JsonNode before = overview();
@@ -188,13 +240,14 @@ class AllocationResourceTest {
         verifyNoInteractions(events, notifications, mail);
     }
 
-    @Test void protectedGroupsArePresentAndUnchangedEvenWhenTheyHaveRuleWarnings() throws Exception {
+    @Test void protectedGroupsThatPreventBalanceAreNeverRepaired() throws Exception {
         var fixed = groups.findById(groupIds.getFirst()).orElseThrow(); fixed.setStatus(GroupStatus.ACCEPTED); groups.saveAndFlush(fixed); em.clear();
         var before = overview().path("groups").get(0);
         var result = preview("{\"targetGroupCount\":2,\"seed\":42}");
-        assertThat(result.path("groups").get(0)).isEqualTo(before);
-        assertThat(result.path("report").path("protectedGroupIds").get(0).asLong()).isEqualTo(fixed.getId());
-        assertThat(result.path("result").path("warnings").findValuesAsText("code")).contains("PROTECTED_RULE_WARNING");
+        assertThat(result.path("result").path("status").asText()).isEqualTo("PROVEN_INFEASIBLE");
+        assertThat(result.path("result").path("warnings").findValuesAsText("code")).contains("BALANCED_SIZE_CONFLICT");
+        assertThat(result.path("groups").isEmpty()).isTrue();
+        assertThat(overview().path("groups").get(0)).isEqualTo(before);
     }
 
     @Test void infeasiblePreviewReturnsNoPretendAfterReport() throws Exception {

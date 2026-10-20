@@ -28,11 +28,12 @@ public class AllocationPreviewStore {
         row.setTargetCount(result.result().targetGroupCount()); row.setSeed(result.result().seed());
         row.setSnapshotFingerprint(result.snapshotFingerprint()); row.setPlanFingerprint(result.planFingerprint());
         row.setCreatedAt(clock.instant().truncatedTo(java.time.temporal.ChronoUnit.MICROS));
+        // Legacy NOT NULL column retained for schema compatibility only. It no longer controls Apply or retention.
         row.setExpiresAt(row.getCreatedAt().plus(Duration.ofMinutes(15)));
         try { row.setPayload(mapper.writeValueAsString(result)); }
         catch (JsonProcessingException exception) { throw new IllegalStateException("Cannot store allocation preview", exception); }
         previews.saveAndFlush(row);
         return new AllocationPreviewDTO(result.scope(), result.snapshotFingerprint(), result.planFingerprint(), result.sameAsPreviousPlan(),
-            result.result(), result.groups(), result.report(), row.getId(), row.getCreatedAt(), row.getExpiresAt());
+            result.result(), result.groups(), result.report(), row.getId(), row.getCreatedAt(), null);
     }
 }

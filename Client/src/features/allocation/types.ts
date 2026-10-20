@@ -40,3 +40,8 @@ export interface ApplyResult { runId: number; previewId: string; actorId: number
   cancelledInvitationIds: number[]; report: AllocationReportData }
 export interface RunSummary { runId: number; previewId: string; actorId: number; targetGroupCount: number; seed: number; appliedAt: string }
 export interface HistoryPage { meta: { page: number; pageSize: number; pages: number; total: number }; result: RunSummary[] }
+export interface PlanSummary { planId: string; actorId: number; actorName: string | null; createdAt: string; appliedAt: string | null;
+  targetGroupCount: number; seed: number; totalStudents: number | null; status: 'UNAPPLIED' | 'APPLIED' | 'INVALID';
+  available: boolean; canApply: boolean; invalidReason: string | null }
+export interface PlanDetail { summary: PlanSummary; preview: Preview }
+export interface PlanPage { meta: HistoryPage['meta']; result: PlanSummary[] }

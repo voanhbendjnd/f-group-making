@@ -1,5 +1,40 @@
 {
   "allocation": {
+    "heroTitle": "Smart Group Allocation",
+    "heroDescription": "Create balanced groups fairly, based on your class rules. Review every plan before applying it.",
+    "chooseClassHint": "Select an assigned class to open automatic allocation.",
+    "detailHint": "Review this class, prepare a plan and confirm changes when ready.",
+    "overview": "Class overview",
+    "activeRules": "{{count}} active",
+    "confirmTargetHint": "Choose a target, then confirm to create a saved random plan.",
+    "suggestionDetails": "Why this suggestion?",
+    "searchDetails": "Search details",
+    "readyToApplyHint": "Apply is available when the plan is feasible and the current data has been verified.",
+    "actionsLocked": "Another request is in progress or awaiting recovery. Finish it before starting another action.",
+    "planOwnerOnly": "Only the plan creator with current class access can apply this plan.",
+    "completed": "This class has completed group allocation",
+    "completedHint": "All groups are accepted and no students are unassigned. History and group details remain available.",
+    "acceptedWithUnassigned": "All existing groups are accepted, but some students are still unassigned. An assigned lecturer must resolve this before allocation can proceed.",
+    "classList": "Your classes",
+    "searchClasses": "Search classes",
+    "openClass": "Open allocation",
+    "backToClasses": "Back to classes",
+    "classUnavailable": "This class is unavailable in the selected term or outside your assignment.",
+    "confirmTarget": "Confirm target & randomize",
+    "balanceHint": "Group sizes may differ by at most 1 student, including protected groups.",
+    "planSavedHint": "This random plan is saved in history. Real groups change only after Apply succeeds.",
+    "randomHistory": "Random History",
+    "randomHistoryHint": "Every successful Random and Random Again is saved. Open a plan to view its exact assignments or apply it after validation.",
+    "noRandomHistory": "No saved random plans yet. Confirm a target to create one.",
+    "randomAt": "Randomized at",
+    "planStatusLabel": "Plan status",
+    "planStatuses": { "UNAPPLIED": "Not applied", "APPLIED": "Applied", "INVALID": "No longer valid" },
+    "viewPlan": "View plan",
+    "applyPlan": "Apply plan",
+    "savedPlan": "Saved random plan",
+    "savedPlanHint": "These are the assignments saved when Random ran. Viewing does not change groups or randomize again.",
+    "openPlan": "Open in workspace",
+    "applyAudit": "Successful Apply audit",
     "applying": "Applying allocation…",
     "waitForApply": "Please wait while the server verifies and saves this request.",
     "deadlineStatus": {
@@ -9,7 +44,7 @@
       "CANCELLED": "Cancelled"
     },
     "title": "Automatic Allocation",
-    "description": "Review your class, explore a balanced plan and apply it only after confirmation.",
+    "description": "Review your class, save random plans and confirm before applying them.",
     "howItWorks": "How automatic allocation works",
     "steps": [
       {
@@ -18,11 +53,11 @@
       },
       {
         "title": "Set Target",
-        "description": "Choose a group count using verified suggestions."
+        "description": "Choose a group count and confirm to randomize."
       },
       {
         "title": "Preview Allocation",
-        "description": "Compare assignments before saving."
+        "description": "Review saved assignments before applying."
       },
       {
         "title": "Apply & Approve",
@@ -135,6 +170,7 @@
       "MIN_SE_MEMBERS_PER_GROUP": "Minimum SE students"
     },
     "reasons": {
+      "BALANCED_SIZE_CONFLICT": "The target cannot keep group sizes within 1 student while preserving protected groups and the active member limits.",
       "TARGET_MUST_BE_POSITIVE": "Target must be a positive whole number.",
       "TARGET_BELOW_PROTECTED": "Target cannot be less than the protected group count ({{required}}).",
       "NEW_GROUPS_NOT_ALLOWED": "This version can only keep or merge existing groups (maximum {{required}}).",
@@ -159,6 +195,9 @@
       "other": "Review the current rules and feasibility warnings before applying."
     },
     "errors": {
+      "allocationAlreadyComplete": "All groups are accepted and no students are unassigned. No further allocation is needed.",
+      "allocationBalanceViolation": "This plan does not meet the maximum size difference of 1 student. Generate a new plan.",
+      "allocationPlanUnavailable": "The saved plan is unavailable in this class/session, or its older payload was already removed.",
       "unknown": "The result could not be verified. For Apply, retry the same request or check History.",
       "other": "Unable to load or process allocation data. Please retry.",
       "http400": "The request is invalid. Check the target and selected scope.",

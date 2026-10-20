@@ -49,12 +49,11 @@ public class AllocationApplyService {
         var preview = previews.findForUpdate(request.getPreviewId()).orElseThrow(AllocationApplyService::notFound);
         checkOwner(preview, actor, classId, deadlineId);
         if (preview.getAppliedAt() != null) throw conflict("allocationPreviewUsed");
-        if (!clock.instant().isBefore(preview.getExpiresAt())) throw conflict("allocationPreviewExpired");
         if (preview.getFormatVersion() != 1 || preview.getPayload() == null) throw conflict("allocationPreviewInvalid");
         request.setStatus(AllocationApplyRequest.Status.PROCESSING);
         locks.data(classId, deadlineId);
         var current = snapshots.capture(deadlineId, classId);
-        if (!clock.instant().isBefore(preview.getExpiresAt())) throw conflict("allocationPreviewExpired");
+        AllocationPreviewService.requireAllocationNeeded(current.overview());
         if (!preview.getSnapshotFingerprint().equals(current.overview().snapshotFingerprint())) throw conflict("allocationPreviewStale");
         var plan = read(preview.getPayload(), AllocationPreviewDTO.class);
         if (plan.result() == null || plan.groups() == null || plan.report() == null || plan.scope() == null
@@ -64,6 +63,8 @@ public class AllocationApplyService {
                 || !preview.getSnapshotFingerprint().equals(plan.snapshotFingerprint())
                 || !preview.getPlanFingerprint().equals(snapshots.planFingerprint(preview.getSnapshotFingerprint(), plan.groups())))
             throw conflict("allocationPreviewInvalid");
+        if (!AllocationBalancePolicy.isBalanced(plan.groups().stream().map(g -> g.members().size()).toList()))
+            throw conflict("allocationBalanceViolation");
         var affected = new HashSet<Long>();
         current.overview().groups().stream().filter(g -> g.status() == GroupStatus.OPEN || g.status() == GroupStatus.REVOKED)
             .forEach(g -> affected.add(g.groupId()));

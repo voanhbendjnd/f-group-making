@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiClient } from '@/services/api/client';
 import { allocationApi } from '@/features/allocation/api/allocationApi';
-import { applyFixture, overviewFixture, previewFixture, setupFixture } from './allocationFixtures';
+import { applyFixture, overviewFixture, planFixture, previewFixture, setupFixture } from './allocationFixtures';
 import type { InternalAxiosRequestConfig } from 'axios';
 
 const originalAdapter = apiClient.defaults.adapter;
@@ -34,5 +34,17 @@ describe('allocation actual Axios and Java DTO contracts', () => {
   it.each([null, {}, { ...applyFixture(), classId: 99 }, { ...applyFixture(), previewId: 'other' }])('keeps an unconfirmed 200 response as an unknown outcome %#', async data => {
     apiClient.defaults.adapter = async config => ({ config, headers: {}, status: 200, statusText: 'OK', data: { statusCode: 200, data } });
     await expect(allocationApi.apply(3, 2, previewFixture().previewId!, 'same-key')).rejects.toMatchObject({ outcomeUnknown: true });
+  });
+  it('reads saved random plans without POST or assignments from the client', async () => {
+    const requests: InternalAxiosRequestConfig[] = [];
+    apiClient.defaults.adapter = async config => {
+      requests.push(config);
+      return { config, headers: {}, status: 200, statusText: 'OK', data: { statusCode: 200, data: config.url?.endsWith('/plans')
+        ? { meta: { page: 1, pageSize: 10, pages: 1, total: 1 }, result: [planFixture().summary] } : planFixture() } };
+    };
+    expect((await allocationApi.plans(3, 2, 1)).result).toHaveLength(1);
+    expect((await allocationApi.plan(3, 2, planFixture().summary.planId)).preview.groups).toEqual(planFixture().preview.groups);
+    expect(requests.map(value => value.method)).toEqual(['get', 'get']);
+    expect(requests[0].params).toEqual({ page: 1, size: 10 });
   });
 });

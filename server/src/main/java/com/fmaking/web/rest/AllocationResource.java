@@ -3,6 +3,7 @@ package com.fmaking.web.rest;
 import com.fmaking.service.AllocationPreviewService;
 import com.fmaking.service.AllocationApplyCoordinator;
 import com.fmaking.service.AllocationHistoryService;
+import com.fmaking.service.AllocationPlanHistoryService;
 import com.fmaking.service.dto.AllocationApplyDTO;
 import com.fmaking.service.dto.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
@@ -21,9 +22,24 @@ public class AllocationResource {
     private final AllocationPreviewService service;
     private final AllocationApplyCoordinator apply;
     private final AllocationHistoryService history;
+    private final AllocationPlanHistoryService plans;
 
-    public AllocationResource(AllocationPreviewService service, AllocationApplyCoordinator apply, AllocationHistoryService history) {
-        this.service = service; this.apply = apply; this.history = history;
+    public AllocationResource(AllocationPreviewService service, AllocationApplyCoordinator apply, AllocationHistoryService history, AllocationPlanHistoryService plans) {
+        this.service = service; this.apply = apply; this.history = history; this.plans = plans;
+    }
+
+    @GetMapping("/plans")
+    @ApiMessage("Random history retrieved")
+    public ResponseEntity<ResultPaginationDTO> plans(@PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId, Pageable pageable) {
+        return ResponseEntity.ok(plans.list(deadlineId, classId, pageable));
+    }
+
+    @GetMapping("/plans/{planId}")
+    @ApiMessage("Saved random plan retrieved")
+    public ResponseEntity<AllocationPlanHistoryService.Detail> plan(@PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId, @PathVariable("planId") String planId) {
+        return ResponseEntity.ok(plans.detail(deadlineId, classId, planId));
     }
 
     @PostMapping("/apply")

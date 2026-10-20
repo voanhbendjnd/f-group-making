@@ -7,8 +7,8 @@ import { useRealtime } from '@/app/providers/realtimeContext';
 import { useTranslation } from 'react-i18next';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { allocationApi } from '../api/allocationApi';
-import { allocationErrorKey, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
-import type { ApplyResult, Preview } from '../types';
+import { allocationErrorKey, isAllocationComplete, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
+import type { ApplyResult, PlanDetail, Preview } from '../types';
 
 export function useAllocationFlow(classId: number, deadlineId: number) {
   const { user } = useAuth(); const { selectedTermId, lockTermSelection } = useTerm();
@@ -21,36 +21,35 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const [preview, setPreview] = useState<Preview | null>(null); const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<unknown>(null); const [applyError, setApplyError] = useState<unknown>(null);
   const [applying, setApplying] = useState(false); const [applied, setApplied] = useState<ApplyResult | null>(null);
-  const [revision, setRevision] = useState(0); const generation = useRef(0); const controller = useRef<AbortController | null>(null);
+  const generation = useRef(0); const controller = useRef<AbortController | null>(null);
+  const calculating = useRef(false); const [confirmedTarget, setConfirmedTarget] = useState<number | null>(null);
+  const [savedPlan, setSavedPlan] = useState<PlanDetail['summary'] | null>(null);
   const previous = useRef<{ seed?: number; fingerprint?: string }>({});
-  const [now, setNow] = useState(() => Date.now());
   const overview = useQuery({ queryKey: [...key, 'overview'], queryFn: ({ signal }) => allocationApi.overview(deadlineId, classId, signal), retry: false });
+  const complete = isAllocationComplete(overview.data);
+  const acceptedWithUnassigned = !!overview.data && overview.data.groups.length > 0 && overview.data.summary.unassignedStudents > 0
+    && overview.data.groups.every(group => group.status === 'ACCEPTED');
   const setup = useQuery({ queryKey: [...key, 'setup'], enabled: configuring,
     queryFn: ({ signal }) => allocationApi.setup(deadlineId, classId, signal), retry: false });
   const suggested = setup.data?.suggestion;
   const target = rawTarget ?? (suggested?.status === 'FEASIBLE' && suggested.suggestedCount !== null ? String(suggested.suggestedCount) : '');
   const parsedTarget = validTarget(target, setup.data?.range);
-  useEffect(() => {
-    if (!configuring || parsedTarget === null || attempt || applied) return;
+  const generate = async () => {
+    if (complete || !configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
     const ticket = ++generation.current; const abort = new AbortController(); controller.current = abort;
-    const timer = window.setTimeout(async () => {
-      setPreviewLoading(true); setPreviewError(null);
-      try {
-        const response = await allocationApi.preview(deadlineId, classId, { targetGroupCount: parsedTarget,
-          seed: newSeed(previous.current.seed), previousPlanFingerprint: previous.current.fingerprint }, abort.signal);
-        if (!abort.signal.aborted && generation.current === ticket) {
-          setNow(Date.now()); setPreview(response); previous.current = { seed: response.result.seed, fingerprint: response.planFingerprint ?? undefined };
-        }
-      } catch (error) { if (!abort.signal.aborted && generation.current === ticket) setPreviewError(error); }
-      finally { if (!abort.signal.aborted && generation.current === ticket) setPreviewLoading(false); }
-    }, 450);
-    return () => { window.clearTimeout(timer); abort.abort(); };
-  }, [configuring, parsedTarget, target, revision, attempt, applied, classId, deadlineId]);
-  useEffect(() => {
-    if (!preview?.expiresAt || applied) return;
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, [preview?.expiresAt, applied]);
+    calculating.current = true; setConfirmedTarget(parsedTarget); setSavedPlan(null); setApplied(null);
+    setPreview(null); setPreviewLoading(true); setPreviewError(null); setApplyError(null);
+    try {
+      const response = await allocationApi.preview(deadlineId, classId, { targetGroupCount: parsedTarget,
+        seed: newSeed(previous.current.seed), previousPlanFingerprint: previous.current.fingerprint }, abort.signal);
+      if (!abort.signal.aborted && generation.current === ticket) {
+        setPreview(response); previous.current = { seed: response.result.seed, fingerprint: response.planFingerprint ?? undefined };
+        void client.invalidateQueries({ queryKey: [...key, 'plans'] });
+      }
+    } catch (error) { if (!abort.signal.aborted && generation.current === ticket) setPreviewError(error); }
+    finally { if (generation.current === ticket) { calculating.current = false; setPreviewLoading(false); } }
+  };
+  useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
   useEffect(() => {
     const listener = (event: { deadlineId: number; schoolClassId?: number }) => {
       if (event.deadlineId === deadlineId && (!event.schoolClassId || event.schoolClassId === classId))
@@ -61,21 +60,22 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     return () => { offGroups(); offDeadline(); };
   }, [subscribe, client, classId, deadlineId]);
   const resetPreview = () => {
-    generation.current++; controller.current?.abort(); setPreview(null); setPreviewError(null); setPreviewLoading(false); setApplyError(null);
+    generation.current++; controller.current?.abort(); calculating.current = false;
+    setPreview(null); setSavedPlan(null); setPreviewError(null); setPreviewLoading(false); setApplyError(null);
   };
   const changeTarget = (value: string) => {
     if (busy.current || attemptRef.current || !/^\d*$/.test(value)) return;
-    resetPreview(); setRawTarget(value);
+    resetPreview(); setRawTarget(value); setConfirmedTarget(null);
   };
   const autoAgain = () => {
-    if (busy.current || attemptRef.current) return;
-    resetPreview(); setRevision(value => value + 1);
+    if (confirmedTarget !== parsedTarget) return;
+    void generate();
   };
-  const secondsLeft = preview?.expiresAt ? Math.max(0, Math.ceil((Date.parse(preview.expiresAt) - now) / 1000)) : 0;
   const stale = !!preview && !!overview.data && preview.snapshotFingerprint !== overview.data.snapshotFingerprint;
-  const canApply = preview?.result.status === 'FEASIBLE' && !!preview.previewId && secondsLeft > 0 && !stale
+  const canApply = !complete && preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
     && overview.isSuccess && !overview.isFetching && setup.isSuccess && !setup.isFetching
-    && !previewLoading && !previewError && !applying && !attempt && !applied && parsedTarget === preview.result.targetGroupCount;
+    && !previewLoading && !previewError && !applying && !attempt && !applied && (!savedPlan || savedPlan.canApply)
+    && parsedTarget === preview.result.targetGroupCount && confirmedTarget === parsedTarget;
   const saveAttempt = (value: ApplyAttempt | null) => { attemptRef.current = value; setAttempt(value); persistAttempt(storageKey, value); };
   const confirmApply = async () => {
     if (busy.current) return;
@@ -95,9 +95,15 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
       // Unknown/busy retains the SAME key and reference, including after page refresh.
     } finally { unlock(); busy.current = false; setApplying(false); }
   };
-  const visiblePreview = preview?.result.targetGroupCount === parsedTarget ? preview : null;
+  const visiblePreview = savedPlan || preview?.result.targetGroupCount === parsedTarget ? preview : null;
+  const restorePlan = (detail: PlanDetail) => {
+    if (busy.current || attemptRef.current || detail.preview.scope.classId !== classId || detail.preview.scope.deadlineId !== deadlineId) return;
+    resetPreview(); setApplied(null); setConfiguring(true); setRawTarget(String(detail.preview.result.targetGroupCount));
+    setConfirmedTarget(detail.preview.result.targetGroupCount); setSavedPlan(detail.summary); setPreview(detail.preview);
+    previous.current = { seed: detail.preview.result.seed, fingerprint: detail.preview.planFingerprint ?? undefined };
+  };
   return { overview, setup, configuring, setConfiguring, target, changeTarget, parsedTarget, preview: visiblePreview, previewLoading, previewError,
-    applyError, applying, applied, attempt, secondsLeft, stale, canApply, autoAgain, confirmApply,
-    start: () => { if (!attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
+    applyError, applying, applied, attempt, complete, acceptedWithUnassigned, stale, canApply, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
+    start: () => { if (!complete && !attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
     refresh: () => client.invalidateQueries({ queryKey: key }) };
 }

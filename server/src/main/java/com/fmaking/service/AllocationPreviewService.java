@@ -55,6 +55,16 @@ public class AllocationPreviewService {
 
     public Overview overview(Integer deadlineId, Integer classId) { return overview(load(deadlineId, classId)); }
 
+    public static boolean isAllocationComplete(Overview overview) {
+        return !overview.groups().isEmpty() && overview.unassignedStudents().isEmpty()
+            && overview.groups().stream().allMatch(group -> group.status() == GroupStatus.ACCEPTED);
+    }
+
+    public static void requireAllocationNeeded(Overview overview) {
+        if (isAllocationComplete(overview))
+            throw new ConflictAlertException("Class allocation is complete", "allocation", "allocationAlreadyComplete");
+    }
+
     public Setup setup(Integer deadlineId, Integer classId, Long requestedSeed) {
         Loaded loaded = load(deadlineId, classId);
         long seed = seed(requestedSeed);
@@ -71,6 +81,7 @@ public class AllocationPreviewService {
         Loaded loaded = load(deadlineId, classId);
         long seed = seed(request.seed());
         Overview before = overview(loaded);
+        requireAllocationNeeded(before);
         var result = engine.allocate(loaded.snapshot(), request.targetGroupCount(), seed);
         boolean feasible = result.status() == AllocationResultDTO.Status.FEASIBLE;
         List<GroupView> proposed = feasible ? result.groups().stream().map(group -> view(loaded.snapshot().rules(), group.groupId(),
@@ -90,6 +101,14 @@ public class AllocationPreviewService {
     public Captured capture(Integer deadlineId, Integer classId) {
         Loaded loaded = load(deadlineId, classId);
         return new Captured(overview(loaded), loaded.snapshot());
+    }
+
+    public Optional<Captured> captureForHistory(Integer deadlineId, Integer classId) {
+        // Catch data conflicts inside this transactional boundary. Catching them in a calling service
+        // after the proxy returns would mark its joined transaction rollback-only.
+        // Authentication, authorization and missing-scope exceptions still propagate normally.
+        try { return Optional.of(capture(deadlineId, classId)); }
+        catch (ConflictAlertException exception) { return Optional.empty(); }
     }
     public String planFingerprint(String snapshotFingerprint, List<GroupView> proposed) {
         return hash(new PlanIdentity(snapshotFingerprint, proposed.stream().sorted(Comparator.comparing(GroupView::groupId)).map(group ->

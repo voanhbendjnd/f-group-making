@@ -165,6 +165,7 @@ export const router = createBrowserRouter([
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
       { path: 'group-review', element: <LecturerGroupReviewPage /> },
       { path: 'automatic-allocation', element: <LecturerAllocationPage /> },
+      { path: 'automatic-allocation/:classId', element: <LecturerAllocationPage /> },
       { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
     ],
