@@ -16,6 +16,11 @@ import { deadlineApi } from '../features/deadline/api/deadlineApi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 
+vi.mock('xlsx', async importOriginal => ({
+  ...await importOriginal<typeof import('xlsx')>(),
+  writeFile: vi.fn(),
+}));
+
 vi.mock('../features/group/api/groupApi', () => ({
   groupApi: {
     getWorkspace: vi.fn(),
@@ -87,6 +92,7 @@ describe('Group Allocation Excel Export Utility', () => {
         groupName: 'EXE101_G01',
         gv: 'DuyVL',
         groupMentor: 'EXE101_G01.01', // Đã có nhóm
+        groupCode: 'G01',
         groupStatus: 'ACCEPTED',
       },
       {
@@ -132,6 +138,7 @@ describe('Group Allocation Excel Export Utility', () => {
       'GroupName',
       'GV',
       'Group Mentor',
+      'Group Code',
     ]);
 
     // Dòng 2: Sinh viên có nhóm
@@ -146,12 +153,14 @@ describe('Group Allocation Excel Export Utility', () => {
     expect(json[2][8]).toBe('EXE101_G01');
     expect(json[2][9]).toBe('DuyVL');
     expect(json[2][10]).toBe('EXE101_G01.01'); // Cột Group Mentor
+    expect(json[2][11]).toBe('G01');
 
     // Dòng 3: Sinh viên chưa có nhóm
     expect(json[3][0]).toBe(2);
     expect(json[3][1]).toBe('SE190001');
     expect(json[3][2]).toBe('Trần Văn Nam');
     expect(json[3][10]).toBe(''); // Cột Group Mentor để trống
+    expect(json[3][11]).toBe('');
   });
 
   it('fetchClassAllocationData retrieves all assigned and unassigned students from workspace', async () => {
@@ -171,6 +180,8 @@ describe('Group Allocation Excel Export Utility', () => {
       groups: [
         {
           id: 1,
+          sequenceNo: 2,
+          groupCode: 'G02',
           deadlineId: 10,
           schoolClassId: 104,
           name: 'EXE101_G01.01',
@@ -222,6 +233,7 @@ describe('Group Allocation Excel Export Utility', () => {
     // Đã sắp xếp theo rollNumber
     expect(result.rows[0].rollNumber).toBe('SE180001');
     expect(result.rows[0].groupMentor).toBe('EXE101_G01.01');
+    expect(result.rows[0].groupCode).toBe('G02');
     expect(result.rows[1].rollNumber).toBe('SE180002');
     expect(result.rows[1].groupMentor).toBe('');
     expect(result.meta.className).toBe('EXE101_G01');

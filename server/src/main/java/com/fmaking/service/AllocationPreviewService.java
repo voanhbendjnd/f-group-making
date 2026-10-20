@@ -157,6 +157,7 @@ public class AllocationPreviewService {
             byGroup.computeIfAbsent(member.getGroupId(), id -> new ArrayList<>()).add(dto);
         }
         List<GroupDTO> groupDtos = stored.stream().map(group -> GroupDTO.builder().id(group.getId()).name(group.getName())
+            .sequenceNo(group.getSequenceNo())
             .schoolClassId(group.getSchoolClassId()).deadlineId(group.getDeadlineId()).leaderId(group.getLeaderId())
             .status(group.getStatus()).version(group.getVersion()).rejectReason(group.getRejectReason())
             .submittedRulesVersion(group.getSubmittedRulesVersion()).isLecturerCreated(group.getIsLecturerCreated())

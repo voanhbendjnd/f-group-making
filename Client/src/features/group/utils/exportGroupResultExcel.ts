@@ -3,6 +3,7 @@ import { classApi } from '@/features/classes/api/classApi';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { groupApi } from '../api/groupApi';
 import type { GroupStatus } from '../types/groupTypes';
+import { groupCode } from './groupSequence';
 
 export interface StudentGroupExportRow {
   studentId: number;
@@ -17,6 +18,7 @@ export interface StudentGroupExportRow {
   gv: string; // Tên/mã giảng viên phụ trách
   groupMentor: string; // Tên nhóm sinh viên thuộc về (e.g. EXE101_G01.01) hoặc '' nếu chưa có nhóm
   groupStatus?: GroupStatus | null;
+  groupCode?: string;
 }
 
 export interface GroupExportMeta {
@@ -63,6 +65,7 @@ export function buildGroupResultWorkbook(
     'GroupName',
     'GV',
     'Group Mentor',
+    'Group Code',
   ]);
 
   // Dòng 2+: Dữ liệu từng sinh viên trong lớp
@@ -79,6 +82,7 @@ export function buildGroupResultWorkbook(
       row.groupName || meta.className,
       row.gv || meta.lecturerCode || '',
       row.groupMentor || '', // Nếu không có nhóm thì để trống ''
+      row.groupCode || '',
     ]);
   });
 
@@ -100,6 +104,7 @@ export function buildGroupResultWorkbook(
     { wch: 16 }, // GroupName
     { wch: 12 }, // GV
     { wch: 18 }, // Group Mentor
+    { wch: 12 }, // Group Code
   ];
 
   const workbook = XLSX.utils.book_new();
@@ -209,6 +214,7 @@ export async function fetchClassAllocationData(
             gv: lecturerCode,
             groupMentor: g.name, // Lưu tên nhóm vào cột Group Mentor
             groupStatus: g.status,
+            groupCode: groupCode(g),
           });
         });
       });

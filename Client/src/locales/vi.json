@@ -1672,6 +1672,7 @@
     "colMemberCode": "Mã TV",
     "colEmail": "Email",
     "colGroupMentor": "Nhóm (Group Mentor)",
+    "colGroupCode": "Mã nhóm",
     "noGroup": "Chưa có nhóm",
     "exportBtn": "Xuất file Excel (.xlsx)",
     "closeBtn": "Đóng",

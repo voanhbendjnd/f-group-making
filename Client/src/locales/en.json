@@ -1672,6 +1672,7 @@
     "colMemberCode": "Member Code",
     "colEmail": "Email",
     "colGroupMentor": "Group (Group Mentor)",
+    "colGroupCode": "Group code",
     "noGroup": "No Group",
     "exportBtn": "Export to Excel (.xlsx)",
     "closeBtn": "Close",

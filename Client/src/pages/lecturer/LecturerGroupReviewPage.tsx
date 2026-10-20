@@ -73,7 +73,6 @@ function ReviewContent() {
     } });
   const reviews = useQuery({ queryKey: ['group-reviews', user?.id, selectedTermId, filters],
     queryFn: ({ signal }) => groupApi.getReviews({ ...filters, termId: selectedTermId! }, signal),
-    refetchInterval: 30000,
     retry: (count, error) => count < 1 && ![400, 401, 403].includes(getApiError(error).status) });
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
@@ -158,6 +157,7 @@ function ReviewContent() {
   const statusBadge = (status: GroupStatus) => <span className={`badge ${status === 'ACCEPTED' ? 'badge-success' : status === 'PENDING' ? 'badge-info' : 'badge-warning'}`}>{t(`groupReview.statuses.${status}`)}</span>;
   const eligibility = (row: GroupReviewRow) => <span className={`badge ${row.eligible ? 'badge-success' : 'badge-warning'}`}>{t(row.eligible ? 'groupReview.ready' : 'groupReview.needsWork')}</span>;
   const columns = [
+    { title: t('groupExport.colGroupCode'), key: 'groupCode', render: (_: unknown, row: GroupReviewRow) => row.group.groupCode || '—' },
     { title: t('groupReview.group'), key: 'group', render: (_: unknown, row: GroupReviewRow) => <strong>{row.group.name}</strong> },
     { title: t('groupReview.class'), dataIndex: 'className', key: 'class' },
     { title: t('groupReview.leader'), key: 'leader', render: (_: unknown, row: GroupReviewRow) => row.group.leaderName && row.group.leaderName !== 'N/A' ? row.group.leaderName : t('groupReview.missing') },
@@ -246,7 +246,7 @@ function ReviewContent() {
         { key: 'accepted', count: rows.filter(row => row.group.status === 'ACCEPTED').length, Icon: CheckCircle2 },
         { key: 'warnings', count: rows.filter(row => !row.eligible).length, Icon: AlertTriangle },
       ].map(({ key, count, Icon }) => <div className={`card review-stat review-stat-${key}`} key={key}>
-        <div className="review-stat-content"><span>{t(`groupReview.${key}`)}</span><strong>{reviews.isError ? '—' : reviews.isFetching ? '…' : count}</strong><small>{t('groupReview.pageSummary')}</small></div>
+        <div className="review-stat-content"><span>{t(`groupReview.${key}`)}</span><strong>{reviews.isPending ? '…' : reviews.data ? count : '—'}</strong><small>{t('groupReview.pageSummary')}</small></div>
         <span className="review-stat-icon" aria-hidden="true"><Icon size={23} /></span>
       </div>)}
     </div>
@@ -264,7 +264,8 @@ function ReviewContent() {
       </div>
     </form>
     {classes.isError && <ErrorState message={t('groupReview.classesError')} onRetry={() => { void classes.refetch(); }} />}
-    {reviews.isError ? <ErrorState message={translateErrorMessage(reviews.error)} onRetry={() => { void reviews.refetch(); }} /> : <>
+    {reviews.isError && <ErrorState message={translateErrorMessage(reviews.error)} onRetry={() => { void reviews.refetch(); }} />}
+    {(!reviews.isError || !!reviews.data) && <>
       <div className="card review-table">
         <div className="review-table-heading">
           <span><ClipboardCheck size={18} aria-hidden="true" />{t('groupReview.title')}</span>
@@ -278,7 +279,7 @@ function ReviewContent() {
             {reviews.data && <span className="badge badge-info">{reviews.data.meta.total}</span>}
           </div>
         </div>
-        <Table rowKey={row => row.group.id} columns={columns} dataSource={reviews.isFetching ? [] : rows} pagination={false} loading={reviews.isFetching} scroll={{ x: 1100 }} locale={{ emptyText: t('groupReview.empty') }} />
+        <Table rowKey={row => row.group.id} columns={columns} dataSource={rows} pagination={false} loading={reviews.isPending} scroll={{ x: 1100 }} locale={{ emptyText: t('groupReview.empty') }} />
         {reviews.data && <div className="review-pagination"><Pagination meta={reviews.data.meta} currentPage={filters.page} onPageChange={page => { setFilters(old => ({ ...old, page })); setViewId(null); }} /></div>}
       </div>
     </>}

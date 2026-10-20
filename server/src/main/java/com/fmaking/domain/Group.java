@@ -12,6 +12,8 @@ import java.io.Serializable;
 @Entity
 @Table(name = "`groups`", indexes = {
     @Index(name = "idx_groups_class_deadline", columnList = "school_class_id, deadline_id, status")
+}, uniqueConstraints = {
+    @UniqueConstraint(name = "uk_groups_class_deadline_sequence", columnNames = {"school_class_id", "deadline_id", "sequence_no"})
 })
 @Getter
 @Setter
@@ -31,6 +33,10 @@ public class Group extends AbstractAuditingEntity<Long> implements Serializable 
     @NotNull
     @Column(name = "school_class_id", nullable = false)
     private Integer schoolClassId;
+
+    // Null for disbanded groups; identity and historical references continue to use id.
+    @Column(name = "sequence_no")
+    private Integer sequenceNo;
 
     @NotNull
     @Length(max = 100, min = 2)

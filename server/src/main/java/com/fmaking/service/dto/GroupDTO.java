@@ -18,6 +18,7 @@ public class GroupDTO {
     private Long id;
     private Integer deadlineId;
     private Integer schoolClassId;
+    private Integer sequenceNo;
     private String name;
     private Long leaderId;
     private String leaderName;
@@ -38,4 +39,8 @@ public class GroupDTO {
 
     private boolean allRulesPassed;
     private boolean hasHardRuleViolations;
+
+    public String getGroupCode() {
+        return sequenceNo == null ? null : "G" + String.format(java.util.Locale.ROOT, "%02d", sequenceNo);
+    }
 }

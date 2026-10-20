@@ -1,5 +1,5 @@
 import { Modal } from 'antd';
-import { cleanup, render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
@@ -14,7 +14,7 @@ const auth = vi.hoisted(() => ({ user: { id: 1, authorities: ['ROLE_LECTURE'] } 
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
 vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ lockTermSelection: () => () => {} }) }));
-vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn() } }));
+vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn(), lecturerSubmitGroup: vi.fn() } }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 vi.mock('@/features/group/hooks/useGroupWebSocket', () => ({ useGroupWebSocket: () => ({ status: 'connected' }) }));
@@ -41,6 +41,48 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); });
 
 describe('lecturer group policy controls', () => {
+  it('keeps columns in numeric group order after submit and a shuffled server refresh', async () => {
+    let initial!: WorkspaceDTO;
+    mount('OPEN', 'EXPIRED', 4, data => {
+      const base = data.groups[0];
+      data.groups = [
+        { ...base, id: 110, name: 'Hundredth group', sequenceNo: 100, groupCode: 'G100', status: 'ACCEPTED', members: [] },
+        { ...base, id: 12, name: 'Third group', sequenceNo: 3, groupCode: 'G03', status: 'REVOKED', members: [] },
+        { ...base, id: 10, sequenceNo: 1, groupCode: 'G01' },
+        { ...base, id: 11, name: 'Second group', sequenceNo: 2, groupCode: 'G02', status: 'PENDING', members: [] },
+      ];
+      initial = data;
+    });
+    await screen.findByText('Policy group');
+    const ids = () => [...document.querySelectorAll('[data-group-id]')].map(column => Number(column.getAttribute('data-group-id')));
+    expect(ids()).toEqual([10, 11, 12, 110]);
+    const originalColumn = document.querySelector('[data-group-id="10"]')!;
+    vi.mocked(groupApi.lecturerSubmitGroup).mockImplementation(async () => {
+      const submitted = { ...initial.groups.find(g => g.id === 10)!, status: 'PENDING' as const };
+      vi.mocked(groupApi.getWorkspace).mockResolvedValue({ ...initial,
+        groups: [...initial.groups.filter(g => g.id !== 10), submitted] });
+      return submitted;
+    });
+    fireEvent.click(within(originalColumn as HTMLElement).getByRole('button', { name: i18n.t('groupLifecycle.submit'), exact: true }));
+    await waitFor(() => expect(groupApi.lecturerSubmitGroup).toHaveBeenCalledExactlyOnceWith(8, 1, 10));
+    await waitFor(() => expect(within(originalColumn as HTMLElement).getByRole('button', { name: i18n.t('groupWorkspace.approve'), exact: true })).toBeEnabled());
+    expect(ids()).toEqual([10, 11, 12, 110]);
+    expect(document.querySelector('[data-group-id="10"]')).toBe(originalColumn);
+    expect(originalColumn).toHaveTextContent('G01');
+  });
+
+  it('searches by group code without renumbering filtered columns', async () => {
+    mount('OPEN', 'EXPIRED', 4, data => {
+      data.groups[0].sequenceNo = 3; data.groups[0].groupCode = 'G03';
+      data.groups.push({ ...data.groups[0], id: 11, sequenceNo: 1, groupCode: 'G01', name: 'First group', members: [] });
+    });
+    await screen.findByText('Policy group');
+    fireEvent.change(screen.getByLabelText(i18n.t('groupBoard.searchGroups')), { target: { value: 'G03' } });
+    expect(document.querySelectorAll('[data-group-id]')).toHaveLength(1);
+    expect(document.querySelector('[data-group-id="10"]')).toHaveTextContent('G03');
+    expect(screen.queryByText('First group')).not.toBeInTheDocument();
+  });
+
   it('moves between groups atomically, renders immediately, and rolls back after a conflict', async () => {
     let reject!: (error: unknown) => void;
     vi.mocked(groupApi.lecturerMoveMember).mockReturnValue(new Promise((_, fail) => { reject = fail; }));
