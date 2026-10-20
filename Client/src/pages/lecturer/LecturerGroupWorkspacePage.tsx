@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, Plus, RefreshCw, Search, Users } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, FileSpreadsheet, Plus, RefreshCw, Search, Users } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -15,6 +15,7 @@ import { BoardStudentCard } from '@/features/group/components/BoardStudentCard';
 import { GroupBoardColumn } from '@/features/group/components/GroupBoardColumn';
 import { LecturerGroupModal } from '@/features/group/components/LecturerGroupModal';
 import { RejectGroupModal } from '@/features/group/components/RejectGroupModal';
+import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
 import { positiveId, reviewPath } from '@/features/group/navigation';
 import type { GroupDTO, GroupMemberDTO } from '@/features/group/types/groupTypes';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
@@ -48,6 +49,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   const [groupSearch, setGroupSearch] = useState(''); const [create, setCreate] = useState<number[] | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [rejectId, setRejectId] = useState<number | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const dragged = useRef<DragStudent | null>(null); const [draggedId, setDraggedId] = useState<number | null>(null);
   const [over, setOver] = useState<number | 'pool' | 'create' | null>(null);
   const data = workspace.data;
@@ -175,6 +177,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       <div className="board-toolbar">
         <span className={`board-connection ${connection === 'connected' ? 'is-live' : ''}`} title={t('groupBoard.realtimeHint')}><i />{t(connection === 'connected' ? 'groupWorkspace.live' : 'groupWorkspace.offline')}</span>
         <Button variant="secondary" size="sm" disabled={pending || workspace.isFetching} aria-label={t('groupWorkspace.refreshData')} icon={<RefreshCw size={16} />} onClick={() => { void workspace.refetch(); }} />
+        <Button size="sm" variant="secondary" onClick={() => setExportModalOpen(true)} icon={<FileSpreadsheet size={16} />}>{t('groupReview.previewExport')}</Button>
         <Button size="sm" variant="secondary" onClick={() => setPool(old => old === 'hidden' ? 'expanded' : 'hidden')} icon={<Users size={16} />}>{t(pool === 'hidden' ? 'groupBoard.showStudents' : 'groupBoard.hideStudents')}</Button>
         {canManage && <Button size="sm" disabled={pending} icon={<Plus size={16} />} onClick={() => setCreate([])}>{t('groupWorkspace.createNewGroup')}</Button>}
       </div>
@@ -259,5 +262,14 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       onClose={() => { if (!pending) setCreate(null); }} onSubmit={values => run(() => groupApi.lecturerCreateGroup(deadlineId, classId, values))} />
     <RejectGroupModal open={rejectId !== null} groupId={rejectId} isLoading={pending} onClose={() => { if (!pending) setRejectId(null); }}
       onSubmit={(id, reason) => run(() => groupApi.rejectGroup(deadlineId, classId, id, { reason }))} />
+    <GroupPreviewExportModal
+      open={exportModalOpen}
+      onClose={() => setExportModalOpen(false)}
+      classId={classId}
+      className={data.schoolClassName}
+      deadlineId={deadlineId}
+      termId={positiveId(params.get('termId'))}
+      termName={params.get('termName') ?? undefined}
+    />
   </div>;
 }

@@ -1646,6 +1646,39 @@
       "MIN_GROUPS_PER_CLASS_failed": "Chưa đạt tối thiểu {{target}} nhóm trong lớp (hiện có: {{actual}})",
       "MAX_GROUPS_PER_CLASS_passed": "Đạt giới hạn tối đa {{target}} nhóm trong lớp (hiện có: {{actual}})",
       "MAX_GROUPS_PER_CLASS_failed": "Vượt tối đa {{target}} nhóm trong lớp (hiện có: {{actual}})"
-    }
+    },
+    "previewExport": "Xem trước xếp nhóm",
+    "exportExcel": "Xuất Excel (.xlsx)",
+    "exportSuccess": "Đã xuất file Excel kết quả phân nhóm thành công!",
+    "exportError": "Có lỗi khi xuất file Excel",
+    "exportSelectClassPrompt": "Vui lòng chọn một lớp học để xem trước hoặc xuất dữ liệu phân nhóm."
+  },
+  "groupExport": {
+    "modalTitle": "Xem trước kết quả phân nhóm",
+    "modalSubtitle": "Kiểm tra thông tin phân nhóm của toàn bộ sinh viên trong lớp trước khi xuất file Excel",
+    "statsTitle": "Thống kê phân nhóm",
+    "totalStudents": "Tổng số SV",
+    "assignedStudents": "Đã có nhóm",
+    "unassignedStudents": "Chưa có nhóm",
+    "totalGroups": "Số nhóm",
+    "searchPlaceholder": "Tìm theo MSSV, họ tên, email, nhóm...",
+    "filterAll": "Tất cả sinh viên",
+    "filterAssigned": "Đã có nhóm",
+    "filterUnassigned": "Chưa có nhóm",
+    "colStt": "STT",
+    "colRollNumber": "Mã SV",
+    "colFullName": "Họ và tên",
+    "colKhoa": "Khoá / Ngành",
+    "colMemberCode": "Mã TV",
+    "colEmail": "Email",
+    "colGroupMentor": "Nhóm (Group Mentor)",
+    "noGroup": "Chưa có nhóm",
+    "exportBtn": "Xuất file Excel (.xlsx)",
+    "closeBtn": "Đóng",
+    "loading": "Đang tải dữ liệu phân nhóm...",
+    "loadError": "Không thể tải dữ liệu",
+    "empty": "Không có dữ liệu sinh viên",
+    "noDataToExport": "Không có dữ liệu sinh viên để xuất file.",
+    "footerHint": "Cột Group Mentor trong file Excel sẽ lưu tên nhóm của sinh viên (để trống nếu chưa có nhóm)."
   }
 }

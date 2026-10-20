@@ -1646,6 +1646,39 @@
       "MIN_GROUPS_PER_CLASS_failed": "Below minimum {{target}} groups in class (current: {{actual}})",
       "MAX_GROUPS_PER_CLASS_passed": "Within maximum {{target}} groups in class (current: {{actual}})",
       "MAX_GROUPS_PER_CLASS_failed": "Exceeds maximum {{target}} groups in class (current: {{actual}})"
-    }
+    },
+    "previewExport": "Preview Group Allocation",
+    "exportExcel": "Export to Excel (.xlsx)",
+    "exportSuccess": "Successfully exported group allocation Excel file!",
+    "exportError": "Error exporting Excel file",
+    "exportSelectClassPrompt": "Please select a class to preview or export allocation data."
+  },
+  "groupExport": {
+    "modalTitle": "Preview Group Allocation",
+    "modalSubtitle": "Review student group assignments before exporting to Excel",
+    "statsTitle": "Allocation Statistics",
+    "totalStudents": "Total Students",
+    "assignedStudents": "Assigned",
+    "unassignedStudents": "Unassigned",
+    "totalGroups": "Groups",
+    "searchPlaceholder": "Search by roll number, name, email, group...",
+    "filterAll": "All Students",
+    "filterAssigned": "Assigned Only",
+    "filterUnassigned": "Unassigned Only",
+    "colStt": "No.",
+    "colRollNumber": "Roll Number",
+    "colFullName": "Full Name",
+    "colKhoa": "Cohort / Major",
+    "colMemberCode": "Member Code",
+    "colEmail": "Email",
+    "colGroupMentor": "Group (Group Mentor)",
+    "noGroup": "No Group",
+    "exportBtn": "Export to Excel (.xlsx)",
+    "closeBtn": "Close",
+    "loading": "Loading group allocation data...",
+    "loadError": "Unable to load data",
+    "empty": "No student data found",
+    "noDataToExport": "No student data available to export.",
+    "footerHint": "The Group Mentor column in Excel will store the student's group name (left blank if unassigned)."
   }
 }
