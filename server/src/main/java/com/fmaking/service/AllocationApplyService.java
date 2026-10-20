@@ -53,6 +53,7 @@ public class AllocationApplyService {
         request.setStatus(AllocationApplyRequest.Status.PROCESSING);
         locks.data(classId, deadlineId);
         var current = snapshots.capture(deadlineId, classId);
+        AllocationPreviewService.requireAllocationNeeded(current.overview());
         if (!preview.getSnapshotFingerprint().equals(current.overview().snapshotFingerprint())) throw conflict("allocationPreviewStale");
         var plan = read(preview.getPayload(), AllocationPreviewDTO.class);
         if (plan.result() == null || plan.groups() == null || plan.report() == null || plan.scope() == null

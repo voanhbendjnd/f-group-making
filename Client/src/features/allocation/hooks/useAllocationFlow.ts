@@ -7,7 +7,7 @@ import { useRealtime } from '@/app/providers/realtimeContext';
 import { useTranslation } from 'react-i18next';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { allocationApi } from '../api/allocationApi';
-import { allocationErrorKey, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
+import { allocationErrorKey, isAllocationComplete, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
 import type { ApplyResult, PlanDetail, Preview } from '../types';
 
 export function useAllocationFlow(classId: number, deadlineId: number) {
@@ -26,13 +26,16 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const [savedPlan, setSavedPlan] = useState<PlanDetail['summary'] | null>(null);
   const previous = useRef<{ seed?: number; fingerprint?: string }>({});
   const overview = useQuery({ queryKey: [...key, 'overview'], queryFn: ({ signal }) => allocationApi.overview(deadlineId, classId, signal), retry: false });
+  const complete = isAllocationComplete(overview.data);
+  const acceptedWithUnassigned = !!overview.data && overview.data.groups.length > 0 && overview.data.summary.unassignedStudents > 0
+    && overview.data.groups.every(group => group.status === 'ACCEPTED');
   const setup = useQuery({ queryKey: [...key, 'setup'], enabled: configuring,
     queryFn: ({ signal }) => allocationApi.setup(deadlineId, classId, signal), retry: false });
   const suggested = setup.data?.suggestion;
   const target = rawTarget ?? (suggested?.status === 'FEASIBLE' && suggested.suggestedCount !== null ? String(suggested.suggestedCount) : '');
   const parsedTarget = validTarget(target, setup.data?.range);
   const generate = async () => {
-    if (!configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
+    if (complete || !configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
     const ticket = ++generation.current; const abort = new AbortController(); controller.current = abort;
     calculating.current = true; setConfirmedTarget(parsedTarget); setSavedPlan(null); setApplied(null);
     setPreview(null); setPreviewLoading(true); setPreviewError(null); setApplyError(null);
@@ -69,7 +72,7 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     void generate();
   };
   const stale = !!preview && !!overview.data && preview.snapshotFingerprint !== overview.data.snapshotFingerprint;
-  const canApply = preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
+  const canApply = !complete && preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
     && overview.isSuccess && !overview.isFetching && setup.isSuccess && !setup.isFetching
     && !previewLoading && !previewError && !applying && !attempt && !applied && (!savedPlan || savedPlan.canApply)
     && parsedTarget === preview.result.targetGroupCount && confirmedTarget === parsedTarget;
@@ -100,7 +103,7 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     previous.current = { seed: detail.preview.result.seed, fingerprint: detail.preview.planFingerprint ?? undefined };
   };
   return { overview, setup, configuring, setConfiguring, target, changeTarget, parsedTarget, preview: visiblePreview, previewLoading, previewError,
-    applyError, applying, applied, attempt, stale, canApply, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
-    start: () => { if (!attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
+    applyError, applying, applied, attempt, complete, acceptedWithUnassigned, stale, canApply, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
+    start: () => { if (!complete && !attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
     refresh: () => client.invalidateQueries({ queryKey: key }) };
 }

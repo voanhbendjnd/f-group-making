@@ -1,5 +1,20 @@
 {
   "allocation": {
+    "heroTitle": "Smart Group Allocation",
+    "heroDescription": "Create balanced groups fairly, based on your class rules. Review every plan before applying it.",
+    "chooseClassHint": "Select an assigned class to open automatic allocation.",
+    "detailHint": "Review this class, prepare a plan and confirm changes when ready.",
+    "overview": "Class overview",
+    "activeRules": "{{count}} active",
+    "confirmTargetHint": "Choose a target, then confirm to create a saved random plan.",
+    "suggestionDetails": "Why this suggestion?",
+    "searchDetails": "Search details",
+    "readyToApplyHint": "Apply is available when the plan is feasible and the current data has been verified.",
+    "actionsLocked": "Another request is in progress or awaiting recovery. Finish it before starting another action.",
+    "planOwnerOnly": "Only the plan creator with current class access can apply this plan.",
+    "completed": "This class has completed group allocation",
+    "completedHint": "All groups are accepted and no students are unassigned. History and group details remain available.",
+    "acceptedWithUnassigned": "All existing groups are accepted, but some students are still unassigned. An assigned lecturer must resolve this before allocation can proceed.",
     "classList": "Your classes",
     "searchClasses": "Search classes",
     "openClass": "Open allocation",
@@ -180,6 +195,7 @@
       "other": "Review the current rules and feasibility warnings before applying."
     },
     "errors": {
+      "allocationAlreadyComplete": "All groups are accepted and no students are unassigned. No further allocation is needed.",
       "allocationBalanceViolation": "This plan does not meet the maximum size difference of 1 student. Generate a new plan.",
       "allocationPlanUnavailable": "The saved plan is unavailable in this class/session, or its older payload was already removed.",
       "unknown": "The result could not be verified. For Apply, retry the same request or check History.",

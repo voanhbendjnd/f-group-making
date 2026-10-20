@@ -162,6 +162,21 @@ class AllocationResourceTest {
             .andExpect(jsonPath("$.data.limits.createsNewGroups").value(false));
     }
 
+    @ParameterizedTest @org.junit.jupiter.params.provider.CsvSource({"ACCEPTED,true,409", "ACCEPTED,false,200", "PENDING,true,200"})
+    void onlyBlocksCompletedClassesWithNoUnassignedStudents(GroupStatus groupStatus, boolean assignEveryone, int expectedStatus) throws Exception {
+        for (Long id : groupIds) { var group = groups.findById(id).orElseThrow(); group.setStatus(groupStatus); groups.saveAndFlush(group); }
+        if (assignEveryone) for (Long id : studentIds.subList(6, 8)) {
+            var member = new GroupMember(); member.setGroupId(groupIds.getFirst()); member.setStudentId(id); member.setSchoolClassId(own.getId());
+            member.setDeadlineId(deadline.getId()); member.setRole(GroupMemberRole.MEMBER); member.setJoinedAt(Instant.now()); members.saveAndFlush(member);
+        }
+        em.clear(); clearInvocations(engine);
+        mvc.perform(get(path("overview")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk());
+        mvc.perform(get(path("plans")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk());
+        mvc.perform(post(path("preview")).contentType(MediaType.APPLICATION_JSON).content("{\"targetGroupCount\":3}")
+            .with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().is(expectedStatus));
+        if (expectedStatus == 409) verify(engine, never()).allocate(any(), anyInt(), anyLong());
+    }
+
     @Test void randomHistoryListsEverySuccessfulPreviewAndRestoresExactAssignmentsWithoutRandomizing() throws Exception {
         var first = preview("{\"targetGroupCount\":2,\"seed\":42}");
         var second = preview("{\"targetGroupCount\":2,\"seed\":43}");

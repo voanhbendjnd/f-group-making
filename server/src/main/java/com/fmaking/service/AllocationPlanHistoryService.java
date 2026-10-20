@@ -44,7 +44,7 @@ public class AllocationPlanHistoryService {
     public record Detail(Summary summary, AllocationPreviewDTO preview) {}
 
     public ResultPaginationDTO list(Integer deadlineId, Integer classId, Pageable pageable) {
-        String current = currentFingerprint(deadlineId, classId); // Scope authorization and one snapshot for the entire page.
+        var current = currentOverview(deadlineId, classId); // Scope authorization and one snapshot for the entire page.
         var page = previews.findBySchoolClassIdAndDeadlineIdOrderByCreatedAtDescIdDesc(classId, deadlineId,
             PageRequest.of(pageable.getPageNumber(), Math.min(pageable.getPageSize(), 100)));
         Map<Long, User> actors = users.findAllById(page.stream().map(AllocationPreview::getOwnerId).distinct().toList())
@@ -54,7 +54,7 @@ public class AllocationPlanHistoryService {
     }
 
     public Detail detail(Integer deadlineId, Integer classId, String id) {
-        String current = currentFingerprint(deadlineId, classId);
+        var current = currentOverview(deadlineId, classId);
         var row = previews.findById(id).filter(value -> Objects.equals(classId, value.getSchoolClassId())
             && Objects.equals(deadlineId, value.getDeadlineId())).orElseThrow(AllocationPlanHistoryService::notFound);
         var saved = decode(row);
@@ -65,10 +65,11 @@ public class AllocationPlanHistoryService {
         return new Detail(summary, restored);
     }
 
-    private Summary summary(AllocationPreview row, AllocationPreviewDTO saved, String currentFingerprint, User actor) {
+    private Summary summary(AllocationPreview row, AllocationPreviewDTO saved, AllocationPreviewDTO.Overview current, User actor) {
         String reason = saved == null ? "allocationPreviewInvalid"
-            : currentFingerprint == null ? "allocationDataConflict"
-            : !row.getSnapshotFingerprint().equals(currentFingerprint) ? "allocationPreviewStale"
+            : current == null ? "allocationDataConflict"
+            : AllocationPreviewService.isAllocationComplete(current) ? "allocationAlreadyComplete"
+            : !row.getSnapshotFingerprint().equals(current.snapshotFingerprint()) ? "allocationPreviewStale"
             : !AllocationBalancePolicy.isBalanced(saved.groups().stream().map(group -> group.members().size()).toList()) ? "allocationBalanceViolation" : null;
         Status status = row.getAppliedAt() != null ? Status.APPLIED : reason != null ? Status.INVALID : Status.UNAPPLIED;
         return new Summary(row.getId(), row.getOwnerId(), actor == null ? null : actor.getName(), row.getCreatedAt(), row.getAppliedAt(),
@@ -76,8 +77,8 @@ public class AllocationPlanHistoryService {
             status == Status.UNAPPLIED && Objects.equals(row.getOwnerId(), access.currentLecturerId()), status == Status.INVALID ? reason : null);
     }
 
-    private String currentFingerprint(Integer deadlineId, Integer classId) {
-        return snapshots.captureForHistory(deadlineId, classId).map(current -> current.overview().snapshotFingerprint()).orElse(null);
+    private AllocationPreviewDTO.Overview currentOverview(Integer deadlineId, Integer classId) {
+        return snapshots.captureForHistory(deadlineId, classId).map(AllocationPreviewService.Captured::overview).orElse(null);
     }
 
     private AllocationPreviewDTO decode(AllocationPreview row) {

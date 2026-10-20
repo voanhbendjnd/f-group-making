@@ -161,6 +161,19 @@ class AllocationApplyServiceTest {
         assertThat(saved.preview().groups()).isEqualTo(p.groups());
         assertThat(apply(p, "durable").approvedGroupIds()).hasSize(2);
     }
+
+    @Test void completedClassRejectsNewRandomAndOtherSavedPlansButKeepsHistoryAndIdempotentReplay() {
+        var selected = preview(); var alternative = preview();
+        var result = apply(selected, "complete-class");
+        assertThat(apply(selected, "complete-class")).isEqualTo(result);
+        conflict(() -> preview(), "allocationAlreadyComplete");
+        conflict(() -> apply(alternative, "alternative"), "allocationAlreadyComplete");
+        var saved = planHistory.detail(deadline.getId(), schoolClass.getId(), alternative.previewId());
+        assertThat(saved.summary().canApply()).isFalse();
+        assertThat(saved.summary().invalidReason()).isEqualTo("allocationAlreadyComplete");
+        assertThat(saved.preview().groups()).isEqualTo(alternative.groups());
+        assertThat(runCount()).isEqualTo(1);
+    }
     @Test void staleMembershipCannotApply() {
         var p = preview(); var m = members.findByStudentIdAndDeadlineId(ids.getFirst(), deadline.getId()).orElseThrow(); m.setRole(GroupMemberRole.MEMBER); members.saveAndFlush(m);
         assertThatThrownBy(() -> apply(p, "stale")).isInstanceOf(ConflictAlertException.class); assertThat(runCount()).isZero();

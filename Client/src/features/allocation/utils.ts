@@ -1,5 +1,10 @@
 import { getApiError } from '@/services/api/types';
-import type { PreliminaryRange } from './types';
+import type { Overview, PreliminaryRange } from './types';
+
+export function isAllocationComplete(overview?: Overview): boolean {
+  return !!overview && overview.groups.length > 0 && overview.summary.unassignedStudents === 0
+    && overview.groups.every(group => group.status === 'ACCEPTED');
+}
 
 export function validTarget(value: string, range?: PreliminaryRange): number | null {
   if (!range || !/^\d+$/.test(value)) return null;
