@@ -15,12 +15,12 @@ beforeEach(() => {
 });
 
 describe('Lecturer navigation and guards', () => {
-  it('redirects an authenticated lecturer away from login to their classes', () => {
+  it('redirects an authenticated lecturer away from login to group review', () => {
     render(<MemoryRouter initialEntries={['/login']}><Routes>
       <Route path="/login" element={<PublicRoute><div>Login</div></PublicRoute>} />
-      <Route path="/lecturer/classes" element={<div>Assigned classes</div>} />
+      <Route path="/lecturer/group-review" element={<div>Group review</div>} />
     </Routes></MemoryRouter>);
-    expect(screen.getByText('Assigned classes')).toBeInTheDocument();
+    expect(screen.getByText('Group review')).toBeInTheDocument();
   });
 
   it('allows lecturers and blocks a student from the lecturer area', () => {
@@ -42,20 +42,20 @@ describe('Lecturer navigation and guards', () => {
     expect(screen.getByText('Class information')).toBeInTheDocument();
   });
 
-  it('redirects a department head from login to classes', () => {
+  it('redirects a department head from login to group review', () => {
     state.user.authorities = ['ROLE_LECTURE_MASTER'];
     render(<MemoryRouter initialEntries={['/login']}><Routes>
       <Route path="/login" element={<PublicRoute><div>Login</div></PublicRoute>} />
-      <Route path="/lecturer/classes" element={<div>All classes</div>} />
+      <Route path="/lecturer/group-review" element={<div>Group review</div>} />
     </Routes></MemoryRouter>);
-    expect(screen.getByText('All classes')).toBeInTheDocument();
+    expect(screen.getByText('Group review')).toBeInTheDocument();
   });
 
   it('keeps role precedence and rejects unknown roles', () => {
     expect(getHomeRoute(['ROLE_ADMIN', 'ROLE_LECTURE'])).toBe('/admin/dashboard');
-    expect(getHomeRoute(['ROLE_LECTURE'])).toBe('/lecturer/classes');
+    expect(getHomeRoute(['ROLE_LECTURE'])).toBe('/lecturer/group-review');
     expect(getHomeRoute(['ROLE_STUDENT'])).toBe('/student/dashboard');
-    expect(getHomeRoute(['ROLE_LECTURE_MASTER'])).toBe('/lecturer/classes');
+    expect(getHomeRoute(['ROLE_LECTURE_MASTER'])).toBe('/lecturer/group-review');
     expect(getHomeRoute(['ROLE_ADMIN', 'ROLE_LECTURE_MASTER'])).toBe('/admin/dashboard');
     expect(getHomeRoute(['ROLE_UNKNOWN'])).toBe('/unauthorized');
     expect(canAccessPath('/lecturer/classes/12', ['ROLE_LECTURE_MASTER'])).toBe(true);

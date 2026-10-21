@@ -355,6 +355,7 @@ public class GroupInvitationService {
 
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lời mời", "invitation", "invitationNotFound"));
+        requireInvitationScope(invitation, deadlineId, classId);
 
         if (!Objects.equals(invitation.getStudentId(), studentId)) {
             throw new ForbiddenAlertException("Bạn không phải người nhận lời mời này", "invitation", "ERR_FORBIDDEN_NOT_RECIPIENT");
@@ -367,6 +368,9 @@ public class GroupInvitationService {
         Long groupId = invitation.getGroupId();
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "groupNotFound"));
+
+        if (!Objects.equals(group.getSchoolClassId(), classId) || !Objects.equals(group.getDeadlineId(), deadlineId))
+            throw new ForbiddenAlertException("Invalid invitation group scope", "invitation", "ERR_FORBIDDEN_NOT_IN_CLASS");
 
         if (group.getStatus() != GroupStatus.OPEN) {
             invitation.setStatus(GroupInvitationStatus.CANCELLED);
@@ -442,11 +446,13 @@ public class GroupInvitationService {
      * Sinh viên từ chối lời mời vào nhóm.
      */
     public void rejectInvitation(Integer deadlineId, Integer classId, Long invitationId) {
+        groupService.lockStudentSession(deadlineId, classId, false);
         Student student = getCurrentStudent(classId);
         Long studentId = student.getUserId();
 
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lời mời", "invitation", "invitationNotFound"));
+        requireInvitationScope(invitation, deadlineId, classId);
 
         if (!Objects.equals(invitation.getStudentId(), studentId)) {
             throw new ForbiddenAlertException("Bạn không phải người nhận lời mời này", "invitation", "ERR_FORBIDDEN_NOT_RECIPIENT");
@@ -468,11 +474,13 @@ public class GroupInvitationService {
      * Người gửi (hoặc trưởng nhóm) hủy lời mời đã gửi.
      */
     public void cancelInvitation(Integer deadlineId, Integer classId, Long invitationId) {
+        groupService.lockStudentSession(deadlineId, classId, false);
         Student student = getCurrentStudent(classId);
         Long currentUserId = student.getUserId();
 
         GroupInvitation invitation = groupInvitationRepository.findById(invitationId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lời mời", "invitation", "invitationNotFound"));
+        requireInvitationScope(invitation, deadlineId, classId);
 
         // Phải là thành viên trong nhóm mời
         groupMemberRepository.findByGroupIdAndStudentId(invitation.getGroupId(), currentUserId)
@@ -482,12 +490,7 @@ public class GroupInvitationService {
             throw new ConflictAlertException("Chỉ có thể hủy lời mời đang ở trạng thái chờ phản hồi.", "invitation", "ERR_INVITATION_NOT_PENDING");
         }
 
-        invitation.setStatus(GroupInvitationStatus.CANCELLED);
-        invitation.setRespondedAt(Instant.now());
-        groupInvitationRepository.save(invitation);
-
-        String actor = getCurrentUserLogin();
-        eventPublisher.publish("GROUP_INVITATION_CANCELLED", invitation.getGroupId(), deadlineId, classId, actor, invitation.getId());
+        cancelPendingInvitation(invitation);
     }
 
     // ==========================================
@@ -495,12 +498,36 @@ public class GroupInvitationService {
     // ==========================================
 
     private void validateDeadlineActive(Integer deadlineId, Integer classId) {
+        groupService.lockStudentSession(deadlineId, classId, true);
         Deadline deadline = deadlineRepository.findById(deadlineId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy đợt tạo nhóm", "deadline", "deadlineNotFound"));
         DeadlineStatus status = deadlinePolicy.status(deadline, classId);
         if (status != DeadlineStatus.ACTIVE) {
             throw new ConflictAlertException("Đợt hạn không ở trạng thái mở.", "deadline", "ERR_DEADLINE_NOT_ACTIVE");
         }
+    }
+
+    private void requireInvitationScope(GroupInvitation invitation, Integer deadlineId, Integer classId) {
+        if (!Objects.equals(invitation.getSchoolClassId(), classId) || !Objects.equals(invitation.getDeadlineId(), deadlineId))
+            throw new ForbiddenAlertException("Invalid invitation scope", "invitation", "ERR_FORBIDDEN_NOT_IN_CLASS");
+    }
+
+    /** Only affected draft groups; protected/out-of-scope invitations are deliberately untouched. */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+    public List<Long> cancelForAllocation(Integer deadlineId, Integer classId, java.util.Set<Long> affectedGroups) {
+        var invitations = groupInvitationRepository.findBySchoolClassIdAndDeadlineIdAndStatus(classId, deadlineId, GroupInvitationStatus.PENDING);
+        List<Long> cancelled = new ArrayList<>();
+        for (var invitation : invitations) if (affectedGroups.contains(invitation.getGroupId())) {
+            cancelPendingInvitation(invitation);
+            cancelled.add(invitation.getId());
+        }
+        return cancelled.stream().sorted().toList();
+    }
+
+    private void cancelPendingInvitation(GroupInvitation invitation) {
+        invitation.setStatus(GroupInvitationStatus.CANCELLED); invitation.setRespondedAt(Instant.now());
+        groupInvitationRepository.save(invitation);
+        eventPublisher.publish("GROUP_INVITATION_CANCELLED", invitation.getGroupId(), invitation.getDeadlineId(), invitation.getSchoolClassId(), getCurrentUserLogin(), invitation.getId());
     }
 
     private Student getCurrentStudent(Integer classId) {

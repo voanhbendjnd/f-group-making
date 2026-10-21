@@ -21,6 +21,7 @@
 .group-review-page .review-table { min-width: 0; overflow: hidden; padding: 0; }
 .review-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.25rem; background: var(--color-primary-light); border-bottom: 1px solid var(--color-primary-border); }
 .review-table-heading > span:first-child { display: flex; align-items: center; gap: 0.75rem; font-size: 1rem; font-weight: 700; color: var(--color-primary-dark); }
+.review-table-heading-actions { display: flex; align-items: center; gap: 0.75rem; }
 .review-table .ant-table-thead > tr > th { background: var(--color-surface-hover); color: var(--color-text-muted); font-size: 0.8125rem; }
 .review-table .ant-table-tbody > tr > td { padding-top: 1.25rem; padding-bottom: 1.25rem; }
 .review-table .ant-table-tbody > tr:nth-child(even) > td { background: var(--color-surface-hover); }

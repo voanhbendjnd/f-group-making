@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input as AntInput, Select, Table } from 'antd';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock3, GraduationCap, Info, Layers, RefreshCw, Search, SlidersHorizontal, Sparkles, Target, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock3, Eye, FileSpreadsheet, GraduationCap, Info, Layers, RefreshCw, Search, SlidersHorizontal, Sparkles, Target, Users } from 'lucide-react';
 import { useTerm } from '@/app/providers/TermContext';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useRealtime } from '@/app/providers/realtimeContext';
@@ -17,6 +17,8 @@ import { classApi } from '@/features/classes/api/classApi';
 import { groupApi } from '@/features/group/api/groupApi';
 import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
+import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
+import { fetchClassAllocationData, exportGroupResultExcel } from '@/features/group/utils/exportGroupResultExcel';
 import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTypes';
 import { getApiError } from '@/services/api/types';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
@@ -32,7 +34,7 @@ export function LecturerGroupReviewPage() {
 
 function ReviewContent() {
   const { t, i18n } = useTranslation();
-  const { selectedTermId, lockTermSelection } = useTerm();
+  const { selectedTermId, selectedTerm, lockTermSelection } = useTerm();
   const { user } = useAuth();
   const toast = useToast();
   const client = useQueryClient();
@@ -71,7 +73,6 @@ function ReviewContent() {
     } });
   const reviews = useQuery({ queryKey: ['group-reviews', user?.id, selectedTermId, filters],
     queryFn: ({ signal }) => groupApi.getReviews({ ...filters, termId: selectedTermId! }, signal),
-    refetchInterval: 30000,
     retry: (count, error) => count < 1 && ![400, 401, 403].includes(getApiError(error).status) });
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
@@ -93,6 +94,51 @@ function ReviewContent() {
       if (request.kind === 'reopen') return groupApi.revokeGroup(deadlineId, schoolClassId, id);
       return groupApi.rejectGroup(deadlineId, schoolClassId, id, { reason: reason.trim() });
     } });
+  const [previewClassId, setPreviewClassId] = useState<number | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleOpenPreview = (classIdToPreview?: number) => {
+    const targetClassId = classIdToPreview ?? filters.classId;
+    if (!targetClassId) {
+      toast.error(t('groupReview.exportSelectClassPrompt'));
+      return;
+    }
+    setPreviewClassId(targetClassId);
+  };
+
+  const handleDirectExport = async (classIdToExport?: number) => {
+    const targetClassId = classIdToExport ?? filters.classId;
+    if (!targetClassId) {
+      toast.error(t('groupReview.exportSelectClassPrompt'));
+      return;
+    }
+    const targetClass = classes.data?.result.find(c => c.id === targetClassId);
+    const deadlineId = rows.find(row => row.group.schoolClassId === targetClassId)?.group.deadlineId;
+
+    setIsExporting(true);
+    try {
+      const result = await fetchClassAllocationData(targetClassId, {
+        deadlineId,
+        termId: selectedTermId ?? undefined,
+        termName: selectedTerm?.name,
+        lecturerCode: user?.name || user?.email?.split('@')[0] || '',
+        className: targetClass?.name,
+      });
+
+      if (!result.rows.length) {
+        toast.error(t('groupExport.noDataToExport'));
+        return;
+      }
+
+      exportGroupResultExcel(result.rows, result.meta);
+      toast.success(t('groupReview.exportSuccess'));
+    } catch {
+      toast.error(t('groupReview.exportError'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const confirm = async () => {
     if (!action || busy.current) return;
     if (action.kind === 'reject' && !reason.trim()) { setReasonRequired(true); return; }
@@ -111,6 +157,7 @@ function ReviewContent() {
   const statusBadge = (status: GroupStatus) => <span className={`badge ${status === 'ACCEPTED' ? 'badge-success' : status === 'PENDING' ? 'badge-info' : 'badge-warning'}`}>{t(`groupReview.statuses.${status}`)}</span>;
   const eligibility = (row: GroupReviewRow) => <span className={`badge ${row.eligible ? 'badge-success' : 'badge-warning'}`}>{t(row.eligible ? 'groupReview.ready' : 'groupReview.needsWork')}</span>;
   const columns = [
+    { title: t('groupExport.colGroupCode'), key: 'groupCode', render: (_: unknown, row: GroupReviewRow) => row.group.groupCode || '—' },
     { title: t('groupReview.group'), key: 'group', render: (_: unknown, row: GroupReviewRow) => <strong>{row.group.name}</strong> },
     { title: t('groupReview.class'), dataIndex: 'className', key: 'class' },
     { title: t('groupReview.leader'), key: 'leader', render: (_: unknown, row: GroupReviewRow) => row.group.leaderName && row.group.leaderName !== 'N/A' ? row.group.leaderName : t('groupReview.missing') },
@@ -184,7 +231,9 @@ function ReviewContent() {
           </div>
         </div>
         <div className="selected-class-actions">
-          <Button variant="primary" icon={<SlidersHorizontal size={16} />} onClick={() => openBoard(selectedClass.id)} disabled={classes.isError || classes.isPending}>{t('groupReview.openAdvancedAction')}</Button>
+          <Button variant="secondary" icon={<Eye size={16} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
+          <Button variant="primary" icon={<FileSpreadsheet size={16} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
+          <Button variant="secondary" icon={<SlidersHorizontal size={16} />} onClick={() => openBoard(selectedClass.id)} disabled={classes.isError || classes.isPending}>{t('groupReview.openAdvancedAction')}</Button>
           <Button variant="secondary" onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>{t('groupReview.viewAllClasses')}</Button>
         </div>
       </div>
@@ -197,7 +246,7 @@ function ReviewContent() {
         { key: 'accepted', count: rows.filter(row => row.group.status === 'ACCEPTED').length, Icon: CheckCircle2 },
         { key: 'warnings', count: rows.filter(row => !row.eligible).length, Icon: AlertTriangle },
       ].map(({ key, count, Icon }) => <div className={`card review-stat review-stat-${key}`} key={key}>
-        <div className="review-stat-content"><span>{t(`groupReview.${key}`)}</span><strong>{reviews.isError ? '—' : reviews.isFetching ? '…' : count}</strong><small>{t('groupReview.pageSummary')}</small></div>
+        <div className="review-stat-content"><span>{t(`groupReview.${key}`)}</span><strong>{reviews.isPending ? '…' : reviews.data ? count : '—'}</strong><small>{t('groupReview.pageSummary')}</small></div>
         <span className="review-stat-icon" aria-hidden="true"><Icon size={23} /></span>
       </div>)}
     </div>
@@ -215,10 +264,22 @@ function ReviewContent() {
       </div>
     </form>
     {classes.isError && <ErrorState message={t('groupReview.classesError')} onRetry={() => { void classes.refetch(); }} />}
-    {reviews.isError ? <ErrorState message={translateErrorMessage(reviews.error)} onRetry={() => { void reviews.refetch(); }} /> : <>
+    {reviews.isError && <ErrorState message={translateErrorMessage(reviews.error)} onRetry={() => { void reviews.refetch(); }} />}
+    {(!reviews.isError || !!reviews.data) && <>
       <div className="card review-table">
-        <div className="review-table-heading"><span><ClipboardCheck size={18} aria-hidden="true" />{t('groupReview.title')}</span>{reviews.data && <span className="badge badge-info">{reviews.data.meta.total}</span>}</div>
-        <Table rowKey={row => row.group.id} columns={columns} dataSource={reviews.isFetching ? [] : rows} pagination={false} loading={reviews.isFetching} scroll={{ x: 1100 }} locale={{ emptyText: t('groupReview.empty') }} />
+        <div className="review-table-heading">
+          <span><ClipboardCheck size={18} aria-hidden="true" />{t('groupReview.title')}</span>
+          <div className="review-table-heading-actions">
+            {selectedClass && (
+              <>
+                <Button size="sm" variant="secondary" icon={<Eye size={14} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
+                <Button size="sm" variant="secondary" icon={<FileSpreadsheet size={14} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
+              </>
+            )}
+            {reviews.data && <span className="badge badge-info">{reviews.data.meta.total}</span>}
+          </div>
+        </div>
+        <Table rowKey={row => row.group.id} columns={columns} dataSource={rows} pagination={false} loading={reviews.isPending} scroll={{ x: 1100 }} locale={{ emptyText: t('groupReview.empty') }} />
         {reviews.data && <div className="review-pagination"><Pagination meta={reviews.data.meta} currentPage={filters.page} onPageChange={page => { setFilters(old => ({ ...old, page })); setViewId(null); }} /></div>}
       </div>
     </>}
@@ -265,5 +326,17 @@ function ReviewContent() {
       {action?.kind === 'reject' && <label className="review-reason">{t('groupReview.reason')}<AntInput.TextArea aria-label={t('groupReview.reason')} rows={4} maxLength={2000} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} /></label>}
       {(reasonRequired || Boolean(actionError)) && <p className="alert alert-error" role="alert">{reasonRequired ? t('groupReview.reasonRequired') : translateErrorMessage(actionError)}</p>}
     </Modal>
+    {previewClassId && (
+      <GroupPreviewExportModal
+        open={Boolean(previewClassId)}
+        onClose={() => setPreviewClassId(null)}
+        classId={previewClassId}
+        className={classes.data?.result.find(c => c.id === previewClassId)?.name || `Class_${previewClassId}`}
+        deadlineId={rows.find(row => row.group.schoolClassId === previewClassId)?.group.deadlineId}
+        termId={selectedTermId ?? undefined}
+        termName={selectedTerm?.name}
+        lecturerCode={user?.name || user?.email?.split('@')[0] || ''}
+      />
+    )}
   </div>;
 }

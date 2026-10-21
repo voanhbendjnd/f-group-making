@@ -59,8 +59,13 @@ public class GroupRuleValidationService {
     }
 
     public List<GroupRuleEvaluationDTO> evaluateGroup(Integer schoolClassId, List<GroupMemberDTO> members) {
-        List<Rule> storedRules = ruleRepository.findBySchoolClassId(schoolClassId);
-        Map<String, Rule> byCode = storedRules.stream().collect(Collectors.toMap(Rule::getCode, Function.identity()));
+        return evaluateRules(getClassRules(schoolClassId), members);
+    }
+
+    /** Evaluate a captured rule snapshot without reading or writing the database. */
+    public List<GroupRuleEvaluationDTO> evaluateRules(List<GroupingRuleDTO> rules, List<GroupMemberDTO> members) {
+        Map<GroupingRuleCode, GroupingRuleDTO> byCode = rules.stream()
+            .collect(Collectors.toMap(GroupingRuleDTO::code, Function.identity()));
 
         List<GroupRuleEvaluationDTO> evaluations = new ArrayList<>();
 
@@ -75,13 +80,13 @@ public class GroupRuleValidationService {
             .count() : 0;
 
         for (GroupingRuleCode code : GroupingRuleCode.values()) {
-            Rule stored = byCode.get(code.name());
-            boolean active = stored == null ? code.isEnabledByDefault() : Boolean.TRUE.equals(stored.getStatus());
+            GroupingRuleDTO stored = byCode.get(code);
+            boolean active = stored == null ? code.isEnabledByDefault() : Boolean.TRUE.equals(stored.status());
             if (!active) {
                 continue;
             }
 
-            int targetValue = stored != null ? stored.getValue() : code.getSuggestedValue();
+            int targetValue = stored != null ? stored.value() : code.getSuggestedValue();
             boolean hard = isHardRule(code);
 
             GroupRuleEvaluationDTO.GroupRuleEvaluationDTOBuilder eval = GroupRuleEvaluationDTO.builder()
