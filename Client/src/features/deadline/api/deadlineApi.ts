@@ -9,6 +9,16 @@ import type {
 } from '../types';
 
 export const deadlineApi = {
+  async getAllDeadlines(termId: number, signal?: AbortSignal): Promise<Deadline[]> {
+    const result = new Map<number, Deadline>();
+    let page = 1;
+    while (true) {
+      const data = await deadlineApi.getDeadlines({ termId, page, size: 100 }, signal);
+      data.result.forEach(item => result.set(item.id, item));
+      if (page >= data.meta.pages) return [...result.values()];
+      page += 1;
+    }
+  },
   async getDeadlines(params?: { page?: number; size?: number; termId?: number }, signal?: AbortSignal): Promise<PaginatedDeadlines> {
     const data = await apiClient.get<unknown, any>('/api/deadlines', {
       params,

@@ -17,6 +17,9 @@ export interface Student {
   majorId: number | null;
   majorCode: string | null;
   majorName?: string | null;
+  schoolClassId?: number | null;
+  groupName?: string | null;
+  lecturerCode?: string | null;
   activated: boolean;
   hasActivationKey: boolean;
   activationKeyExpiresAt: string | null;

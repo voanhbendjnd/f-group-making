@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, ConfigProvider, Empty, Input, Modal, Pagination, Skeleton, Tabs, Tag, Tooltip } from 'antd';
 import viVN from 'antd/locale/vi_VN';
@@ -27,6 +27,7 @@ export function LecturerAllocationPage() {
   return <ConfigProvider locale={i18n.language.startsWith('vi') ? viVN : enUS}><TermScope><AllocationClassSelection key={selectedTermId} /></TermScope></ConfigProvider>;
 }
 function AllocationClassSelection() {
+  const basePath = useLocation().pathname.startsWith('/admin') ? '/admin/automatic-allocation' : '/lecturer/automatic-allocation';
   const { t } = useTranslation(); const { user, isAdmin } = useAuth(); const { selectedTermId, isLocked } = useTerm();
   const [params] = useSearchParams(); const route = useParams(); const navigate = useNavigate();
   const [search, setSearch] = useState(''); const [page, setPage] = useState(1);
@@ -43,8 +44,8 @@ function AllocationClassSelection() {
   // Preserve old bookmarked query URLs while using the new list/detail routes.
   const legacyClass = positiveId(params.get('classId'));
   if (!route.classId && legacyClass && (!params.has('termId') || positiveId(params.get('termId')) === selectedTermId))
-    return <Navigate replace to={`/lecturer/automatic-allocation/${legacyClass}`} />;
-  const backAction = <Button className="allocation-back" disabled={isLocked} icon={<ArrowLeft size={16} />} onClick={() => navigate('/lecturer/automatic-allocation')}>{t('allocation.backToClasses')}</Button>;
+    return <Navigate replace to={`${basePath}/${legacyClass}`} />;
+  const backAction = <Button className="allocation-back" disabled={isLocked} icon={<ArrowLeft size={16} />} onClick={() => navigate(basePath)}>{t('allocation.backToClasses')}</Button>;
   const stepIcons = [UsersRound, Target, ClipboardList, CheckCircle2];
   return <div className="allocation-page">
     {route.classId && (classes.isPending || classes.isError || !selected) && backAction}
@@ -67,24 +68,24 @@ function AllocationClassSelection() {
     </section>}
     {classes.isError && <AllocationError error={classes.error} retry={() => void classes.refetch()} />}
     {classes.isPending ? <Skeleton active /> : !classes.isError && (route.classId
-      ? selected ? <AllocationSession key={selected.id} classId={selected.id} termName={selected.termName} backAction={backAction} /> : <Empty description={t('allocation.classUnavailable')} />
+      ? selected ? <AllocationSession key={selected.id} classId={selected.id} termName={selected.termName} requestedDeadline={positiveId(params.get('deadlineId'))} backAction={backAction} /> : <Empty description={t('allocation.classUnavailable')} />
       : filtered.length ? <><div className="allocation-class-grid">{filtered.slice((page - 1) * 9, page * 9).map(value => <article className="allocation-panel allocation-class-card" key={value.id}>
         <div className="allocation-class-card-heading"><span className="allocation-class-icon"><BookOpen size={21} aria-hidden="true" /></span><Tag className="allocation-term-chip">{value.termName || t('allocation.missing')}</Tag></div>
         <h3>{value.name}</h3>
         <div className="allocation-class-enrollment"><Users size={16} aria-hidden="true" /><strong>{value.studentCount}</strong><span>{t('allocation.totalStudents')}</span></div>
-        <Button type="primary" block disabled={isLocked} icon={<ArrowRight size={16} />} onClick={() => navigate(`/lecturer/automatic-allocation/${value.id}`)}>{t('allocation.openClass')}</Button>
+        <Button type="primary" block disabled={isLocked} icon={<ArrowRight size={16} />} onClick={() => navigate(`${basePath}/${value.id}`)}>{t('allocation.openClass')}</Button>
       </article>)}</div><div className="allocation-pagination"><Pagination current={page} pageSize={9} total={filtered.length} showSizeChanger={false} onChange={setPage} /></div></>
       : <Empty description={t('allocation.noClasses')} />)}
   </div>;
 }
-function AllocationSession({ classId, termName, backAction }: { classId: number; termName: string | null; backAction: ReactNode }) {
+function AllocationSession({ classId, termName, backAction, requestedDeadline }: { classId: number; termName: string | null; backAction: ReactNode; requestedDeadline: number | null }) {
   const { t } = useTranslation(); const { user } = useAuth(); const { selectedTermId } = useTerm();
-  const session = useQuery({ queryKey: ['allocation-sessions', user?.id, classId, selectedTermId], retry: false, refetchInterval: 30000,
+  const session = useQuery({ queryKey: ['allocation-sessions', user?.id, classId, selectedTermId, requestedDeadline], retry: false, refetchInterval: 30000,
     queryFn: async ({ signal }) => {
       const first = await deadlineApi.getDeadlines({ termId: selectedTermId!, size: 50 }, signal);
       const values = [...first.result];
       for (let page = 2; page <= first.meta.pages; page++) values.push(...(await deadlineApi.getDeadlines({ page, termId: selectedTermId!, size: 50 }, signal)).result);
-      const matches = values.filter(value => value.schoolClassIds.includes(classId));
+      const matches = values.filter(value => value.schoolClassIds.includes(classId) && (!requestedDeadline || value.id === requestedDeadline));
       if (matches.length > 1) throw { status: 409, message: '', errorKey: 'allocationMultipleSessions' };
       return matches[0]?.id ?? null;
     } });

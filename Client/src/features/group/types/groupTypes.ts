@@ -56,6 +56,8 @@ export interface GroupingRuleDTO {
 
 export interface GroupDTO {
   id: number;
+  sequenceNo?: number | null;
+  groupCode?: string | null;
   deadlineId: number;
   schoolClassId: number;
   name: string;

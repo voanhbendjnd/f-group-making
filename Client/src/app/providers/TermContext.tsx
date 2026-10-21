@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { termApi } from '@/features/terms/api/termApi';
 import type { Term } from '@/features/terms/types';
+import { useNavigationGuard } from './NavigationGuard';
 
 interface TermCatalog {
   terms: Term[];
@@ -28,6 +29,7 @@ const TermContext = createContext<TermContextType | undefined>(undefined);
 export const TermProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const requestLeave = useNavigationGuard();
   const storageKey = `f_group_selected_term_${user?.id}`;
   const queryKey = ['terms', user?.id];
   const [savedTermId, setSavedTermId] = useState<number | null>(() => {
@@ -73,7 +75,7 @@ export const TermProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const selectTerm = (termId: number) => {
     const latestCatalog = queryClient.getQueryData<TermCatalog>(queryKey);
     if (operationCount.current > 0 || !latestCatalog?.terms.some((term) => term.id === termId)) return;
-    setSavedTermId(termId);
+    if (termId !== selectedTermId) requestLeave(() => setSavedTermId(termId));
   };
 
   const lockTermSelection = useCallback(() => {

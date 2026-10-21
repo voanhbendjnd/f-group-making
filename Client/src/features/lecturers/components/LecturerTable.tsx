@@ -1,6 +1,7 @@
 import React from 'react';
 import { Mail, CheckCircle2, Clock, Trash2 } from 'lucide-react';
 import type { Lecturer } from '../types';
+import { useTranslation } from 'react-i18next';
 
 export interface LecturerTableProps {
   lecturers: Lecturer[];
@@ -23,6 +24,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
   isSendingActivation,
   getCooldown,
 }) => {
+  const { t } = useTranslation();
   const allSelected = lecturers.length > 0 && lecturers.every((l) => selectedUserIds.includes(l.userId));
   const someSelected = lecturers.some((l) => selectedUserIds.includes(l.userId)) && !allSelected;
 
@@ -39,21 +41,22 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                   if (el) el.indeterminate = someSelected;
                 }}
                 onChange={onToggleSelectAll}
+                  aria-label={t('students.selectAllPageAria')}
               />
             </th>
-            <th style={{ width: '60px' }}>STT</th>
-            <th>Mã Giảng viên / Mentor</th>
-            <th>Email đăng nhập</th>
-            <th>Họ và tên</th>
-            <th>Trạng thái tài khoản</th>
-            <th style={{ textAlign: 'right' }}>Thao tác</th>
+            <th style={{ width: '60px' }}>#</th>
+            <th>{t('addLecturer.code')}</th>
+            <th>{t('addLecturer.email')}</th>
+            <th>{t('students.colFullName')}</th>
+            <th>{t('students.colAccountStatus')}</th>
+            <th style={{ textAlign: 'right' }}>{t('students.colActions')}</th>
           </tr>
         </thead>
         <tbody>
           {lecturers.length === 0 ? (
             <tr>
               <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--color-text-muted)' }}>
-                Không tìm thấy giảng viên nào phù hợp.
+                {t('adminUx.noLecturers')}
               </td>
             </tr>
           ) : (
@@ -66,6 +69,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                       type="checkbox"
                       checked={isSelected}
                       onChange={() => onToggleSelect(lecturer.userId)}
+                      aria-label={t('adminUx.selectLecturer', { code: lecturer.code })}
                     />
                   </td>
                   <td>{index + 1}</td>
@@ -79,7 +83,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                       >
                         <CheckCircle2 size={13} />
-                        Đã kích hoạt
+                        {t('students.activated')}
                       </span>
                     ) : (
                       <span
@@ -87,7 +91,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                         style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                       >
                         <Clock size={13} />
-                        Chờ kích hoạt
+                        {t('students.unactivated')}
                       </span>
                     )}
                   </td>
@@ -108,10 +112,10 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                                 cursor: 'not-allowed',
                               }}
                               disabled
-                              title={`Vui lòng đợi ${cooldown}s trước khi gửi lại`}
+                              title={t('adminUx.cooldown', { seconds: cooldown })}
                             >
                               <Clock size={13} />
-                              Gửi lại sau ({cooldown}s)
+                              {t('adminUx.cooldown', { seconds: cooldown })}
                             </button>
                           );
                         }
@@ -124,7 +128,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                             onClick={() => onSendActivation(lecturer)}
                           >
                             <Mail size={13} />
-                            Gửi email kích hoạt
+                            {t('students.btnSend')}
                           </button>
                         );
                       })()}
@@ -139,7 +143,9 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                           backgroundColor: 'transparent',
                           padding: '0.25rem 0.5rem',
                         }}
-                        title="Xóa giảng viên này"
+                        title={t('adminUx.deleteAccount')}
+                        aria-label={`${t('adminUx.deleteAccount')}: ${lecturer.code}`}
+                        disabled={isSendingActivation}
                         onClick={() => onDelete(lecturer)}
                       >
                         <Trash2 size={14} />

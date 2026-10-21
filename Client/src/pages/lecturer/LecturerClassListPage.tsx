@@ -36,7 +36,7 @@ function LecturerClassListPageContent() {
   const error = getApiError(query.error);
 
   return <div className="space-y-6 lecturer-page">
-    <PageHeader title={t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses')}
+    <PageHeader title={t('lecturer.classesAndRules')}
       description={t(allClasses ? 'lecturer.allListDescription' : 'lecturer.listDescription')} />
     <form className="card lecturer-card lecturer-search" onSubmit={event => {
       event.preventDefault(); setFilters(previous => ({ ...previous, search: searchInput.trim(), page: 1 }));

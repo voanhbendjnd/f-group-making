@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, Plus, RefreshCw, Search, Users } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, FileSpreadsheet, Plus, RefreshCw, Search, Users } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -15,8 +15,10 @@ import { BoardStudentCard } from '@/features/group/components/BoardStudentCard';
 import { GroupBoardColumn } from '@/features/group/components/GroupBoardColumn';
 import { LecturerGroupModal } from '@/features/group/components/LecturerGroupModal';
 import { RejectGroupModal } from '@/features/group/components/RejectGroupModal';
+import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
 import { positiveId, reviewPath } from '@/features/group/navigation';
 import type { GroupDTO, GroupMemberDTO } from '@/features/group/types/groupTypes';
+import { compareGroupSequence, groupCode } from '@/features/group/utils/groupSequence';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
 import './LecturerGroupWorkspacePage.css';
 
@@ -39,6 +41,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   classId: number | null; requestedDeadline: number | null; params: URLSearchParams; setDeadline: (id: number) => void;
 }) {
   const { t } = useTranslation();
+  const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
   const { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, run, move } =
     useGroupBoard(classId, requestedDeadline, positiveId(params.get('termId')));
   const { boardRef, startAutoScroll, stopAutoScroll } = useBoardAutoScroll();
@@ -48,6 +51,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   const [groupSearch, setGroupSearch] = useState(''); const [create, setCreate] = useState<number[] | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [rejectId, setRejectId] = useState<number | null>(null);
+  const [exportModalOpen, setExportModalOpen] = useState(false);
   const dragged = useRef<DragStudent | null>(null); const [draggedId, setDraggedId] = useState<number | null>(null);
   const [over, setOver] = useState<number | 'pool' | 'create' | null>(null);
   const data = workspace.data;
@@ -70,7 +74,8 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
 
   useEffect(() => { if (!requestedDeadline && deadlineId) setDeadline(deadlineId); }, [deadlineId, requestedDeadline, setDeadline]);
   const clearDrag = () => { dragged.current = null; setDraggedId(null); setOver(null); stopAutoScroll(); };
-  const back = reviewPath(params);
+  const back = area === 'admin' && params.get('source') === 'class' && classId
+    ? `/admin/classes/${classId}?tab=groups` : reviewPath(params, area);
   const breadcrumb = <nav className="board-breadcrumb" aria-label={t('groupBoard.breadcrumb')}>
     <Link to={back}>{t('groupReview.title')}</Link><span aria-hidden="true">/</span>
     {data && <><Link to={back}>{data.schoolClassName}</Link><span aria-hidden="true">/</span></>}
@@ -80,13 +85,16 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   if (session.isError || workspace.isError) return <div>{breadcrumb}<ErrorState
     message={session.error instanceof AmbiguousGroupSessionError ? t('groupBoard.multipleSessions') : translateErrorMessage(session.error ?? workspace.error)} onRetry={() => { if (deadlineId) void workspace.refetch(); else void session.refetch(); }} />
     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-      {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to="/lecturer/deadlines">{t('nav.lecturerDeadlines')}</Link>}
+      {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to={`/${area}/deadlines`}>{t(area === 'admin' ? 'nav.adminDeadlines' : 'nav.lecturerDeadlines')}</Link>}
       <Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link>
     </div></div>;
   if ((!requestedDeadline && session.isPending) || (deadlineId && workspace.isPending)) return <LoadingSpinner message={t('groupWorkspace.loading')} />;
-  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
-  const targets = data.groups.filter(editable);
-  const groups = data.groups.filter(group => !groupSearch.trim() || group.name.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase()) || group.members.some(student => matches(student, groupSearch)));
+  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to={`/${area}/deadlines`} className="btn btn-primary">{t(area === 'admin' ? 'nav.adminDeadlines' : 'nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
+  const orderedGroups = [...data.groups].sort(compareGroupSequence);
+  const targets = orderedGroups.filter(editable);
+  const groups = orderedGroups.filter(group => !groupSearch.trim()
+    || `${groupCode(group)} ${group.name}`.toLocaleLowerCase().includes(groupSearch.trim().toLocaleLowerCase())
+    || group.members.some(student => matches(student, groupSearch)));
   const students = (data.unassignedStudents || [])
     .filter(student => (!major || student.majorCode === major) && matches(student, studentSearch))
     .map(student => {
@@ -175,6 +183,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       <div className="board-toolbar">
         <span className={`board-connection ${connection === 'connected' ? 'is-live' : ''}`} title={t('groupBoard.realtimeHint')}><i />{t(connection === 'connected' ? 'groupWorkspace.live' : 'groupWorkspace.offline')}</span>
         <Button variant="secondary" size="sm" disabled={pending || workspace.isFetching} aria-label={t('groupWorkspace.refreshData')} icon={<RefreshCw size={16} />} onClick={() => { void workspace.refetch(); }} />
+        <Button size="sm" variant="secondary" onClick={() => setExportModalOpen(true)} icon={<FileSpreadsheet size={16} />}>{t('groupReview.previewExport')}</Button>
         <Button size="sm" variant="secondary" onClick={() => setPool(old => old === 'hidden' ? 'expanded' : 'hidden')} icon={<Users size={16} />}>{t(pool === 'hidden' ? 'groupBoard.showStudents' : 'groupBoard.hideStudents')}</Button>
         {canManage && <Button size="sm" disabled={pending} icon={<Plus size={16} />} onClick={() => setCreate([])}>{t('groupWorkspace.createNewGroup')}</Button>}
       </div>
@@ -259,5 +268,14 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       onClose={() => { if (!pending) setCreate(null); }} onSubmit={values => run(() => groupApi.lecturerCreateGroup(deadlineId, classId, values))} />
     <RejectGroupModal open={rejectId !== null} groupId={rejectId} isLoading={pending} onClose={() => { if (!pending) setRejectId(null); }}
       onSubmit={(id, reason) => run(() => groupApi.rejectGroup(deadlineId, classId, id, { reason }))} />
+    <GroupPreviewExportModal
+      open={exportModalOpen}
+      onClose={() => setExportModalOpen(false)}
+      classId={classId}
+      className={data.schoolClassName}
+      deadlineId={deadlineId}
+      termId={positiveId(params.get('termId'))}
+      termName={params.get('termName') ?? undefined}
+    />
   </div>;
 }

@@ -8,12 +8,15 @@ import { deadlineApi } from '../api/deadlineApi';
 import { deadlineClassWindows } from '../classWindows';
 import type { Deadline } from '../types';
 import { Clock } from 'lucide-react';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { getApiError } from '@/services/api/types';
 
 interface ExtendDeadlineModalProps {
   open: boolean;
   onClose: () => void;
   deadline: Deadline | null;
   onSuccess: () => void;
+  lockSelection?: () => () => void;
 }
 const localTime = (value: string) => {
   const date = new Date(value);
@@ -22,7 +25,7 @@ const localTime = (value: string) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
-export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, onClose, deadline, onSuccess }) => {
+export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, onClose, deadline, onSuccess, lockSelection }) => {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const [name, setName] = useState('');
@@ -35,12 +38,18 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
   const [version, setVersion] = useState<number | undefined>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const busy = useRef(false);
+  const [requestError, setRequestError] = useState('');
+  const [unknown, setUnknown] = useState(false);
+  const discard = useUnsavedChanges(open && Boolean(deadline && (name !== deadline.name || description !== (deadline.description ?? '')
+    || startTime !== localTime(deadline.startTime) || endTime !== localTime(deadline.endTime))), open && isSubmitting);
+  const close = () => { if (!busy.current) discard(onClose); };
   const reset = () => {
     if (!deadline) return;
     setName(deadline.name); setDescription(deadline.description ?? '');
     setStartTime(localTime(deadline.startTime)); setEndTime(localTime(deadline.endTime));
     setSelected(deadline.schoolClassIds.length === 1 ? [...deadline.schoolClassIds] : []);
     setScope('SELECTED'); setConfirmed(false); setVersion(deadline.version);
+    setRequestError(''); setUnknown(false);
   };
   useEffect(() => {
     if (open) reset();
@@ -60,7 +69,7 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
   const label = reopening ? t('deadlineLifecycle.reopen') : upcoming ? t('deadline.modal.submitSave') : t('deadline.modal.submitExtend');
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (busy.current || changed || !targetIds.length || (shared && !confirmed)) return;
+    if (busy.current || unknown || changed || !targetIds.length || (shared && !confirmed)) return;
     const end = new Date(endTime);
     if (!name.trim()) return toast.error(t('deadline.modal.nameRequired'));
     if (!Number.isFinite(end.getTime()) || end.getTime() <= Date.now()) return toast.error(t('deadline.modal.timeFutureError'));
@@ -71,6 +80,7 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
       return toast.error(t('deadline.modal.extendTimeMustBeGreater'));
     }
     busy.current = true; setIsSubmitting(true);
+    const release = lockSelection?.();
     try {
       await deadlineApi.updateDeadline(deadline.id, {
         id: deadline.id, name: name.trim(), description,
@@ -79,14 +89,18 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
       });
       toast.success(reopening ? t('deadlineLifecycle.reopened') : t('deadline.messages.updateSuccess'));
       await onSuccess(); onClose();
-    } catch (error: any) {
-      toast.error(error.message || t('deadline.messages.updateError'));
-    } finally { busy.current = false; setIsSubmitting(false); }
+    } catch (value: unknown) {
+      const error = getApiError(value);
+      const uncertain = Boolean(error.outcomeUnknown || error.status === 0 || error.status >= 500);
+      setUnknown(uncertain);
+      setRequestError(uncertain ? t('adminUx.unknownWrite') : error.message || t('deadline.messages.updateError'));
+    } finally { release?.(); busy.current = false; setIsSubmitting(false); }
   };
   const choose = (ids: number[]) => { setSelected(ids); setConfirmed(false); };
-  return <Modal open={open} onClose={() => { if (!busy.current) onClose(); }}
+  return <Modal open={open} onClose={close}
     title={t('deadlineScope.title')} maxWidth="640px">
     <form onSubmit={submit} aria-busy={isSubmitting}>
+      {requestError && <p className="alert alert-error" role="alert">{requestError}</p>}
       <p className="alert alert-info" style={{ padding: '0.75rem', marginBottom: '1rem' }}>{t('deadlineScope.groupNotice')}</p>
       {changed && <div role="alert" className="alert alert-warning">
         <p>{t('deadlineScope.changed')}</p>
@@ -133,9 +147,9 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
         {t('deadlineLifecycle.confirmScope')}
       </label>}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-        <Button type="button" variant="secondary" disabled={isSubmitting} onClick={onClose}>{t('deadline.modal.cancelBtn')}</Button>
+        <Button type="button" variant="secondary" disabled={isSubmitting} onClick={close}>{t('deadline.modal.cancelBtn')}</Button>
         <Button type="submit" icon={<Clock size={16} />} loading={isSubmitting}
-          disabled={changed || !targetIds.length || (shared && !confirmed)}>{label}</Button>
+          disabled={unknown || changed || !targetIds.length || (shared && !confirmed)}>{label}</Button>
       </div>
     </form>
   </Modal>;

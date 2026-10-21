@@ -4,7 +4,6 @@ import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   Users,
-  Upload,
   LogOut,
   Sparkles,
   ShieldCheck,
@@ -14,8 +13,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
-import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
 import { TermSelect } from '@/features/terms/components/TermSelect';
+import { useNavigationGuard } from '@/app/providers/NavigationGuard';
 
 export interface SidebarProps {
   area?: 'admin' | 'lecturer' | 'student';
@@ -38,59 +37,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const profilePath = isStudentArea ? '/student/profile' : lecturerProfile ? '/lecturer/profile' : null;
   const FooterProfile = profilePath ? 'button' : 'div';
   const isMaster = Boolean(user?.authorities?.includes('ROLE_LECTURE_MASTER'));
-  const allClasses = canViewAllClasses(user?.authorities || []);
 
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const requestLeave = useNavigationGuard();
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    requestLeave(() => { logout(); navigate('/login'); });
   };
 
-  const navItems = isAdmin
+  const navItems: Array<{ to: string; label: string; icon: React.ReactNode; group?: string }> = isAdmin
     ? [
         {
           to: '/admin/dashboard',
+          group: 'adminUx.navigationOperations',
           label: t('nav.dashboard'),
           icon: <LayoutDashboard size={18} />,
         },
+        { to: '/admin/deadlines', label: t('nav.adminDeadlines'), icon: <Clock size={18} /> },
         {
           to: '/admin/classes',
+          group: 'adminUx.navigationClasses',
           label: t('classes.label'),
           icon: <Layers size={18} />,
         },
+        { to: '/admin/group-review', label: t('groupReview.title'), icon: <Users size={18} /> },
         {
           to: '/admin/students',
+          group: 'adminUx.navigationPeople',
           label: t('nav.students'),
           icon: <Users size={18} />,
-        },
-        {
-          to: '/admin/students/import',
-          label: t('nav.importExcel'),
-          icon: <Upload size={18} />,
-        },
-        {
-          to: '/admin/majors',
-          label: t('majors.navLabel'),
-          icon: <GraduationCap size={18} />,
         },
         {
           to: '/admin/lecturers',
           label: t('lecturer.role'),
           icon: <UserCheck size={18} />,
         },
-        {
-          to: '/admin/deadlines',
-          label: t('nav.adminDeadlines'),
-          icon: <Clock size={18} />,
-        },
+        { to: '/admin/majors', label: t('majors.navLabel'), icon: <GraduationCap size={18} />, group: 'adminUx.navigationCatalog' },
       ]
     : isLecturer ? [
-        { to: '/lecturer/classes', label: t(allClasses ? 'lecturer.allClasses' : 'lecturer.myClasses'), icon: <Layers size={18} /> },
-        { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
         { to: '/lecturer/group-review', label: t('groupReview.title'), icon: <Users size={18} /> },
+        { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
         { to: '/lecturer/automatic-allocation', label: t('allocation.title'), icon: <Sparkles size={18} /> },
+        { to: '/lecturer/classes', label: t('lecturer.classesAndRules'), icon: <Layers size={18} /> },
       ] : [
         {
           to: '/student/dashboard',
@@ -105,7 +94,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ];
 
   if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
-  if (lecturerProfile) navItems.push({ to: '/lecturer/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
 
   return (
     <aside className={`sidebar ${isOpen ? 'is-open' : ''}`}>
@@ -170,8 +158,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
           {navItems.map((item) => (
+            <React.Fragment key={item.to}>
+            {item.group && <span className="sidebar-nav-heading">{t(item.group)}</span>}
             <NavLink
-              key={item.to}
               to={item.to}
               onClick={onClose}
               style={({ isActive }) => ({
@@ -191,30 +180,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {item.icon}
               <span>{item.label}</span>
             </NavLink>
+            </React.Fragment>
           ))}
         </nav>
 
-        {isAdmin && (
-          <div
-            style={{
-              margin: '1.5rem 0.75rem 0',
-              padding: '1rem',
-              backgroundColor: '#f0fdf4',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid #bbf7d0',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.375rem', color: '#166534', fontWeight: 600, fontSize: '0.8125rem' }}>
-              <Sparkles size={16} />
-              <span>{t('sidebar.workflowTitle')}</span>
-            </div>
-            <p style={{ fontSize: '0.75rem', color: '#14532d', lineHeight: 1.4 }}>
-              {t('sidebar.step1')}<br />
-              {t('sidebar.step2')}<br />
-              {t('sidebar.step3')}
-            </p>
-          </div>
-        )}
       </div>
 
       {/* User Profile & Logout Footer */}
@@ -279,7 +248,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         </FooterProfile>
 
-        <button
+        {!isAdmin && <button
           type="button"
           onClick={handleLogout}
           style={{
@@ -297,7 +266,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           aria-label={t('common.logout')}
         >
           <LogOut size={18} />
-        </button>
+        </button>}
       </div>
     </aside>
   );

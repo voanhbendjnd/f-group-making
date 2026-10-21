@@ -10,7 +10,9 @@ Quy định nhóm mặc định được thu gọn thành nút trên trang chi t
 
 `ROLE_ADMIN` xem và sửa quy định mọi lớp. `ROLE_LECTURE` chỉ xem/quản lý lớp có `lecturerId` bằng ID tài khoản. `ROLE_LECTURE_MASTER` xem mọi lớp; chỉ sửa quy định lớp được phân công cho mình. Quyền trưởng bộ môn hoạt động độc lập, không cần có thêm `ROLE_LECTURE`. Khi có cả hai quyền giảng viên, quyền xem toàn bộ vẫn được giữ. Tài khoản có nhiều quyền ưu tiên trang chủ admin, giảng viên/trưởng bộ môn rồi sinh viên; admin cũng được vào khu vực giảng viên.
 
-Giảng viên thường dùng danh sách lớp được phân công (`/api/me/school-classes`). Trưởng bộ môn và admin dùng danh sách toàn bộ (`/api/school-classes`). FE hiển thị "Tất cả lớp học" cho quyền xem toàn bộ. Form của trưởng bộ môn khi xem lớp người khác chỉ đọc, không có nút lưu; backend vẫn kiểm tra quyền độc lập với FE.
+Giảng viên thường dùng danh sách lớp được phân công (`/api/me/school-classes`). Trưởng bộ môn và admin dùng danh sách toàn bộ (`/api/school-classes`). Mục lớp có tên "Lớp học và quy định"; phạm vi danh sách vẫn theo quyền tài khoản. Form của trưởng bộ môn khi xem lớp người khác chỉ đọc, không có nút lưu; backend vẫn kiểm tra quyền độc lập với FE.
+
+Cập nhật điều hướng 20/10/2026: menu giảng viên theo thứ tự Duyệt nhóm → Deadline của lớp → Phân bổ tự động → Lớp học và quy định. Duyệt nhóm là trang mặc định sau đăng nhập và khi vào `/lecturer`. Ẩn mục Hồ sơ của tôi khỏi menu; bấm tên tài khoản ở góc trên phải để mở hồ sơ, giữ phần xem nhanh khi rê chuột. Nội dung và chức năng các màn hình giữ nguyên.
 
 Frontend dùng stack hiện hữu: React/TypeScript, React Router, TanStack Query, React Hook Form, client Axios chung, CSS token/component chung và Lucide; không bổ sung UI kit. `ManagementLayout` dùng chung cho admin và giảng viên. Các trang ở `pages/lecturer`; API/type/form/hook quy định ở `features/rules`; API/type/bảng lớp ở `features/classes`. Nội dung mới có tiếng Việt và tiếng Anh với bộ khóa tương ứng.
 

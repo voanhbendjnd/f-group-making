@@ -112,6 +112,130 @@ class GroupSessionPolicyTest {
         dto.setEndTime(Instant.now().plusSeconds(7200).truncatedTo(java.time.temporal.ChronoUnit.MICROS)); return dto;
     }
 
+    @Test void groupNumbersCompactAfterDeletingMiddleFirstAndLastWithoutChangingIdentity() {
+        GroupDTO first = draft(1), middle = draft(1), last = draft(1);
+        assertThat(List.of(first.getGroupCode(), middle.getGroupCode(), last.getGroupCode()))
+            .containsExactly("G01", "G02", "G03");
+        service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), middle.getId());
+        assertThat(groups.findById(middle.getId()).orElseThrow().getSequenceNo()).isNull();
+        GroupDTO renumbered = service.getGroupDetail(last.getId(), schoolClass.getId(), deadline.getId());
+        assertThat(renumbered.getGroupCode()).isEqualTo("G02");
+        assertThat(renumbered.getLeaderId()).isEqualTo(last.getLeaderId());
+        assertThat(renumbered.getMembers()).extracting(GroupMemberDTO::getStudentId)
+            .containsExactlyElementsOf(last.getMembers().stream().map(GroupMemberDTO::getStudentId).toList());
+        GroupDTO added = draft(1);
+        assertThat(added.getGroupCode()).isEqualTo("G03");
+        service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), added.getId());
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+            .extracting(GroupDTO::getId).containsExactly(last.getId());
+        assertThat(service.getGroupDetail(last.getId(), schoolClass.getId(), deadline.getId()).getGroupCode()).isEqualTo("G01");
+        assertThat(draft(1).getGroupCode()).isEqualTo("G02");
+    }
+
+    @Test void submitApproveRejectAndUnlockPreserveGroupNumbersAndColumnOrder() {
+        GroupDTO first = draft(4), middle = draft(4), last = draft(4);
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        service.acceptGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), middle.getId());
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+            .extracting(GroupDTO::getId).containsExactly(first.getId(), middle.getId(), last.getId());
+        RejectGroupRequest rejection = new RejectGroupRequest(); rejection.setReason("Revise membership");
+        service.rejectGroup(deadline.getId(), schoolClass.getId(), middle.getId(), rejection);
+        service.revokeGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+            .extracting(GroupDTO::getGroupCode).containsExactly("G01", "G02", "G03");
+    }
+
+    @Test void deletingDraftRenumbersPendingAndApprovedGroupsWithoutChangingTheirStatus() {
+        GroupDTO first = draft(1), pending = draft(4), approved = draft(4);
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), pending.getId());
+        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), approved.getId());
+        service.acceptGroup(deadline.getId(), schoolClass.getId(), approved.getId());
+        service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+            .extracting(GroupDTO::getGroupCode).containsExactly("G01", "G02");
+        assertThat(groups.findById(pending.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.PENDING);
+        assertThat(groups.findById(approved.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+    }
+
+    @Test void studentCreationDisbandAndFinalLeaderLeavingShareTheSameSequence() {
+        User leader = student(schoolClass, se);
+        login(leader, "ROLE_STUDENT");
+        CreateGroupRequest request = new CreateGroupRequest(); request.setName("Student first group");
+        GroupDTO first = service.createGroup(deadline.getId(), schoolClass.getId(), request);
+        login(teacher, "ROLE_ADMIN"); GroupDTO second = draft(1);
+        assertThat(first.getGroupCode()).isEqualTo("G01");
+        assertThat(second.getGroupCode()).isEqualTo("G02");
+        login(leader, "ROLE_STUDENT");
+        service.leaveGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        assertThat(groups.findById(first.getId()).orElseThrow().getSequenceNo()).isNull();
+        request.setName("Student recreated group");
+        GroupDTO recreated = service.createGroup(deadline.getId(), schoolClass.getId(), request);
+        assertThat(recreated.getGroupCode()).isEqualTo("G02");
+        service.disbandGroup(deadline.getId(), schoolClass.getId(), recreated.getId());
+        assertThat(groups.findById(recreated.getId()).orElseThrow().getSequenceNo()).isNull();
+        assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+            .extracting(GroupDTO::getGroupCode).containsExactly("G01");
+    }
+
+    @Test void numberingIsIndependentForClassesSharingADeadline() {
+        GroupDTO first = draft(1), second = draft(1);
+        SchoolClass other = schoolClass(); deadline.getSchoolClasses().add(other); deadline = deadlines.saveAndFlush(deadline);
+        LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("Other class group");
+        request.setStudentIds(List.of(student(other, se).getId()));
+        GroupDTO otherGroup = service.lecturerCreateGroup(deadline.getId(), other.getId(), request);
+        assertThat(otherGroup.getGroupCode()).isEqualTo("G01");
+        service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), first.getId());
+        assertThat(service.getGroupDetail(second.getId(), schoolClass.getId(), deadline.getId()).getGroupCode()).isEqualTo("G01");
+        assertThat(service.getGroupDetail(otherGroup.getId(), other.getId(), deadline.getId()).getGroupCode()).isEqualTo("G01");
+    }
+
+    @Test void concurrentCreatesAllocateDistinctConsecutiveNumbers() throws Exception {
+        User firstLeader = student(schoolClass, se), secondLeader = student(schoolClass, se);
+        ExecutorService executor = Executors.newFixedThreadPool(2); CountDownLatch start = new CountDownLatch(1);
+        List<Future<GroupDTO>> results = new ArrayList<>();
+        try {
+            for (User leader : List.of(firstLeader, secondLeader)) results.add(executor.submit(() -> {
+                login(leader, "ROLE_STUDENT"); start.await();
+                try {
+                    CreateGroupRequest request = new CreateGroupRequest(); request.setName("Concurrent " + leader.getId());
+                    return service.createGroup(deadline.getId(), schoolClass.getId(), request);
+                } finally { SecurityContextHolder.clearContext(); }
+            }));
+            start.countDown();
+            assertThat(List.of(results.get(0).get(15, TimeUnit.SECONDS).getSequenceNo(),
+                results.get(1).get(15, TimeUnit.SECONDS).getSequenceNo())).containsExactlyInAnyOrder(1, 2);
+            assertThat(service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups())
+                .extracting(GroupDTO::getGroupCode).containsExactly("G01", "G02");
+        } finally { executor.shutdownNow(); }
+    }
+
+    @Test void concurrentCreateAndDisbandLeaveNoGapsOrDuplicateNumbers() throws Exception {
+        GroupDTO first = draft(1), middle = draft(1), last = draft(1);
+        User leader = student(schoolClass, se);
+        ExecutorService executor = Executors.newFixedThreadPool(2); CountDownLatch start = new CountDownLatch(1);
+        try {
+            Future<?> deletion = executor.submit(() -> {
+                login(teacher, "ROLE_ADMIN");
+                try { start.await(); service.lecturerDisbandGroup(deadline.getId(), schoolClass.getId(), middle.getId()); }
+                catch (InterruptedException exception) { throw new RuntimeException(exception); }
+                finally { SecurityContextHolder.clearContext(); }
+            });
+            Future<GroupDTO> creation = executor.submit(() -> {
+                login(leader, "ROLE_STUDENT"); start.await();
+                try {
+                    CreateGroupRequest request = new CreateGroupRequest(); request.setName("Concurrent replacement");
+                    return service.createGroup(deadline.getId(), schoolClass.getId(), request);
+                } finally { SecurityContextHolder.clearContext(); }
+            });
+            start.countDown(); deletion.get(15, TimeUnit.SECONDS); GroupDTO added = creation.get(15, TimeUnit.SECONDS);
+            List<GroupDTO> remaining = service.getWorkspace(deadline.getId(), schoolClass.getId()).getGroups();
+            assertThat(remaining).extracting(GroupDTO::getId).containsExactly(first.getId(), last.getId(), added.getId());
+            assertThat(remaining).extracting(GroupDTO::getGroupCode).containsExactly("G01", "G02", "G03");
+        } finally { executor.shutdownNow(); }
+    }
+
     @Test void repeatedReopeningPreservesGroupsMembersAndApprovalHistory() {
         GroupDTO group = draft(4); service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
         service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());

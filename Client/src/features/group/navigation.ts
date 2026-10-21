@@ -6,18 +6,18 @@ export function positiveId(value: string | null | undefined): number | null {
   return Number.isSafeInteger(id) && id > 0 ? id : null;
 }
 
-export function reviewPath(context: URLSearchParams): string {
+export function reviewPath(context: URLSearchParams, area: 'admin' | 'lecturer' = 'lecturer'): string {
   const query = new URLSearchParams();
-  for (const name of ['termId', 'classId', 'status', 'search', 'page', 'size']) {
+  for (const name of ['termId', 'classId', 'status', 'search', 'page', 'size', 'source']) {
     const value = context.get(name);
     if (value) query.set(name, value);
   }
-  return `/lecturer/group-review${query.size ? `?${query}` : ''}`;
+  return `/${area}/group-review${query.size ? `?${query}` : ''}`;
 }
 
-export function advancedGroupPath(classId: number, context = new URLSearchParams(), deadlineId?: number): string {
+export function advancedGroupPath(classId: number, context = new URLSearchParams(), deadlineId?: number, area: 'admin' | 'lecturer' = 'lecturer'): string {
   const query = new URLSearchParams(reviewPath(context).split('?')[1]);
   query.set('classId', String(classId));
   if (deadlineId) query.set('deadlineId', String(deadlineId));
-  return `${ADVANCED_GROUP_PATH}?${query}`;
+  return `/${area}/group-review/advanced?${query}`;
 }

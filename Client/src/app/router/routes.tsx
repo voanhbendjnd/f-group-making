@@ -145,6 +145,10 @@ export const router = createBrowserRouter([
         path: 'deadlines',
         element: <AdminDeadlinePage />,
       },
+      { path: 'group-review', element: <LecturerGroupReviewPage /> },
+      { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
+      { path: 'automatic-allocation', element: <LecturerAllocationPage /> },
+      { path: 'automatic-allocation/:classId', element: <LecturerAllocationPage /> },
     ],
   },
 
@@ -157,7 +161,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/lecturer/classes" replace /> },
+      { index: true, element: <Navigate to="/lecturer/group-review" replace /> },
       { path: 'classes', element: <LecturerClassListPage /> },
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
       { path: 'deadlines', element: <LecturerDeadlinePage /> },

@@ -23,7 +23,9 @@ public interface GroupRepository extends JpaRepository<Group, Long>, JpaSpecific
     @Query("SELECT g FROM Group g WHERE g.id = :id")
     Optional<Group> findByIdForUpdate(@Param("id") Long id);
 
-    List<Group> findBySchoolClassIdAndDeadlineId(Integer schoolClassId, Integer deadlineId);
+    @Query("SELECT g FROM Group g WHERE g.schoolClassId = :schoolClassId AND g.deadlineId = :deadlineId " +
+        "ORDER BY CASE WHEN g.sequenceNo IS NULL THEN 1 ELSE 0 END, g.sequenceNo, g.id")
+    List<Group> findBySchoolClassIdAndDeadlineId(@Param("schoolClassId") Integer schoolClassId, @Param("deadlineId") Integer deadlineId);
 
     List<Group> findBySchoolClassIdAndDeadlineIdAndStatus(Integer schoolClassId, Integer deadlineId, GroupStatus status);
 

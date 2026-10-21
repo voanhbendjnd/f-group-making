@@ -30,7 +30,7 @@ const AdminDeadlineContent: React.FC = () => {
   const { t } = useTranslation();
   const toast = useToast();
   const queries = useQueryClient();
-  const { selectedTermId } = useTerm();
+  const { selectedTermId, lockTermSelection } = useTerm();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -50,12 +50,13 @@ const AdminDeadlineContent: React.FC = () => {
   });
 
   // Fetch classes for modal
-  const { data: classesData } = useQuery({
+  const classesQuery = useQuery({
     queryKey: ['admin-classes-for-deadline', selectedTermId],
-    queryFn: () => classApi.getClasses({ page: 1, size: 200, termId: selectedTermId || undefined }),
+    queryFn: ({ signal }) => classApi.getAllClasses(selectedTermId!, signal),
+    enabled: isCreateOpen, retry: false,
   });
 
-  const availableClasses = (classesData?.result || []).map((c) => ({
+  const availableClasses = (classesQuery.data || []).map((c) => ({
     id: c.id,
     name: c.name,
   }));
@@ -86,6 +87,7 @@ const AdminDeadlineContent: React.FC = () => {
       cancelText: t('deadline.confirmCancel.cancel'),
       centered: true,
       onOk: async () => {
+        const release = lockTermSelection();
         try {
           const updated = await deadlineApi.closeDeadline(d);
           toast.success(t('deadline.messages.cancelSuccess'));
@@ -94,7 +96,7 @@ const AdminDeadlineContent: React.FC = () => {
           toast.error(err.message || t('deadline.messages.cancelError'));
           await syncDeadlineQueries(queries);
           throw err;
-        }
+        } finally { release(); }
       },
     });
   };
@@ -152,7 +154,7 @@ const AdminDeadlineContent: React.FC = () => {
                   meta={meta}
                   currentPage={page}
                   onPageChange={setPage}
-                  onPageSizeChange={setPageSize}
+                  onPageSizeChange={size => { setPageSize(size); setPage(1); }}
                 />
               </div>
             )}
@@ -164,6 +166,10 @@ const AdminDeadlineContent: React.FC = () => {
         open={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
         availableClasses={availableClasses}
+        classesLoading={classesQuery.isPending || classesQuery.isFetching}
+        classesError={classesQuery.isError}
+        onRetryClasses={() => void classesQuery.refetch()}
+        lockSelection={lockTermSelection}
         onSuccess={() => refetch()}
       />
 
@@ -171,6 +177,7 @@ const AdminDeadlineContent: React.FC = () => {
         open={!!visibleEditing}
         onClose={() => setEditingDeadline(null)}
         deadline={visibleEditing}
+        lockSelection={lockTermSelection}
         onSuccess={() => refetch()}
       />
     </div>

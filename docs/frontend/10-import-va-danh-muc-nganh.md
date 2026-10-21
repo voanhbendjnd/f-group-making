@@ -26,6 +26,21 @@ nullable hoặc không tồn tại. `ddl-auto=update` không tự sửa cột đ
 
 ## Hợp đồng import
 
+### Mẫu Excel trên giao diện Admin
+
+Hai trang import có khối tải mẫu trước vùng chọn tệp, dùng chung `ImportTemplateGuide`:
+
+- `/admin/students/import`: tải `/sample-students.xlsx`; sheet `Students` đầu tiên, hai dòng tiêu đề, nhập dữ liệu từ dòng 3. Các cột bắt buộc ở B/C/D/E/F/I/J lần lượt là RollNumber/FullName/Khoá/MemberCode/Email/GroupName/GV. Giữ vị trí các cột A/G/H/K dù để trống.
+- `/admin/lecturers/import`: tải `/sample-lecturers.xlsx`; sheet `Mentors` có Mentor/Email ở A1/B1, nhập từ dòng 2.
+
+Cả hai tệp dùng bố cục cơ bản theo ảnh tham chiếu, mỗi tệp chỉ có một sheet và vùng nhập trống. Mẫu sinh viên có tiêu đề `DSSV_EXE101_FA26 / *Xếp nhóm`, hàng tên cột màu vàng, hướng dẫn Group Mentor tại K1 và bộ lọc cột. Tiêu đề FA26 chỉ là ví dụ; học kỳ nhập lấy từ lựa chọn trên giao diện. Mẫu giảng viên là bảng trắng hai cột Mentor/Email, không trang trí thêm. Hướng dẫn và ví dụ nằm trên trang import, không có sheet `Huong dan` trong tệp.
+
+Sinh viên phải dùng mã GV đã có, vì vậy cần tạo/import giảng viên trước. Ngay trên giao diện có mục mở rộng xem cột bắt buộc, ý nghĩa, ví dụ, giới hạn `.xlsx`/5 MB; hỗ trợ VI/EN. Các liên kết tải vẫn hiện sau khi đã chọn tệp, dùng `BASE_URL` để hỗ trợ ứng dụng được đặt dưới đường dẫn con.
+
+Kiểm thử `importTemplates.test.ts` đọc chính hai tệp public: kiểm tra sheet/header, mẫu trống không có bản ghi và điền dữ liệu giả vào đúng vị trí thì parser hiện tại đọc được. Đây là kiểm tra cấu trúc, không chứng minh mã/email/GV của một tệp thực tế hợp lệ trong database.
+
+### Gửi dữ liệu sinh viên
+
 `POST /api/students/import`, multipart, chỉ ADMIN:
 
 - `file`: file `.xlsx`, tối đa 5 MB, hai dòng đầu là tiêu đề/header.

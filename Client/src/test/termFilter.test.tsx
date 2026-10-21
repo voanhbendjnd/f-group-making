@@ -39,7 +39,7 @@ vi.mock('@/features/lecturers/api/lecturerApi', () => ({ lecturerApi: {
   getLecturers: vi.fn(), sendSingleActivation: vi.fn(), sendBatchActivation: vi.fn(), deleteBatchLecturers: vi.fn(),
   deleteLecturer: vi.fn(), importExcel: vi.fn(),
 } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getClassById: vi.fn(), getClassStudents: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getAllClasses: vi.fn(), getClasses: vi.fn(), getClassById: vi.fn(), getClassStudents: vi.fn() } }));
 vi.mock('@/features/import/api/importApi', () => ({ importApi: { importExcel: vi.fn() } }));
 vi.mock('@/features/import/utils/excelParser', () => ({ parseExcelClientSide: vi.fn() }));
 vi.mock('@/features/lecturers/utils/lecturerExcelParser', () => ({ parseLecturerExcelClientSide: vi.fn() }));
@@ -132,6 +132,7 @@ describe('Academic Term filter', () => {
       result: [{ id: 7, name: `Class ${params?.termId}`, termId: params?.termId ?? null, termName: 'SP26',
         lecturerId: null, lecturerCode: null, lecturerName: null, lecturerEmail: null, studentCount: 1, createdDate: '' }],
     }));
+    vi.mocked(classApi.getAllClasses).mockImplementation(async termId => (await classApi.getClasses({ termId, page: 1 })).result);
   });
   afterEach(() => { cleanup(); client?.clear(); });
 
@@ -264,17 +265,17 @@ describe('Academic Term filter', () => {
 
   it('scopes every Dashboard statistic and recent-student request', async () => {
     renderPage(<AdminDashboardPage />);
-    await waitFor(() => expect(studentApi.getStudents).toHaveBeenCalledTimes(5));
+    await waitFor(() => expect(studentApi.getStudents).toHaveBeenCalledTimes(3));
     expect(vi.mocked(studentApi.getStudents).mock.calls.every(([params]) => params?.termId === 2)).toBe(true);
     await switchTerm(1);
-    await waitFor(() => expect(studentApi.getStudents).toHaveBeenCalledTimes(10));
-    expect(vi.mocked(studentApi.getStudents).mock.calls.slice(5).every(([params]) => params?.termId === 1)).toBe(true);
+    await waitFor(() => expect(studentApi.getStudents).toHaveBeenCalledTimes(6));
+    expect(vi.mocked(studentApi.getStudents).mock.calls.slice(3).every(([params]) => params?.termId === 1)).toBe(true);
   });
 
   it('shows Dashboard failures instead of presenting failed statistics as zero', async () => {
     vi.mocked(studentApi.getStudents).mockRejectedValue(new Error('Statistics unavailable'));
     renderPage(<AdminDashboardPage />);
-    expect(await screen.findByText('Statistics unavailable')).toBeInTheDocument();
+    expect((await screen.findAllByText(i18n.t('adminUx.dataUnavailable'))).length).toBeGreaterThan(0);
     expect(screen.queryByText('Student 2')).not.toBeInTheDocument();
   });
 
@@ -284,9 +285,9 @@ describe('Academic Term filter', () => {
     vi.mocked(termApi.getTerms).mockResolvedValueOnce([past, current]).mockResolvedValue([past, current, created]);
     renderPage(<TermSelect />);
     await waitFor(() => expect(screen.getAllByRole('combobox')[0]).not.toBeDisabled());
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo kỳ mới' }));
-    fireEvent.change(screen.getByLabelText(/Tên học kỳ/), { target: { value: 'SP27' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Tạo học kỳ' }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.createTerm') }));
+    fireEvent.change(screen.getByLabelText(i18n.t('adminUx.termName'), { exact: false }), { target: { value: 'SP27' } });
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: i18n.t('adminUx.createTerm') }));
     await waitFor(() => expect(screen.getAllByRole('combobox').every((select) => select.textContent === 'SP27')).toBe(true));
     expect(termApi.createTerm).toHaveBeenCalledWith({ name: 'SP27' });
     expect(localStorage.getItem(storageKey)).toBe('3');
@@ -326,7 +327,8 @@ describe('Academic Term filter', () => {
     expect(lecturerApi.getLecturers).toHaveBeenLastCalledWith(expect.objectContaining({ termId: undefined }));
     expect(screen.getAllByRole('checkbox')[1]).not.toBeChecked();
     fireEvent.click(screen.getAllByRole('checkbox')[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Gửi email kích hoạt (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.sendLecturers', { count: 1 }) }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: i18n.t('adminUx.sendLecturers', { count: 1 }) }));
     await waitFor(() => expect(lecturerApi.sendBatchActivation).toHaveBeenCalledWith([100], undefined));
   });
 
@@ -334,12 +336,13 @@ describe('Academic Term filter', () => {
     renderPage(<LecturerListPage />);
     await screen.findByText('ASSIGNED');
     fireEvent.click(screen.getAllByRole('checkbox')[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Gửi email kích hoạt (1)' }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.sendLecturers', { count: 1 }) }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: i18n.t('adminUx.sendLecturers', { count: 1 }) }));
     await waitFor(() => expect(lecturerApi.sendBatchActivation).toHaveBeenCalledWith([100], 2));
     await waitFor(() => expect(screen.getAllByRole('checkbox')[1]).not.toBeChecked());
     fireEvent.click(screen.getAllByRole('checkbox')[1]);
-    fireEvent.click(screen.getByRole('button', { name: 'Xóa (1)' }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Xóa 1 giảng viên' }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.deleteAccounts', { count: 1 }) }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: i18n.t('adminUx.deleteAccounts', { count: 1 }) }));
     await waitFor(() => expect(lecturerApi.deleteBatchLecturers).toHaveBeenCalledWith([100], 2));
   });
 
@@ -349,19 +352,21 @@ describe('Academic Term filter', () => {
     await screen.findByText('Student 2');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select student Student 2' }));
     fireEvent.click(screen.getByRole('button', { name: /Send activation email/ }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Send Activation Emails Now/ }));
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: i18n.t('adminUx.sendRecipients', { count: 1 }) }));
     await waitFor(() => expect(studentApi.sendBatchActivation).toHaveBeenCalledWith([20], 2));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['admin-dashboard'] });
   });
 
-  it('sends activate-all with termId and does not reuse the prior Term selection', async () => {
+  it('resolves all matching students and sends explicit IDs in the selected Term', async () => {
     renderPage(<StudentListPage />);
     await screen.findByText('Student 2');
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select student Student 2' }));
     fireEvent.click(screen.getByRole('button', { name: i18n.t('bulkAction.selectAllMatching', { total: 20 }) }));
     fireEvent.click(screen.getByRole('button', { name: /Send activation email/ }));
-    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Send Activation Emails Now/ }));
-    await waitFor(() => expect(studentApi.sendActivateAllMatching).toHaveBeenCalledWith('', '', undefined, 2));
+    const send = await within(screen.getByRole('dialog')).findByRole('button', { name: i18n.t('adminUx.sendRecipients', { count: 1 }) });
+    await waitFor(() => expect(send).toBeEnabled()); fireEvent.click(send);
+    await waitFor(() => expect(studentApi.sendBatchActivation).toHaveBeenCalledWith([20], 2));
+    expect(studentApi.sendActivateAllMatching).not.toHaveBeenCalled();
     await switchTerm(1);
     await screen.findByText('Student 1');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -409,11 +414,11 @@ describe('Academic Term filter', () => {
       email: 'lecturer@example.test', isValid: true, validationErrors: [] }], totalRows: 1, validCount: 1, invalidCount: 0, hasErrors: false });
     vi.mocked(lecturerApi.importExcel).mockResolvedValue({ success: true, totalImported: 1, errors: [] });
     renderPage(<LecturerImportPage />);
-    expect(screen.getByText(i18n.t('terms.lecturerImportGlobal'))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('adminUx.lecturerFileHelp'))).toBeInTheDocument();
     const file = chooseFile();
-    fireEvent.click(await screen.findByRole('button', { name: 'Xác nhận Import (1 giảng viên)' }));
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('import.confirmImportBtn', { count: 1 }) }));
     await waitFor(() => expect(lecturerApi.importExcel).toHaveBeenCalledWith(file));
-    expect(screen.getByRole('link', { name: /Quay lại danh sách/ })).toHaveAttribute('href', '/admin/lecturers?scope=all');
+    expect(screen.getByRole('link', { name: i18n.t('import.backToList') })).toHaveAttribute('href', '/admin/lecturers?scope=all');
   });
 
   it('global Lecturer List remains available even if the term catalog is empty', async () => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '@/components/common/Modal';
 import { Input } from '@/components/common/Input';
@@ -6,12 +6,20 @@ import { Button } from '@/components/common/Button';
 import { useToast } from '@/app/providers/ToastContext';
 import { deadlineApi } from '../api/deadlineApi';
 import { CalendarPlus, Check, Clock, Info, Mail, Search } from 'lucide-react';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { getApiError } from '@/services/api/types';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorState } from '@/components/common/ErrorState';
 
 interface CreateDeadlineModalProps {
   open: boolean;
   onClose: () => void;
   availableClasses: { id: number; name: string }[];
   onSuccess: () => void;
+  classesLoading?: boolean;
+  classesError?: boolean;
+  onRetryClasses?: () => void;
+  lockSelection?: () => () => void;
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -105,6 +113,10 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
   onClose,
   availableClasses,
   onSuccess,
+  classesLoading = false,
+  classesError = false,
+  onRetryClasses,
+  lockSelection,
 }) => {
   const { t, i18n } = useTranslation();
   const isEn = i18n.language === 'en';
@@ -113,17 +125,26 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [baseline, setBaseline] = useState(getInitialTimes);
   const [startTime, setStartTime] = useState(() => getInitialTimes().start);
   const [endTime, setEndTime] = useState(() => getInitialTimes().end);
   const [selectedClassIds, setSelectedClassIds] = useState<number[]>([]);
   const [classQuery, setClassQuery] = useState('');
   const [showErrors, setShowErrors] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const busy = useRef(false);
+  const [requestError, setRequestError] = useState('');
+  const [unknown, setUnknown] = useState(false);
+  const discard = useUnsavedChanges(open && Boolean(name || description || selectedClassIds.length
+    || startTime !== baseline.start || endTime !== baseline.end), open && isSubmitting);
+  const close = () => { if (!busy.current) discard(onClose); };
 
   // Mỗi lần mở lại modal: xoá dữ liệu cũ và tính lại mốc thời gian theo "bây giờ"
   useEffect(() => {
     if (!open) return;
     const tTimes = getInitialTimes();
+    setBaseline(tTimes);
+    setRequestError(''); setUnknown(false);
     setName('');
     setDescription('');
     setStartTime(tTimes.start);
@@ -194,7 +215,7 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
   // ---------- submit ----------
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isSubmitting) return;
+    if (busy.current || unknown || classesLoading || classesError) return;
 
     setShowErrors(true);
     if (errors.name || errors.classes || errors.time) {
@@ -202,7 +223,9 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
       return;
     }
 
-    setIsSubmitting(true);
+    busy.current = true;
+    const release = lockSelection?.();
+    setIsSubmitting(true); setRequestError('');
     try {
       await deadlineApi.createDeadline({
         name: name.trim(),
@@ -214,15 +237,19 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
       toast.success(t('deadline.messages.createSuccess'));
       onSuccess();
       onClose();
-    } catch (err: any) {
-      toast.error(err.message || t('deadline.messages.createError'));
+    } catch (err: unknown) {
+      const error = getApiError(err);
+      const uncertain = Boolean(error.outcomeUnknown || error.status === 0 || error.status >= 500);
+      setUnknown(uncertain);
+      setRequestError(uncertain ? t('adminUx.unknownWrite') : error.message || t('deadline.messages.createError'));
     } finally {
+      release?.(); busy.current = false;
       setIsSubmitting(false);
     }
   };
 
   return (
-    <Modal open={open} onClose={onClose} title={t('deadline.modal.createTitle')} maxWidth="640px">
+    <Modal open={open} onClose={close} title={t('deadline.modal.createTitle')} maxWidth="800px">
       {/* Hover / focus cho các phần tử tương tác (không làm được bằng inline style) */}
       <style>{`
         .cdm-chip, .cdm-class { transition: background-color .12s, border-color .12s; }
@@ -250,6 +277,10 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
       `}</style>
 
       <form onSubmit={handleSubmit} noValidate>
+        <fieldset disabled={isSubmitting} style={{ border: 0, padding: 0, margin: 0 }}>
+        {requestError && <div className="alert alert-error" role="alert">{requestError}
+          {unknown && <Button type="button" variant="secondary" onClick={() => { onSuccess(); onClose(); }}>{t('adminUx.checkList')}</Button>}
+        </div>}
         {/* 1. Thông tin chung */}
         <div style={styles.section}>
           <Input
@@ -400,6 +431,8 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
             )}
           </div>
 
+          {classesLoading && <LoadingSpinner message={t('adminUx.classOptionsLoading')} />}
+          {classesError && <ErrorState message={t('adminUx.classOptionsError')} onRetry={onRetryClasses} />}
           {availableClasses.length > SEARCH_THRESHOLD && (
             <div style={{ position: 'relative', marginBottom: '0.5rem' }}>
               <Search
@@ -427,7 +460,7 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
 
           <div
             style={{
-              maxHeight: '200px',
+              maxHeight: '280px',
               overflowY: 'auto',
               border: `1px solid ${showErrors && errors.classes ? 'var(--color-danger, #dc2626)' : 'var(--color-border)'}`,
               borderRadius: 'var(--radius-md)',
@@ -506,6 +539,12 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
               {errors.classes}
             </p>
           )}
+          {selectedClassIds.length > 0 && <div className="admin-selected-classes">
+            <strong>{t('adminUx.selectedClasses', { count: selectedClassIds.length })}</strong>
+            <div>{availableClasses.filter(item => selectedClassIds.includes(item.id)).map(item =>
+              <button type="button" className="btn btn-secondary btn-sm" key={item.id} onClick={() => toggleClass(item.id)}
+                aria-label={t('adminUx.removeClass', { name: item.name })}>{item.name} ×</button>)}</div>
+          </div>}
         </div>
 
         {/* Ghi chú về email */}
@@ -532,19 +571,22 @@ export const CreateDeadlineModal: React.FC<CreateDeadlineModalProps> = ({
         </div>
 
         {/* Hành động */}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSubmitting}>
+        <p className="form-hint">{t('adminUx.timezone', { zone: Intl.DateTimeFormat().resolvedOptions().timeZone })}</p>
+        <div className="admin-form-actions">
+          <Button type="button" variant="secondary" onClick={close} disabled={isSubmitting}>
             {t('deadline.modal.cancelBtn')}
           </Button>
           <Button
             type="submit"
             variant="primary"
             loading={isSubmitting}
+            disabled={classesLoading || classesError || unknown}
             icon={selectedClassIds.length > 0 ? <Mail size={16} /> : <CalendarPlus size={16} />}
           >
             {isSubmitting ? t('deadline.modal.creating') : t('deadline.modal.submitCreate')}
           </Button>
         </div>
+        </fieldset>
       </form>
     </Modal>
   );

@@ -1,5 +1,4 @@
-import { Eye, Pencil } from 'lucide-react';
-import { DeleteOutlined } from '@ant-design/icons';
+import { Eye, Pencil, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
 import type { Major } from '../types';
@@ -16,31 +15,31 @@ export function MajorTable({ majors, isLoading, onView, onEdit, onDelete }: Majo
   const { t } = useTranslation();
 
   return (
-    <div className="table-container" aria-busy={isLoading}>
-      <table className="table" aria-label={t('majors.title')}>
+    <div className="table-container major-table-container" aria-busy={isLoading}>
+      <table className="table major-table" aria-label={t('majors.title')}>
         <thead>
           <tr>
             <th>{t('majors.code')}</th>
             <th>{t('majors.name')}</th>
-            <th style={{ textAlign: 'right' }}>{t('majors.actions')}</th>
+            <th className="major-actions-column">{t('majors.actions')}</th>
           </tr>
         </thead>
         <tbody>
           {majors.map((major) => (
             <tr key={major.id}>
-              <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{major.code}</td>
-              <td style={{ overflowWrap: 'anywhere' }}>{major.name}</td>
-              <td>
-                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <Button variant="ghost" size="sm" icon={<Eye size={16} />} disabled={isLoading}
+              <td><span className="major-code">{major.code}</span></td>
+              <td className="major-name">{major.name}</td>
+              <td className="major-actions-column">
+                <div className="major-row-actions">
+                  <Button variant="outline" size="sm" icon={<Eye size={16} aria-hidden="true" />} disabled={isLoading}
                     aria-label={t('majors.viewAria', { code: major.code })} onClick={() => onView(major)}>
                     {t('majors.view')}
                   </Button>
-                  <Button variant="secondary" size="sm" icon={<Pencil size={16} />} disabled={isLoading}
+                  <Button variant="secondary" size="sm" icon={<Pencil size={16} aria-hidden="true" />} disabled={isLoading}
                     aria-label={t('majors.editAria', { code: major.code })} onClick={() => onEdit(major)}>
                     {t('majors.edit')}
                   </Button>
-                  <Button variant="danger" size="sm" icon={<DeleteOutlined style={{ fontSize: '15px' }} />} disabled={isLoading}
+                  <Button variant="danger-outline" size="sm" icon={<Trash2 size={16} aria-hidden="true" />} disabled={isLoading}
                     aria-label={t('majors.deleteAria', { code: major.code })} onClick={() => onDelete(major)}>
                     {t('majors.delete')}
                   </Button>

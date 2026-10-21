@@ -66,9 +66,9 @@ describe('Class student roster', () => {
     renderPanel(); await screen.findByText('Nguyễn An');
     fireEvent.change(screen.getByLabelText('Trạng thái kích hoạt'), { target: { value: 'unactivated' } });
     expect(screen.queryByText('Nguyễn An')).not.toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Trạng thái gửi email'), { target: { value: 'not_sent' } });
+    fireEvent.change(screen.getByLabelText(i18n.t('adminUx.linkStatus')), { target: { value: 'not_sent' } });
     expect(screen.getByText('Không tìm thấy sinh viên phù hợp')).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Trạng thái gửi email'), { target: { value: 'sent' } });
+    fireEvent.change(screen.getByLabelText(i18n.t('adminUx.linkStatus')), { target: { value: 'sent' } });
     expect(screen.getByText('Trần Bình')).toBeInTheDocument();
     fireEvent.focus(screen.getByRole('combobox', { name: 'Ngành' }));
     fireEvent.click(await screen.findByRole('option', { name: 'IB — International Business' }));
@@ -78,7 +78,7 @@ describe('Class student roster', () => {
     expect(screen.getByText('Nguyễn An')).toBeInTheDocument();
     expect(screen.getByRole('combobox', { name: 'Ngành' })).toHaveValue('');
     expect(screen.getByLabelText('Trạng thái kích hoạt')).toHaveValue('all');
-    expect(screen.getByLabelText('Trạng thái gửi email')).toHaveValue('all');
+    expect(screen.getByLabelText(i18n.t('adminUx.linkStatus'))).toHaveValue('all');
     expect(majorApi.getMajors).not.toHaveBeenCalled();
     expect(classApi.getClassStudents).toHaveBeenCalledTimes(1);
   });

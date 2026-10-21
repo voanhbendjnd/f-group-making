@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
-import { Mail, CheckCircle2, AlertCircle, Send } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
 import { Modal } from '@/components/common/Modal';
-import { studentApi } from '../api/studentApi';
-import type { BatchActivationResult, StudentFilterParams } from '../types';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { ErrorState } from '@/components/common/ErrorState';
 import { useTerm } from '@/app/providers/TermContext';
+import { getApiError } from '@/services/api/types';
+import { studentApi } from '../api/studentApi';
+import { getActivationRecipients } from '../api/activationRecipients';
+import type { BatchActivationResult, Student, StudentFilterParams } from '../types';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export interface BatchActivationModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   userIds: number[];
+  selectedStudents?: Student[];
   totalSelected: number;
   alreadyActiveCount: number;
   isAllMatching: boolean;
@@ -19,214 +25,69 @@ export interface BatchActivationModalProps {
   totalFilteredCount: number;
 }
 
-export const BatchActivationModal: React.FC<BatchActivationModalProps> = ({
-  open,
-  onClose,
-  onSuccess,
-  userIds,
-  totalSelected,
-  alreadyActiveCount,
-  isAllMatching,
-  filters,
-  totalFilteredCount,
-}) => {
+export function BatchActivationModal({ open, onClose, onSuccess, userIds, selectedStudents,
+  totalSelected, alreadyActiveCount, isAllMatching, filters, totalFilteredCount }: BatchActivationModalProps) {
   const { t } = useTranslation();
-  const { lockTermSelection } = useTerm();
+  const { selectedTerm, lockTermSelection } = useTerm();
+  const busy = useRef(false);
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<BatchActivationResult | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  const eligibleCount = isAllMatching
-    ? totalFilteredCount
-    : Math.max(0, totalSelected - alreadyActiveCount);
-
-  const handleSend = async () => {
-    if (isSending || !filters.termId) return;
-    const unlock = lockTermSelection();
-    setIsSending(true);
-    setErrorMsg(null);
-
+  const [error, setError] = useState('');
+  const [unknown, setUnknown] = useState(false);
+  useUnsavedChanges(false, isSending);
+  const recipients = useQuery({
+    queryKey: ['activation-recipients', filters.termId, filters.search, filters.majorId,
+      filters.majorSearch, filters.activated, filters.hasActivationKey],
+    queryFn: ({ signal }) => getActivationRecipients(filters, signal),
+    enabled: open && isAllMatching && !result,
+    staleTime: 0, retry: false,
+  });
+  const records = isAllMatching ? recipients.data : selectedStudents;
+  const eligible = records?.filter(student => !student.activated);
+  const count = eligible?.length ?? Math.max(0, totalSelected - alreadyActiveCount);
+  const total = records?.length ?? (isAllMatching ? totalFilteredCount : totalSelected);
+  const unavailable = isAllMatching && (recipients.isPending || recipients.isError || recipients.isFetching);
+  const close = () => { if (!busy.current) onClose(); };
+  const send = async () => {
+    if (busy.current || unavailable || !count || unknown || !filters.termId) return;
+    busy.current = true;
+    const release = lockTermSelection();
+    setIsSending(true); setError('');
     try {
-      let res: BatchActivationResult;
-      if (isAllMatching) {
-        res = await studentApi.sendActivateAllMatching(filters.search, filters.majorSearch, filters.majorId, filters.termId);
-      } else {
-        res = await studentApi.sendBatchActivation(userIds, filters.termId);
-      }
-
-      setResult(res);
-      onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err.message || t('errors.generalFailure'));
-    } finally {
-      setIsSending(false);
-      unlock();
-    }
+      // activate/all does not accept every list filter: submit only the reviewed IDs.
+      const response = await studentApi.sendBatchActivation(eligible?.map(student => student.userId) ?? userIds, filters.termId);
+      setResult(response); onSuccess();
+    } catch (value) {
+      const apiError = getApiError(value);
+      const uncertain = Boolean(apiError.outcomeUnknown || apiError.status === 0 || apiError.status >= 500);
+      setUnknown(uncertain);
+      setError(uncertain ? t('adminUx.unknownActivation') : apiError.message || t('errors.generalFailure'));
+    } finally { release(); busy.current = false; setIsSending(false); }
   };
-
-  const handleClose = () => {
-    setResult(null);
-    setErrorMsg(null);
-    onClose();
-  };
-
-  if (!open) return null;
-
-  return (
-    <Modal
-      open={open}
-      onClose={isSending ? () => {} : handleClose}
-      title={result ? t('modals.batchSuccessTitle') : t('modals.batchTitle')}
-      footer={
-        result ? (
-          <Button variant="primary" onClick={handleClose}>
-            {t('common.close')}
-          </Button>
-        ) : (
-          <>
-            <Button variant="secondary" onClick={handleClose} disabled={isSending}>
-              {t('common.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleSend}
-              loading={isSending}
-              icon={<Send size={16} />}
-              disabled={eligibleCount === 0}
-            >
-              {t('modals.batchSubmit')} ({eligibleCount})
-            </Button>
-          </>
-        )
-      }
-    >
-      {result ? (
-        // Results View
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          <div
-            style={{
-              padding: '1.25rem',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '1rem',
-            }}
-          >
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: '#dcfce7',
-                color: 'var(--color-success)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <CheckCircle2 size={28} />
-            </div>
-            <div>
-              <h4 style={{ color: '#166534', fontWeight: 700, fontSize: '1.125rem' }}>
-                {t('modals.batchSuccessTitle')}
-              </h4>
-            </div>
-          </div>
-
-          {/* Metrics summary */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              gap: '0.75rem',
-              textAlign: 'center',
-            }}
-          >
-            <div style={{ padding: '0.875rem', backgroundColor: 'var(--color-surface-muted)', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--color-text-subtle)' }}>{t('common.status')}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                {result.totalRequested}
-              </div>
-            </div>
-
-            <div style={{ padding: '0.875rem', backgroundColor: '#f0fdf4', borderRadius: 'var(--radius-md)', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontSize: '0.75rem', color: '#15803d' }}>{t('modals.batchSuccessSent')}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-success)' }}>
-                {result.totalProcessed}
-              </div>
-            </div>
-
-            <div style={{ padding: '0.875rem', backgroundColor: '#fffbeb', borderRadius: 'var(--radius-md)', border: '1px solid #fde68a' }}>
-              <div style={{ fontSize: '0.75rem', color: '#b45309' }}>{t('modals.batchSuccessSkipped')}</div>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--color-warning)' }}>
-                {result.totalSkippedAlreadyActive}
-              </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        // Confirmation View
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          {errorMsg && (
-            <div className="alert alert-error">
-              <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <div className="alert-content">{errorMsg}</div>
-            </div>
-          )}
-
-          <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
-            <div
-              style={{
-                width: '48px',
-                height: '48px',
-                borderRadius: 'var(--radius-full)',
-                backgroundColor: 'var(--color-primary-light)',
-                color: 'var(--color-primary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <Mail size={24} />
-            </div>
-            <div>
-              <h4 style={{ fontSize: '1.0625rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-                {t('modals.batchTitle')}
-              </h4>
-              <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '4px', lineHeight: 1.5 }}>
-                {isAllMatching
-                  ? t('modals.batchDescAll', { total: totalFilteredCount })
-                  : t('modals.batchDescSelected', { total: totalSelected })}
-              </p>
-            </div>
-          </div>
-
-          {alreadyActiveCount > 0 && !isAllMatching && (
-            <div
-              style={{
-                backgroundColor: '#fffbeb',
-                border: '1px solid #fde68a',
-                borderRadius: 'var(--radius-md)',
-                padding: '0.875rem 1rem',
-                fontSize: '0.8125rem',
-                color: '#b45309',
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: '0.5rem',
-              }}
-            >
-              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
-              <span>
-                {t('modals.batchSkipNotice', { count: alreadyActiveCount })}
-              </span>
-            </div>
-          )}
-        </div>
-      )}
-    </Modal>
-  );
-};
+  return <Modal open={open} onClose={close} title={t(result ? 'modals.batchSuccessTitle' : 'modals.batchTitle')}
+    footer={result || unknown ? <Button onClick={close}>{t('common.close')}</Button> : <>
+      <Button variant="secondary" onClick={close} disabled={isSending}>{t('common.cancel')}</Button>
+      <Button onClick={() => void send()} loading={isSending} disabled={unavailable || count === 0}>
+        {t('adminUx.sendRecipients', { count })}
+      </Button>
+    </>}>
+    {result ? <div role="status">
+      <p className="alert alert-success">{t('adminUx.activationAccepted')}</p>
+      <dl className="admin-summary-grid">
+        <div><dt>{t('adminUx.requested')}</dt><dd>{result.totalRequested}</dd></div>
+        <div><dt>{t('modals.batchSuccessSent')}</dt><dd>{result.totalProcessed}</dd></div>
+        <div><dt>{t('modals.batchSuccessSkipped')}</dt><dd>{result.totalSkippedAlreadyActive}</dd></div>
+      </dl>
+    </div> : <>
+      <p className="form-hint">{t('adminUx.recipientScope', { term: selectedTerm?.name ?? '', total, eligible: count, skipped: total - count })}</p>
+      {isAllMatching && recipients.isPending && <LoadingSpinner message={t('adminUx.resolvingRecipients')} />}
+      {isAllMatching && recipients.isError && <ErrorState message={t('adminUx.recipientError')} onRetry={() => void recipients.refetch()} />}
+      {records && !unavailable && <div className="admin-recipient-preview" aria-label={t('adminUx.recipients')}>
+        <ul>{eligible?.map(student => <li key={student.userId}><strong>{student.rollNumber} · {student.fullName}</strong><span>{student.email}</span></li>)}</ul>
+        {!count && <p>{t('adminUx.noRecipients')}</p>}
+      </div>}
+      <p className="form-hint">{t('adminUx.activationAccepted')}</p>
+      {error && <p className="alert alert-error" role="alert">{error}</p>}
+    </>}
+  </Modal>;
+}

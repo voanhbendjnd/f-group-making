@@ -198,7 +198,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
         {/* Key / Invitation status filter */}
         <div>
           <label htmlFor={`${id}-key`} className="form-label" style={{ marginBottom: '0.375rem' }}>
-            {t('students.emailStatusLabel')}
+            {t('adminUx.linkStatus')}
           </label>
           <select
             id={`${id}-key`}
@@ -207,8 +207,8 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
             onChange={handleKeyStatusChange}
           >
             <option value="all">{t('students.allEmailStatus')}</option>
-            <option value="sent">{t('students.emailSent')}</option>
-            <option value="not_sent">{t('students.emailNotSent')}</option>
+            <option value="sent">{t('adminUx.validLink')}</option>
+            <option value="not_sent">{t('adminUx.noValidLink')}</option>
           </select>
         </div>
 
