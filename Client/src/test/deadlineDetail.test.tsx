@@ -64,8 +64,9 @@ describe('compact deadline list and detail view', () => {
   });
   it('keeps class names, instructions and start times out of the list', () => {
     mount();
-    expect(screen.getAllByRole('columnheader')).toHaveLength(4);
-    expect(screen.queryByRole('columnheader', { name: i18n.t('deadline.table.classes') })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader')).toHaveLength(5);
+    expect(screen.getByRole('columnheader', { name: i18n.t('deadline.table.classes') })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: i18n.t('adminUx.applyToClasses', { count: 2 }) })).toBeInTheDocument();
     expect(screen.queryByRole('columnheader', { name: i18n.t('deadline.table.startTime') })).not.toBeInTheDocument();
     expect(screen.queryByText('CLASS_A')).not.toBeInTheDocument();
     expect(screen.queryByText(deadline.description!)).not.toBeInTheDocument();

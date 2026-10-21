@@ -103,6 +103,17 @@ describe('group review', () => {
     expect(screen.getByLabelText('Rejection reason')).toHaveValue('Please revise');
   });
 
+  it('blocks repeat approval when the write outcome is unknown', async () => {
+    vi.mocked(groupApi.acceptGroup).mockRejectedValue({ status: 0, outcomeUnknown: true });
+    mount(); await screen.findByText('Review fixture');
+    fireEvent.click(screen.getByRole('button', { name: 'Approve', exact: true }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(dialog.querySelector('.ant-btn-primary')!);
+    await screen.findByText(i18n.t('adminUx.unknownWrite'));
+    expect(dialog.querySelector('.ant-btn-primary')).toBeDisabled();
+    expect(groupApi.acceptGroup).toHaveBeenCalledTimes(1);
+  });
+
   it('invalidates review, workspace and profile caches together', async () => {
     client = new QueryClient();
     for (const key of ['group-reviews', 'group-workspace', 'student-profile']) client.setQueryData([key, 1], {});

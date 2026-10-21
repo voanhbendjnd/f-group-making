@@ -7,6 +7,7 @@ import { Input } from '@/components/common/Input';
 import { getApiError } from '@/services/api/types';
 import { RULE_CODES, getRuleMinimum, type ClassRules, type RuleCode, type RuleFormValues, type RuleStatuses, type SaveClassRules } from '../types';
 import { validateRuleValues } from '../utils/ruleValidation';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 interface Props {
   readOnly?: boolean;
@@ -41,6 +42,7 @@ export function ClassRulesForm({ initial, onSave, onReload, readOnly = false }: 
   const { register, handleSubmit, setError, setFocus, clearErrors, reset, control, setValue,
     formState: { errors, isSubmitting, isDirty } } = useForm<RuleFormValues>({ defaultValues: formValues(initial) });
   const statuses = useWatch({ control, name: 'statuses' });
+  useUnsavedChanges(!readOnly && isDirty, isSubmitting || reloading);
 
   useEffect(() => {
     // Focus after the submitting fieldset is enabled again.

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { Search, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
 import type { MajorFilters } from '../types';
@@ -35,20 +35,22 @@ export function MajorFilterBar({ filters, onApply }: MajorFilterBarProps) {
   }
 
   return (
-    <div className="card"
-      style={{ padding: '1.25rem', marginBottom: '1.25rem', display: 'flex', flexWrap: 'wrap', gap: '1rem', alignItems: 'flex-end' }}>
-      <div style={{ flex: '2 1 240px' }}>
+    <div className="card admin-list-toolbar major-filter-bar">
+      <div className="major-search-field">
         <label className="form-label" htmlFor="major-list-search">{t('majors.searchLabel')}</label>
-        <input id="major-list-search" className="form-control" value={search}
-          placeholder={t('majors.searchPlaceholder')} onChange={(event) => setSearch(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault();
-              onApply({ ...filters, search: search.trim() || undefined });
-            }
-          }} />
+        <div className="major-search-input">
+          <Search size={18} aria-hidden="true" />
+          <input id="major-list-search" className="form-control" value={search}
+            placeholder={t('majors.searchPlaceholder')} onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                onApply({ ...filters, search: search.trim() || undefined });
+              }
+            }} />
+        </div>
       </div>
-      <div style={{ flex: '1 1 200px' }}>
+      <div className="major-status-field">
         <label className="form-label" htmlFor="major-name-status">{t('majors.nameStatus')}</label>
         <select id="major-name-status" className="form-control" value={nameStatus}
           onChange={(event) => {
@@ -62,7 +64,7 @@ export function MajorFilterBar({ filters, onApply }: MajorFilterBarProps) {
           <option value="named">{t('majors.assignedNames')}</option>
         </select>
       </div>
-      <Button type="button" variant="secondary" icon={<X size={16} />} onClick={reset}>{t('majors.clearFilters')}</Button>
+      <Button type="button" variant="secondary" icon={<RotateCcw size={16} aria-hidden="true" />} onClick={reset}>{t('majors.clearFilters')}</Button>
     </div>
   );
 }

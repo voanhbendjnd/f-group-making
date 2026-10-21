@@ -5,6 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
+import { TermSelect } from '@/features/terms/components/TermSelect';
+import { useNavigationGuard } from '@/app/providers/NavigationGuard';
 
 export interface TopNavbarProps {
   area?: 'admin' | 'lecturer' | 'student';
@@ -19,17 +21,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 }) => {
   const { user, isAdmin: hasAdminRole, logout } = useAuth();
   const isAdmin = area ? area === 'admin' : hasAdminRole;
-  const canOpenLecturerProfile = area === 'lecturer' && user?.authorities.some(role => role === 'ROLE_LECTURE' || role === 'ROLE_LECTURE_MASTER');
+  const canOpenLecturerProfile = area === 'lecturer' && user?.authorities?.some(role => role === 'ROLE_LECTURE' || role === 'ROLE_LECTURE_MASTER');
   const navigate = useNavigate();
   const { t } = useTranslation();
+  const requestLeave = useNavigationGuard();
 
   const handleLogout = () => {
-    logout();
-    navigate('/login');
+    requestLeave(() => { logout(); navigate('/login'); });
   };
 
   return (
-    <header className="top-navbar">
+    <header className={`top-navbar${isAdmin ? ' admin-top-navbar' : ''}`}>
       <div className="top-navbar-leading">
         {onToggleSidebar && (
           <button
@@ -49,12 +51,14 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               boxShadow: 'var(--shadow-xs)',
             }}
             title={isSidebarCollapsed ? t('nav.toggleSidebarOpen') : t('nav.toggleSidebarCollapse')}
-            aria-label={t('nav.toggleSidebarOpen')}
+            aria-label={t(isSidebarCollapsed ? 'nav.toggleSidebarOpen' : 'nav.toggleSidebarCollapse')}
+            aria-expanded={!isSidebarCollapsed}
           >
             <Menu size={20} />
           </button>
         )}
 
+        {isAdmin && <TermSelect compact allowCreate />}
         <div className="top-navbar-subtitle">
           {isAdmin ? (
             <span>{t('nav.adminSubtitle')}</span>

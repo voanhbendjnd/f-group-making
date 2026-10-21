@@ -4,6 +4,16 @@ import type { Student } from '@/features/students/types';
 import { parseClassPage, parseSchoolClass } from './classContract';
 
 export const classApi = {
+  async getAllClasses(termId: number, signal?: AbortSignal): Promise<SchoolClass[]> {
+    const result = new Map<number, SchoolClass>();
+    let page = 1;
+    while (true) {
+      const data = await classApi.getClasses({ termId, page, size: 100, sort: 'name,asc' }, signal);
+      data.result.filter(item => item.termId === termId).forEach(item => result.set(item.id, item));
+      if (page >= data.meta.pages) return [...result.values()];
+      page += 1;
+    }
+  },
   async assignLecturer(id: number, lecturerId: number, expectedLecturerId: number | null): Promise<SchoolClass> {
     const data = await apiClient.put<unknown, unknown>(`/api/school-classes/${id}/lecturer`, { lecturerId, expectedLecturerId });
     const assigned = parseSchoolClass(data);

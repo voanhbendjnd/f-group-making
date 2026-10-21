@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
 import { classApi } from '@/features/classes/api/classApi';
 import { ClassManagementControls } from '@/features/classes/components/ClassManagementControls';
+import { ClassGroupingSessions } from '@/features/classes/components/ClassGroupingSessions';
 import { useTranslation } from 'react-i18next';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
@@ -28,7 +29,11 @@ const ClassDetailContent: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const previousList = typeof location.state?.from === 'string' && /^\/admin\/classes(?:\?|$)/.test(location.state.from) ? location.state.from : '/admin/classes';
   const classId = Number(id);
+  const [params, setParams] = useSearchParams();
+  const tab = ['groups', 'deadlines', 'settings'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'students';
 
   const [searchStudent, setSearchStudent] = useState<string>('');
 
@@ -79,7 +84,7 @@ const ClassDetailContent: React.FC = () => {
     </div>;
   }
 
-  if (isClassLoading || isStudentsLoading) {
+  if (isClassLoading) {
     return (
       <div className="card" style={{ padding: '4rem' }}>
         <LoadingSpinner message={t('classes.loadingDetail')} />
@@ -98,9 +103,6 @@ const ClassDetailContent: React.FC = () => {
     );
   }
 
-  if (isStudentsError) return <ErrorState message={(studentsError as any)?.message || t('errors.generalFailure')}
-    onRetry={() => void refetchStudents()} />;
-
   return (
     <div className="space-y-6">
       <PageHeader
@@ -116,7 +118,7 @@ const ClassDetailContent: React.FC = () => {
             variant="secondary"
             size="sm"
             icon={<ArrowLeft size={16} />}
-            onClick={() => navigate('/admin/classes')}
+            onClick={() => navigate(previousList)}
           >
             {t('classes.back')}
           </Button>
@@ -216,10 +218,22 @@ const ClassDetailContent: React.FC = () => {
         </div>
       </div>
 
-      <ClassManagementControls key={classId} schoolClass={classDetail} />
+      <nav className="admin-tabs" aria-label={t('adminUx.classDetail')}>
+        {(['students', 'groups', 'deadlines', 'settings'] as const).map(value =>
+          <button type="button" key={value} aria-current={tab === value ? 'page' : undefined}
+            onClick={() => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next); }}>
+            {t(`adminUx.${value}`)}{value === 'students' ? ` (${students.length})` : ''}
+          </button>)}
+      </nav>
+      {tab === 'settings' && <div className="admin-class-settings">
+        <ClassManagementControls key={classId} schoolClass={classDetail} />
+      </div>}
+      {(tab === 'groups' || tab === 'deadlines') && <ClassGroupingSessions classId={classId} mode={tab} />}
+      {tab === 'students' && isStudentsLoading && <LoadingSpinner message={t('students.loadingList')} />}
+      {tab === 'students' && isStudentsError && <ErrorState message={(studentsError as any)?.message || t('errors.generalFailure')} onRetry={() => void refetchStudents()} />}
 
       {/* Student List in Class */}
-      <div className="card">
+      {tab === 'students' && !isStudentsLoading && !isStudentsError && <div className="card">
         {/* Table header with search */}
         <div
           style={{
@@ -386,7 +400,7 @@ const ClassDetailContent: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </div>}
     </div>
   );
 };

@@ -15,6 +15,7 @@ import { classApi } from '../features/classes/api/classApi';
 import { deadlineApi } from '../features/deadline/api/deadlineApi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
+import i18n from '@/locales/i18n';
 
 vi.mock('xlsx', async importOriginal => ({
   ...await importOriginal<typeof import('xlsx')>(),
@@ -30,6 +31,7 @@ vi.mock('../features/group/api/groupApi', () => ({
 vi.mock('../features/classes/api/classApi', () => ({
   classApi: {
     getClassStudents: vi.fn(),
+    getClassById: vi.fn(),
   },
 }));
 
@@ -239,6 +241,35 @@ describe('Group Allocation Excel Export Utility', () => {
     expect(result.meta.className).toBe('EXE101_G01');
     expect(result.meta.subjectCode).toBe('EXE101');
   });
+
+  it('uses the assigned class lecturer when export metadata is incomplete', async () => {
+    vi.mocked(classApi.getClassById).mockResolvedValue({ id: 104, name: 'EXE101_G01', termId: 2, termName: 'FA26',
+      lecturerId: 7, lecturerCode: 'AssignedTeacher', lecturerName: 'Teacher', lecturerEmail: null, studentCount: 0, createdDate: '' });
+    vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({ result: [], meta: { page: 1, pageSize: 50, pages: 0, total: 0 } });
+    vi.mocked(classApi.getClassStudents).mockResolvedValue([]);
+    const result = await fetchClassAllocationData(104, { termId: 2, lecturerCode: 'LoggedInAdmin' });
+    expect(result.meta.lecturerCode).toBe('AssignedTeacher');
+    expect(result.meta.termName).toBe('FA26');
+  });
+
+  it('does not turn a workspace read error into an export with empty groups', async () => {
+    vi.mocked(groupApi.getWorkspace).mockRejectedValueOnce(new Error('Workspace unavailable'));
+    await expect(fetchClassAllocationData(104, { deadlineId: 10, className: 'EXE101_G01', termName: 'FA26', lecturerCode: 'DuyVL' }))
+      .rejects.toThrow('Workspace unavailable');
+    expect(classApi.getClassStudents).not.toHaveBeenCalled();
+  });
+
+  it('checks later deadline pages and requires a specific session when several apply', async () => {
+    vi.mocked(deadlineApi.getDeadlines).mockImplementation(async params => ({
+      result: [{ id: params?.page === 2 ? 11 : 10, schoolClassIds: [104] }] as never[],
+      meta: { page: params?.page ?? 1, pageSize: 50, pages: 2, total: 2 },
+    }));
+    await expect(fetchClassAllocationData(104, { termId: 2, className: 'EXE101_G01', termName: 'FA26', lecturerCode: 'DuyVL' }))
+      .rejects.toThrow();
+    expect(deadlineApi.getDeadlines).toHaveBeenCalledWith({ termId: 2, page: 2, size: 50 });
+    expect(groupApi.getWorkspace).not.toHaveBeenCalled();
+    expect(classApi.getClassStudents).not.toHaveBeenCalled();
+  });
 });
 
 describe('GroupPreviewExportModal Component', () => {
@@ -347,12 +378,22 @@ describe('GroupPreviewExportModal Component', () => {
     expect(screen.getAllByText('Chưa có nhóm').length).toBeGreaterThanOrEqual(1);
 
     // Kiểm tra nút xuất file
-    const exportBtn = screen.getByRole('button', { name: /Xuất file Excel/i });
+    const exportBtn = screen.getByRole('button', { name: /Xuất toàn bộ lớp/i });
     expect(exportBtn).toBeInTheDocument();
     expect(exportBtn).not.toBeDisabled();
 
     // Bấm nút xuất file Excel
     fireEvent.click(exportBtn);
     expect(mockToastSuccess).toHaveBeenCalled();
+    const fullWorkbook = vi.mocked(XLSX.writeFile).mock.calls.at(-1)![0];
+    expect(XLSX.utils.sheet_to_json(fullWorkbook.Sheets[fullWorkbook.SheetNames[0]], { header: 1 })).toHaveLength(4);
+
+    fireEvent.change(screen.getByPlaceholderText(i18n.t('groupExport.searchPlaceholder')), { target: { value: 'SE180002' } });
+    fireEvent.change(screen.getByLabelText(i18n.t('adminUx.exportScope')), { target: { value: 'filtered' } });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.exportFiltered', { count: 1 }) }));
+    const filteredWorkbook = vi.mocked(XLSX.writeFile).mock.calls.at(-1)![0];
+    const exported = XLSX.utils.sheet_to_json<string[]>(filteredWorkbook.Sheets[filteredWorkbook.SheetNames[0]], { header: 1 });
+    expect(exported).toHaveLength(3);
+    expect(exported[2][1]).toBe('SE180002');
   });
 });

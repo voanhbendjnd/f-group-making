@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
-import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
@@ -41,6 +41,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   classId: number | null; requestedDeadline: number | null; params: URLSearchParams; setDeadline: (id: number) => void;
 }) {
   const { t } = useTranslation();
+  const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
   const { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, run, move } =
     useGroupBoard(classId, requestedDeadline, positiveId(params.get('termId')));
   const { boardRef, startAutoScroll, stopAutoScroll } = useBoardAutoScroll();
@@ -73,7 +74,8 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
 
   useEffect(() => { if (!requestedDeadline && deadlineId) setDeadline(deadlineId); }, [deadlineId, requestedDeadline, setDeadline]);
   const clearDrag = () => { dragged.current = null; setDraggedId(null); setOver(null); stopAutoScroll(); };
-  const back = reviewPath(params);
+  const back = area === 'admin' && params.get('source') === 'class' && classId
+    ? `/admin/classes/${classId}?tab=groups` : reviewPath(params, area);
   const breadcrumb = <nav className="board-breadcrumb" aria-label={t('groupBoard.breadcrumb')}>
     <Link to={back}>{t('groupReview.title')}</Link><span aria-hidden="true">/</span>
     {data && <><Link to={back}>{data.schoolClassName}</Link><span aria-hidden="true">/</span></>}
@@ -83,11 +85,11 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   if (session.isError || workspace.isError) return <div>{breadcrumb}<ErrorState
     message={session.error instanceof AmbiguousGroupSessionError ? t('groupBoard.multipleSessions') : translateErrorMessage(session.error ?? workspace.error)} onRetry={() => { if (deadlineId) void workspace.refetch(); else void session.refetch(); }} />
     <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1rem' }}>
-      {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to="/lecturer/deadlines">{t('nav.lecturerDeadlines')}</Link>}
+      {session.error instanceof AmbiguousGroupSessionError && <Link className="btn btn-primary" to={`/${area}/deadlines`}>{t(area === 'admin' ? 'nav.adminDeadlines' : 'nav.lecturerDeadlines')}</Link>}
       <Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link>
     </div></div>;
   if ((!requestedDeadline && session.isPending) || (deadlineId && workspace.isPending)) return <LoadingSpinner message={t('groupWorkspace.loading')} />;
-  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to="/lecturer/deadlines" className="btn btn-primary">{t('nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
+  if (!data || !deadlineId) return <div>{breadcrumb}<div className="card board-message"><p>{t('groupBoard.noSession')}</p><div style={{ display: 'flex', gap: '0.75rem' }}><Link to={`/${area}/deadlines`} className="btn btn-primary">{t(area === 'admin' ? 'nav.adminDeadlines' : 'nav.lecturerDeadlines')}</Link><Link to={back} className="btn btn-secondary"><ArrowLeft size={16} aria-hidden="true" /> {t('groupBoard.back')}</Link></div></div></div>;
   const orderedGroups = [...data.groups].sort(compareGroupSequence);
   const targets = orderedGroups.filter(editable);
   const groups = orderedGroups.filter(group => !groupSearch.trim()

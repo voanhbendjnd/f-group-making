@@ -57,6 +57,10 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
 }) => {
   const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
+  const [externalSearch, setExternalSearch] = useState(filters.search || '');
+  if (externalSearch !== (filters.search || '')) {
+    setExternalSearch(filters.search || ''); setSearchTerm(filters.search || '');
+  }
 
   // Debounce search update
   useEffect(() => {
@@ -85,6 +89,7 @@ export const ClassFilterBar: React.FC<ClassFilterBarProps> = ({
             aria-label={t('classes.searchLabel')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
+            onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); onChange({ search: searchTerm.trim(), page: 1 }); } }}
           />
           {searchTerm && (
             <button

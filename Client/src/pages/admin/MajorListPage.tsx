@@ -17,6 +17,7 @@ import { MajorPagination } from '@/features/majors/components/MajorPagination';
 import { MajorTable } from '@/features/majors/components/MajorTable';
 import { getMajorErrorKey } from '@/features/majors/utils/majorErrors';
 import type { Major, MajorFilters } from '@/features/majors/types';
+import '@/features/majors/components/majors.css';
 
 export function MajorListPage() {
   const { t } = useTranslation();
@@ -97,9 +98,10 @@ export function MajorListPage() {
   }
 
   return (
-    <div>
+    <div className="major-management-page">
       <PageHeader title={t('majors.title')} description={t('majors.description')}
         action={<Button icon={<Plus size={16} />} onClick={openCreate}>{t('majors.create')}</Button>} />
+      <p className="admin-workflow-caption">{t('adminUx.globalScope')}</p>
 
       <MajorFilterBar key={filterResetVersion} filters={filters} onApply={applyFilters} />
 
@@ -111,7 +113,7 @@ export function MajorListPage() {
           icon={<GraduationCap size={32} />} actionText={t(page > 1 ? 'majors.firstPage' : hasFilters ? 'majors.clearFilters' : 'majors.create')}
           onAction={page > 1 ? () => setPage(1) : hasFilters ? clearFilters : openCreate} />
       ) : (
-        <div style={{ opacity: isFetching ? 0.65 : 1, transition: 'opacity 0.2s ease-in-out' }}>
+        <div className="major-results" style={{ opacity: isFetching ? 0.65 : 1, transition: 'opacity 0.2s ease-in-out' }}>
           <MajorTable majors={majors} isLoading={isFetching} onView={(major) => setDetailId(major.id)}
             onEdit={openEdit} onDelete={openDelete} />
           {data && <MajorPagination meta={data.meta} currentPage={page} isLoading={isFetching} onPageChange={setPage}

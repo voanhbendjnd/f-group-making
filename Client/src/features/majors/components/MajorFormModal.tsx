@@ -7,6 +7,8 @@ import { Modal } from '@/components/common/Modal';
 import { majorApi } from '../api/majorApi';
 import { getMajorErrorKey } from '../utils/majorErrors';
 import type { Major, MajorFormValues } from '../types';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { Check, GraduationCap } from 'lucide-react';
 
 interface MajorFormModalProps {
   major: Major | null;
@@ -17,9 +19,10 @@ interface MajorFormModalProps {
 export function MajorFormModal({ major, onClose, onSuccess }: MajorFormModalProps) {
   const { t } = useTranslation();
   const [serverErrorKey, setServerErrorKey] = useState('');
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<MajorFormValues>({
+  const { register, handleSubmit, formState: { errors, isSubmitting, isDirty } } = useForm<MajorFormValues>({
     defaultValues: { code: major?.code || '', name: major?.name || '' },
   });
+  const discard = useUnsavedChanges(isDirty, isSubmitting);
 
   async function saveMajor(values: MajorFormValues) {
     setServerErrorKey('');
@@ -38,15 +41,16 @@ export function MajorFormModal({ major, onClose, onSuccess }: MajorFormModalProp
   }
 
   function closeModal() {
-    if (!isSubmitting) onClose();
+    if (!isSubmitting) discard(onClose);
   }
 
   return (
     <Modal open onClose={closeModal} title={t(major ? 'majors.editTitle' : 'majors.createTitle')}
+      headerIcon={<span className="major-modal-icon"><GraduationCap size={22} aria-hidden="true" /></span>}
       footer={
         <>
           <Button variant="secondary" onClick={closeModal} disabled={isSubmitting}>{t('common.cancel')}</Button>
-          <Button type="submit" form="major-form" loading={isSubmitting}>{t('common.save')}</Button>
+          <Button type="submit" form="major-form" loading={isSubmitting} icon={<Check size={18} aria-hidden="true" />}>{t('common.save')}</Button>
         </>
       }>
       <form id="major-form" noValidate onSubmit={handleSubmit(saveMajor)}>

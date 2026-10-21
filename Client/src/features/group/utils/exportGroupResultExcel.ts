@@ -4,6 +4,7 @@ import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { groupApi } from '../api/groupApi';
 import type { GroupStatus } from '../types/groupTypes';
 import { groupCode } from './groupSequence';
+import i18n from '@/locales/i18n';
 
 export interface StudentGroupExportRow {
   studentId: number;
@@ -167,60 +168,43 @@ export async function fetchClassAllocationData(
     className?: string;
   } = {}
 ): Promise<{ rows: StudentGroupExportRow[]; meta: GroupExportMeta }> {
+  const classInfo = !options.lecturerCode || !options.className || !options.termName
+    ? await classApi.getClassById(classId) : undefined;
+  if (classInfo && (classInfo.id !== classId || (options.termId && classInfo.termId !== options.termId))) {
+    throw new Error(i18n.t('terms.classOutsideTerm'));
+  }
+  const termName = classInfo?.termName || options.termName || '';
+  let className = classInfo?.name || options.className || '';
+  const lecturerCode = classInfo ? classInfo.lecturerCode ?? '' : options.lecturerCode || '';
   let resolvedDeadlineId = options.deadlineId;
 
   // Nếu chưa có deadlineId, tìm đợt deadline liên kết với lớp
   if (!resolvedDeadlineId) {
-    try {
-      const deadlines = await deadlineApi.getDeadlines({
-        termId: options.termId,
-        page: 1,
-        size: 50,
-      });
-      const match = deadlines.result.find((d) => d.schoolClassIds?.includes(classId));
-      if (match) {
-        resolvedDeadlineId = match.id;
-      }
-    } catch {
-      // Tiếp tục nếu không lấy được deadline
+    const deadlines = await deadlineApi.getDeadlines({
+      termId: options.termId ?? classInfo?.termId ?? undefined,
+      page: 1,
+      size: 50,
+    });
+    const all = [...deadlines.result];
+    for (let page = 2; page <= deadlines.meta.pages; page++) {
+      all.push(...(await deadlineApi.getDeadlines({ termId: options.termId ?? classInfo?.termId ?? undefined, page, size: 50 })).result);
     }
+    const matches = all.filter(item => item.schoolClassIds?.includes(classId));
+    if (matches.length > 1) throw new Error(i18n.t('groupBoard.multipleSessions'));
+    resolvedDeadlineId = matches[0]?.id;
   }
-
-  let className = options.className || '';
-  let lecturerCode = options.lecturerCode || '';
 
   // Thử lấy dữ liệu từ workspace nếu có deadlineId
   if (resolvedDeadlineId) {
-    try {
-      const ws = await groupApi.getWorkspace(resolvedDeadlineId, classId);
-      className = className || ws.schoolClassName || `Class_${classId}`;
-      const subjectCode = extractSubjectCode(className);
+    const ws = await groupApi.getWorkspace(resolvedDeadlineId, classId);
+    className = className || ws.schoolClassName || `Class_${classId}`;
+    const subjectCode = extractSubjectCode(className);
 
-      const rows: StudentGroupExportRow[] = [];
+    const rows: StudentGroupExportRow[] = [];
 
-      // 1. Sinh viên đã ở trong nhóm
-      (ws.groups || []).forEach((g) => {
-        (g.members || []).forEach((m) => {
-          rows.push({
-            studentId: m.studentId,
-            rollNumber: m.rollNumber || '',
-            fullName: m.fullName || '',
-            khoa: m.majorName || m.majorCode || '',
-            memberCode: m.memberCode || '',
-            email: m.email || '',
-            slotType: 'A24/EXE   ',
-            subjectCode,
-            groupName: className,
-            gv: lecturerCode,
-            groupMentor: g.name, // Lưu tên nhóm vào cột Group Mentor
-            groupStatus: g.status,
-            groupCode: groupCode(g),
-          });
-        });
-      });
-
-      // 2. Sinh viên chưa có nhóm
-      (ws.unassignedStudents || []).forEach((m) => {
+    // 1. Sinh viên đã ở trong nhóm
+    (ws.groups || []).forEach((g) => {
+      (g.members || []).forEach((m) => {
         rows.push({
           studentId: m.studentId,
           rollNumber: m.rollNumber || '',
@@ -232,49 +216,32 @@ export async function fetchClassAllocationData(
           subjectCode,
           groupName: className,
           gv: lecturerCode,
-          groupMentor: '', // Chưa có nhóm thì không điền gì
-          groupStatus: null,
+          groupMentor: g.name, // Lưu tên nhóm vào cột Group Mentor
+          groupStatus: g.status,
+          groupCode: groupCode(g),
         });
       });
+    });
 
-      // Sắp xếp theo mã sinh viên
-      rows.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
+    // 2. Sinh viên chưa có nhóm
+    (ws.unassignedStudents || []).forEach((m) => {
+      rows.push({
+        studentId: m.studentId,
+        rollNumber: m.rollNumber || '',
+        fullName: m.fullName || '',
+        khoa: m.majorName || m.majorCode || '',
+        memberCode: m.memberCode || '',
+        email: m.email || '',
+        slotType: 'A24/EXE   ',
+        subjectCode,
+        groupName: className,
+        gv: lecturerCode,
+        groupMentor: '', // Chưa có nhóm thì không điền gì
+        groupStatus: null,
+      });
+    });
 
-      return {
-        rows,
-        meta: {
-          className,
-          subjectCode,
-          termName: options.termName || '',
-          lecturerCode,
-        },
-      };
-    } catch {
-      // Fallback xuống getClassStudents nếu workspace gặp lỗi
-    }
-  }
-
-  // Fallback: Lấy danh sách sinh viên trực tiếp từ lớp học
-  try {
-    const students = await classApi.getClassStudents(classId);
-    className = className || `Class_${classId}`;
-    const subjectCode = extractSubjectCode(className);
-
-    const rows: StudentGroupExportRow[] = students.map((s) => ({
-      studentId: s.userId,
-      rollNumber: s.rollNumber || '',
-      fullName: s.fullName || '',
-      khoa: s.majorName || s.majorCode || '',
-      memberCode: s.memberCode || '',
-      email: s.email || '',
-      slotType: 'A24/EXE   ',
-      subjectCode,
-      groupName: className,
-      gv: lecturerCode,
-      groupMentor: '',
-      groupStatus: null,
-    }));
-
+    // Sắp xếp theo mã sinh viên
     rows.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
 
     return {
@@ -282,11 +249,41 @@ export async function fetchClassAllocationData(
       meta: {
         className,
         subjectCode,
-        termName: options.termName || '',
+        termName,
         lecturerCode,
       },
     };
-  } catch (error) {
-    throw error;
   }
+
+  // A roster without groups is valid only after confirming there is no grouping session.
+  const students = await classApi.getClassStudents(classId);
+  className = className || `Class_${classId}`;
+  const subjectCode = extractSubjectCode(className);
+
+  const rows: StudentGroupExportRow[] = students.map((s) => ({
+    studentId: s.userId,
+    rollNumber: s.rollNumber || '',
+    fullName: s.fullName || '',
+    khoa: s.majorName || s.majorCode || '',
+    memberCode: s.memberCode || '',
+    email: s.email || '',
+    slotType: 'A24/EXE   ',
+    subjectCode,
+    groupName: className,
+    gv: lecturerCode,
+    groupMentor: '',
+    groupStatus: null,
+  }));
+
+  rows.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
+
+  return {
+    rows,
+    meta: {
+      className,
+      subjectCode,
+      termName,
+      lecturerCode,
+    },
+  };
 }

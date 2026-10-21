@@ -1,349 +1,91 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import {
-  Users,
-  CheckCircle2,
-  Clock,
-  Mail,
-  Upload,
-  ArrowRight,
-} from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { studentApi } from '@/features/students/api/studentApi';
-import { PageHeader } from '@/components/common/PageHeader';
-import { Button } from '@/components/common/Button';
-import { StatusBadge } from '@/components/common/StatusBadge';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { ErrorState } from '@/components/common/ErrorState';
+import { Users, Layers, Clock, ArrowRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
+import { studentApi } from '@/features/students/api/studentApi';
+import { classApi } from '@/features/classes/api/classApi';
+import { deadlineApi } from '@/features/deadline/api/deadlineApi';
+import { deadlinePresentation } from '@/features/deadline/presentation';
+import { useDeadlineBoundary } from '@/features/deadline/hooks/useDeadlineBoundary';
+import { DeadlineTable } from '@/features/deadline/components/DeadlineTable';
+import { PageHeader } from '@/components/common/PageHeader';
+import { Button } from '@/components/common/Button';
+import { ErrorState } from '@/components/common/ErrorState';
+import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { StatusBadge } from '@/components/common/StatusBadge';
 
-export const AdminDashboardPage: React.FC = () => <TermScope><AdminDashboardContent /></TermScope>;
+export const AdminDashboardPage = () => <TermScope><Dashboard /></TermScope>;
 
-const AdminDashboardContent: React.FC = () => {
-  const { selectedTermId } = useTerm();
+function Metric({ title, value, pending, error, retry, to, icon }: {
+  title: string; value: number | undefined; pending: boolean; error: boolean; retry: () => void; to: string; icon: ReactNode;
+}) {
   const { t } = useTranslation();
-  const navigate = useNavigate();
+  return <article className="card admin-metric">
+    <span className="admin-metric-icon" aria-hidden="true">{icon}</span>
+    <h2>{title}</h2>
+    {error ? <><p role="status">{t('adminUx.dataUnavailable')}</p><Button size="sm" variant="secondary" onClick={retry}>{t('adminUx.retry')}</Button></>
+      : <Link to={to}><strong aria-live="polite">{pending ? '…' : value?.toLocaleString() ?? '—'}</strong><ArrowRight size={16} aria-hidden="true" /></Link>}
+  </article>;
+}
 
-  // Query 1: Total students
-  const totalQuery = useQuery({
-    queryKey: ['admin-dashboard', selectedTermId, 'students-count-total'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1, termId: selectedTermId! }),
-  });
-
-  // Query 2: Activated students
-  const activatedQuery = useQuery({
-    queryKey: ['admin-dashboard', selectedTermId, 'students-count-activated'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: true, termId: selectedTermId! }),
-  });
-
-  // Query 3: Waiting for activation
-  const waitingQuery = useQuery({
-    queryKey: ['admin-dashboard', selectedTermId, 'students-count-waiting'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 1, activated: false, termId: selectedTermId! }),
-  });
-
-  // Query 4: Email sent waiting for student to activate
-  const emailSentQuery = useQuery({
-    queryKey: ['admin-dashboard', selectedTermId, 'students-count-sent'],
-    queryFn: () =>
-      studentApi.getStudents({ page: 1, size: 1, activated: false, hasActivationKey: true, termId: selectedTermId! }),
-  });
-
-  // Query 5: Recent students preview
-  const recentQuery = useQuery({
-    queryKey: ['admin-dashboard', selectedTermId, 'students-recent'],
-    queryFn: () => studentApi.getStudents({ page: 1, size: 5, sort: 'userId,desc', termId: selectedTermId! }),
-  });
-
-  const totalStudents = totalQuery.data?.meta?.total ?? 0;
-  const activatedStudents = activatedQuery.data?.meta?.total ?? 0;
-  const waitingStudents = waitingQuery.data?.meta?.total ?? 0;
-  const emailSentStudents = emailSentQuery.data?.meta?.total ?? 0;
-  const notSentStudents = Math.max(0, waitingStudents - emailSentStudents);
-
-  const recentStudents = recentQuery.data?.result || [];
-  const queries = [totalQuery, activatedQuery, waitingQuery, emailSentQuery, recentQuery];
-  const isLoading = queries.some((query) => query.isPending);
-  const failedQuery = queries.find((query) => query.isError);
-
-  if (failedQuery) return <ErrorState message={failedQuery.error?.message || t('errors.generalFailure')}
-    onRetry={() => queries.forEach((query) => void query.refetch())} />;
-  if (isLoading) return <LoadingSpinner message={t('students.loadingList')} />;
-
-  return (
-    <div>
-      <PageHeader
-        title={t('dashboard.title')}
-        description={t('dashboard.description')}
-        action={
-          <div style={{ display: 'flex', gap: '0.75rem' }}>
-            <Button
-              variant="secondary"
-              icon={<Users size={16} />}
-              onClick={() => navigate('/admin/students')}
-            >
-              {t('dashboard.studentListBtn')}
-            </Button>
-            <Button
-              variant="primary"
-              icon={<Upload size={16} />}
-              onClick={() => navigate('/admin/students/import')}
-            >
-              {t('dashboard.importExcelBtn')}
-            </Button>
-          </div>
-        }
-      />
-
-      {/* KPI Stats Grid */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-          gap: '1.25rem',
-          marginBottom: '2rem',
-        }}
-      >
-        {/* Total students */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: '#eff6ff',
-              color: 'var(--color-primary)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Users size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', fontWeight: 500 }}>
-              {t('dashboard.statTotalStudents')}
-            </div>
-            <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--color-text-main)', marginTop: '2px' }}>
-              {isLoading ? '...' : totalStudents.toLocaleString()}
-            </div>
-          </div>
-        </div>
-
-        {/* Activated */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: '#f0fdf4',
-              color: 'var(--color-success)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <CheckCircle2 size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#166534', fontWeight: 500 }}>
-              {t('dashboard.statActivated')}
-            </div>
-            <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--color-success)', marginTop: '2px' }}>
-              {isLoading ? '...' : activatedStudents.toLocaleString()}
-            </div>
-          </div>
-        </div>
-
-        {/* Email sent waiting for activation */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: '#f0f9ff',
-              color: 'var(--color-info)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Mail size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#0369a1', fontWeight: 500 }}>
-              {t('dashboard.statEmailSent')}
-            </div>
-            <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--color-info)', marginTop: '2px' }}>
-              {isLoading ? '...' : emailSentStudents.toLocaleString()}
-            </div>
-          </div>
-        </div>
-
-        {/* Not sent invitation yet */}
-        <div className="card" style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
-          <div
-            style={{
-              width: '54px',
-              height: '54px',
-              borderRadius: 'var(--radius-lg)',
-              backgroundColor: '#fffbeb',
-              color: 'var(--color-warning)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            <Clock size={28} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.875rem', color: '#b45309', fontWeight: 500 }}>
-              {t('dashboard.statNotSent')}
-            </div>
-            <div style={{ fontSize: '1.875rem', fontWeight: 800, color: 'var(--color-warning)', marginTop: '2px' }}>
-              {isLoading ? '...' : notSentStudents.toLocaleString()}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Action Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '1.25rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.75rem' }}>
-              <div style={{ padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: '#eff6ff', color: 'var(--color-primary)' }}>
-                <Upload size={20} />
-              </div>
-              <h3 style={{ fontSize: '1.125rem' }}>{t('dashboard.cardImportTitle')}</h3>
-            </div>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-              {t('dashboard.cardImportDesc')}
-            </p>
-          </div>
-
-          <div style={{ marginTop: '1.25rem' }}>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<ArrowRight size={16} />}
-              onClick={() => navigate('/admin/students/import')}
-            >
-              {t('dashboard.cardImportAction')}
-            </Button>
-          </div>
-        </div>
-
-        <div className="card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginBottom: '0.75rem' }}>
-              <div style={{ padding: '8px', borderRadius: 'var(--radius-md)', backgroundColor: '#f0fdf4', color: 'var(--color-success)' }}>
-                <Mail size={20} />
-              </div>
-              <h3 style={{ fontSize: '1.125rem' }}>{t('dashboard.cardActivateTitle')}</h3>
-            </div>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', lineHeight: 1.5 }}>
-              {t('dashboard.cardActivateDesc')}
-            </p>
-          </div>
-
-          <div style={{ marginTop: '1.25rem' }}>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<ArrowRight size={16} />}
-              onClick={() => navigate('/admin/students')}
-            >
-              {t('dashboard.cardActivateAction')}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Students Card */}
-      <div className="card">
-        <div className="card-header">
-          <div>
-            <h3 className="card-title">{t('dashboard.recentTitle')}</h3>
-            <p className="card-subtitle">{t('dashboard.recentDesc')}</p>
-          </div>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<ArrowRight size={16} />}
-            onClick={() => navigate('/admin/students')}
-          >
-            {t('dashboard.viewAll')}
-          </Button>
-        </div>
-
-        {isLoading ? (
-          <LoadingSpinner message={t('common.loading')} />
-        ) : recentStudents.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-            {t('dashboard.emptyRecent')}
-          </div>
-        ) : (
-          <div className="table-container" style={{ border: 'none', boxShadow: 'none' }}>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>{t('students.colRollNumber')}</th>
-                  <th>{t('students.colFullName')}</th>
-                  <th>{t('students.colEmail')}</th>
-                  <th>{t('students.colMajor')}</th>
-                  <th>{t('students.colAccountStatus')}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentStudents.map((s) => (
-                  <tr key={s.userId}>
-                    <td style={{ fontWeight: 600, color: 'var(--color-primary)' }}>{s.rollNumber}</td>
-                    <td style={{ fontWeight: 500 }}>{s.fullName}</td>
-                    <td style={{ color: 'var(--color-text-muted)' }}>{s.email}</td>
-                    <td>
-                      <span
-                        style={{
-                          padding: '2px 8px',
-                          borderRadius: 'var(--radius-sm)',
-                          backgroundColor: 'var(--color-surface-muted)',
-                          fontSize: '0.8125rem',
-                          fontWeight: 600,
-                        }}
-                      >
-                        {s.majorCode || 'N/A'}
-                      </span>
-                    </td>
-                    <td>
-                      <StatusBadge
-                        activated={s.activated}
-                        hasActivationKey={s.hasActivationKey}
-                        isKeyExpired={s.isKeyExpired}
-                      />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+function Dashboard() {
+  const { t } = useTranslation();
+  const { selectedTermId, selectedTerm } = useTerm();
+  const total = useQuery({ queryKey: ['admin-dashboard', selectedTermId, 'students-count-total'],
+    queryFn: () => studentApi.getStudents({ termId: selectedTermId!, page: 1, size: 1 }) });
+  const waiting = useQuery({ queryKey: ['admin-dashboard', selectedTermId, 'students-count-waiting'],
+    queryFn: () => studentApi.getStudents({ termId: selectedTermId!, page: 1, size: 1, activated: false }) });
+  const recent = useQuery({ queryKey: ['admin-dashboard', selectedTermId, 'students-recent'],
+    queryFn: () => studentApi.getStudents({ termId: selectedTermId!, page: 1, size: 5, sort: 'userId,desc' }) });
+  const classes = useQuery({ queryKey: ['admin-dashboard', selectedTermId, 'classes'],
+    queryFn: ({ signal }) => classApi.getAllClasses(selectedTermId!, signal) });
+  const deadlines = useQuery({ queryKey: ['admin-dashboard', selectedTermId, 'deadlines'],
+    queryFn: ({ signal }) => deadlineApi.getAllDeadlines(selectedTermId!, signal) });
+  const now = useDeadlineBoundary(deadlines.data ?? []);
+  const activeDeadlines = deadlines.data?.filter(item => deadlinePresentation(item, now).windows.some(window => window.status === 'ACTIVE'));
+  const missingLecturers = classes.data?.filter(item => item.lecturerId === null).length;
+  return <div className="admin-dashboard">
+    <PageHeader title={t('dashboard.title')} description={`${t('adminUx.dashboardDescription')} · ${selectedTerm?.name ?? ''}`}
+      action={<Link to="/admin/students/import" className="btn btn-primary">{t('students.importBtn')}</Link>} />
+    <div className="admin-metrics">
+      <Metric title={t('dashboard.statTotalStudents')} value={total.data?.meta.total} pending={total.isPending} error={total.isError}
+        retry={() => void total.refetch()} to="/admin/students" icon={<Users />} />
+      <Metric title={t('adminUx.waitingStudents')} value={waiting.data?.meta.total} pending={waiting.isPending} error={waiting.isError}
+        retry={() => void waiting.refetch()} to="/admin/students?activated=false" icon={<Users />} />
+      <Metric title={t('adminUx.totalClasses')} value={classes.data?.length} pending={classes.isPending} error={classes.isError}
+        retry={() => void classes.refetch()} to="/admin/classes" icon={<Layers />} />
+      <Metric title={t('adminUx.openDeadlines')} value={activeDeadlines?.length} pending={deadlines.isPending} error={deadlines.isError}
+        retry={() => void deadlines.refetch()} to="/admin/deadlines" icon={<Clock />} />
     </div>
-  );
-};
+    <section className="card admin-attention">
+      <h2 className="card-title">{t('adminUx.operations')}</h2>
+      {waiting.data && waiting.data.meta.total > 0 && <Link to="/admin/students?activated=false"><span>{t('adminUx.waitingStudents')}</span><strong>{waiting.data.meta.total}</strong><ArrowRight size={16} /></Link>}
+      {missingLecturers !== undefined && missingLecturers > 0 && <Link to="/admin/classes?assignment=unassigned"><span>{t('adminUx.missingLecturer')}</span><strong>{missingLecturers}</strong><ArrowRight size={16} /></Link>}
+      {waiting.isSuccess && classes.isSuccess && waiting.data.meta.total === 0 && missingLecturers === 0 && <p>{t('adminUx.dashboardNoAttention')}</p>}
+      {(waiting.isPending || classes.isPending) && <p role="status">{t('common.loading')}</p>}
+    </section>
+    <section className="card">
+      <div className="card-header"><h2 className="card-title">{t('adminUx.deadlines')}</h2><Link className="btn btn-secondary btn-sm" to="/admin/deadlines">{t('adminUx.viewDeadlines')}</Link></div>
+      {deadlines.isPending ? <LoadingSpinner message={t('deadline.loadingList')} />
+        : deadlines.isError ? <ErrorState message={t('deadline.loadErrorDesc')} onRetry={() => void deadlines.refetch()} />
+        : <DeadlineTable deadlines={(deadlines.data ?? []).slice(0, 5)} canManage={false} />}
+    </section>
+    <section className="card">
+      <div className="card-header"><h2 className="card-title">{t('dashboard.recentTitle')}</h2><Link className="btn btn-secondary btn-sm" to="/admin/students">{t('dashboard.viewAll')}</Link></div>
+      {recent.isPending ? <LoadingSpinner message={t('students.loadingList')} />
+        : recent.isError ? <ErrorState message={t('students.errorDefault')} onRetry={() => void recent.refetch()} />
+        : !recent.data?.result.length ? <p>{t('dashboard.emptyRecent')}</p>
+        : <div className="table-container"><table className="table"><thead><tr>
+          <th>{t('students.colRollNumber')}</th><th>{t('students.colFullName')}</th><th>{t('students.colAccountStatus')}</th>
+        </tr></thead><tbody>{recent.data.result.map(student => <tr key={student.userId}>
+          <td>{student.rollNumber}</td><td>{student.fullName}</td><td><StatusBadge activated={student.activated} hasActivationKey={student.hasActivationKey} isKeyExpired={student.isKeyExpired} /></td>
+        </tr>)}</tbody></table></div>}
+    </section>
+    <details className="card admin-setup"><summary>{t('adminUx.setup')}</summary><p>{t('adminUx.setupHint')}</p>
+      <div className="admin-inline-actions"><Link to="/admin/lecturers?scope=all">{t('lecturer.role')}</Link><Link to="/admin/students/import">{t('students.importBtn')}</Link><Link to="/admin/classes">{t('classes.label')}</Link></div>
+    </details>
+  </div>;
+}

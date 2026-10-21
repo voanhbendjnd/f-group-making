@@ -12,6 +12,7 @@ import { useTerm } from '@/app/providers/TermContext';
 import { getApiError } from '@/services/api/types';
 import { studentApi } from '../api/studentApi';
 import { useStudentCreateOptions } from '../hooks/useStudentCreateOptions';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 interface FormValues {
   fullName: string;
@@ -25,7 +26,7 @@ interface FormValues {
 
 export function CreateStudentModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { t } = useTranslation();
-  const { terms, currentTerm, isLoading, isError, refreshTerms, lockTermSelection } = useTerm();
+  const { terms, currentTerm, selectedTermId: viewingTermId, isLoading, isError, refreshTerms, lockTermSelection } = useTerm();
   const [serverError, setServerError] = useState('');
   const [unknownResult, setUnknownResult] = useState(false);
   const [manualMemberCode, setManualMemberCode] = useState(false);
@@ -34,7 +35,7 @@ export function CreateStudentModal({ onClose, onSuccess }: { onClose: () => void
   const root = useRef<HTMLDivElement>(null);
   const previousFocus = useRef<HTMLElement | null>(document.activeElement as HTMLElement | null);
   const client = useQueryClient();
-  const { register, handleSubmit, control, setValue, setError, clearErrors, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, control, setValue, setError, clearErrors, formState: { errors, isSubmitting, isDirty } } = useForm<FormValues>({
     defaultValues: { fullName: '', rollNumber: '', memberCode: '', email: '', majorId: '', termId: '', schoolClassId: '' },
   });
   const selectedTermId = Number(useWatch({ control, name: 'termId' }));
@@ -53,15 +54,17 @@ export function CreateStudentModal({ onClose, onSuccess }: { onClose: () => void
   useEffect(() => {
     if (initializedTerm.current || isLoading) return;
     initializedTerm.current = true;
-    if (currentTerm && terms.some((term) => term.id === currentTerm.id)) setValue('termId', String(currentTerm.id));
-  }, [currentTerm, terms, isLoading, setValue]);
+    const initialTerm = viewingTermId ?? currentTerm?.id;
+    if (initialTerm && terms.some(term => term.id === initialTerm)) setValue('termId', String(initialTerm));
+  }, [currentTerm, viewingTermId, terms, isLoading, setValue]);
   useEffect(() => {
     const previous = previousFocus.current;
     return () => previous?.focus();
   }, []);
 
   const busy = isSubmitting || mutation.isPending;
-  const close = () => { if (!busy) onClose(); };
+  const discard = useUnsavedChanges(isDirty, busy);
+  const close = () => { if (!busy) discard(onClose); };
   async function save(values: FormValues) {
     if (sending.current || unknownResult) return;
     if (!selectedClass || !validLecturer) {

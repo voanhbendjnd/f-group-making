@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { advancedGroupPath } from '@/features/group/navigation';
 import { useTranslation } from 'react-i18next';
 import { CalendarClock, CircleStop, Edit3, Users } from 'lucide-react';
@@ -21,6 +21,7 @@ interface Props {
 
 export function DeadlineDetailModal({ deadline, onClose, onEdit, onCancel, canManage }: Props) {
   const { t, i18n } = useTranslation();
+  const { pathname } = useLocation();
   const { data, isFetching, isError, refetch } = useQuery({
     queryKey: ['deadline-detail', deadline.id],
     queryFn: ({ signal }) => deadlineApi.getDeadlineById(deadline.id, signal),
@@ -76,7 +77,7 @@ export function DeadlineDetailModal({ deadline, onClose, onEdit, onCancel, canMa
               <div><dt>{t('deadline.table.endTime')}</dt><dd>{formatDeadlineDate(window.endTime, locale)}</dd></div>
             </dl>
             {canManage && window.canEdit && <Link className="btn btn-secondary btn-sm"
-              to={advancedGroupPath(window.schoolClassId, new URLSearchParams(), data.id)} onClick={onClose}>
+              to={advancedGroupPath(window.schoolClassId, new URLSearchParams(), data.id, pathname.startsWith('/admin') ? 'admin' : 'lecturer')} onClick={onClose}>
               <Users size={14} />{t('deadline.table.manageGroups')}
             </Link>}
           </article>)}

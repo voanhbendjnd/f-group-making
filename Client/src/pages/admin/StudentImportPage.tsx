@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ArrowLeft, Send, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -17,13 +17,15 @@ import { TermSelect } from '@/features/terms/components/TermSelect';
 import type { ImportResult } from '@/features/import/types';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { getApiError } from '@/services/api/types';
 
 export const StudentImportPage: React.FC = () => <TermScope><StudentImportContent /></TermScope>;
 
 const StudentImportContent: React.FC = () => {
   const { t } = useTranslation();
   const queryClient = useQueryClient();
-  const { selectedTermId, lockTermSelection } = useTerm();
+  const { selectedTermId, selectedTerm, lockTermSelection } = useTerm();
   const [pendingMajorCodes, setPendingMajorCodes] = useState<string[]>([]);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isParsingClient, setIsParsingClient] = useState<boolean>(false);
@@ -32,6 +34,9 @@ const StudentImportContent: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [serverResult, setServerResult] = useState<ImportResult | null>(null);
   const [genericError, setGenericError] = useState<string | null>(null);
+  const [unknown, setUnknown] = useState(false);
+  const submitting = useRef(false);
+  const discard = useUnsavedChanges(Boolean(selectedFile && !serverResult?.success), isParsingClient || isSubmitting);
 
   const handleFileSelect = async (file: File) => {
     const unlock = lockTermSelection();
@@ -40,6 +45,7 @@ const StudentImportContent: React.FC = () => {
     setServerResult(null);
     setPendingMajorCodes([]);
     setGenericError(null);
+    setUnknown(false);
     setIsParsingClient(true);
 
     try {
@@ -54,16 +60,18 @@ const StudentImportContent: React.FC = () => {
     }
   };
 
-  const handleFileRemove = () => {
+  const handleFileRemove = () => discard(() => {
     setSelectedFile(null);
     setClientParseResult(null);
     setServerResult(null);
     setPendingMajorCodes([]);
     setGenericError(null);
-  };
+    setUnknown(false);
+  });
 
   const handleConfirmImport = async (confirmedMajorCodes: string[] = []) => {
-    if (!selectedFile || isSubmitting || selectedTermId === null) return;
+    if (!selectedFile || submitting.current || unknown || selectedTermId === null) return;
+    submitting.current = true;
     const unlock = lockTermSelection();
 
     setIsSubmitting(true);
@@ -83,9 +91,13 @@ const StudentImportContent: React.FC = () => {
         void queryClient.invalidateQueries({ queryKey: ['lecturers'] });
         void queryClient.invalidateQueries({ queryKey: ['admin-dashboard'] });
       }
-    } catch (err: any) {
-      setGenericError(err.message || t('import.errorOccurred'));
+    } catch (err: unknown) {
+      const error = getApiError(err);
+      const uncertain = Boolean(error.outcomeUnknown || error.status === 0 || error.status >= 500);
+      setUnknown(uncertain);
+      setGenericError(uncertain ? t('adminUx.unknownWrite') : error.message || t('import.errorOccurred'));
     } finally {
+      submitting.current = false;
       setIsSubmitting(false);
       unlock();
     }
@@ -143,6 +155,7 @@ const StudentImportContent: React.FC = () => {
           {genericError && <p role="alert" style={{ color: 'var(--color-error)' }}>{genericError}</p>}
         </div>} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <p className="admin-workflow-caption">{t('adminUx.importSteps')}</p>
         {/* Step 1: File Dropzone & Term Selection */}
         <div className="card">
           <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
@@ -163,6 +176,8 @@ const StudentImportContent: React.FC = () => {
             onFileRemove={handleFileRemove}
             disabled={isParsingClient || isSubmitting}
           />
+          <p className="form-hint">{t('adminUx.studentFileHelp')}</p>
+          <p className="form-hint">{t('adminUx.importScope', { term: selectedTerm?.name ?? '' })}</p>
         </div>
 
         {/* Parsing state */}
@@ -177,6 +192,7 @@ const StudentImportContent: React.FC = () => {
           <div className="alert alert-error">
             <AlertTriangle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
             <div className="alert-content">{genericError}</div>
+            {unknown && <Link to="/admin/students" className="btn btn-secondary btn-sm">{t('adminUx.checkList')}</Link>}
           </div>
         )}
 
@@ -205,7 +221,7 @@ const StudentImportContent: React.FC = () => {
                 onClick={() => handleConfirmImport()}
                 loading={isSubmitting}
                 icon={<Send size={16} />}
-                disabled={clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
+                disabled={unknown || clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
               >
                 {t('import.confirmImportBtn', { count: clientParseResult.validCount })}
               </Button>
@@ -216,6 +232,7 @@ const StudentImportContent: React.FC = () => {
               validCount={clientParseResult.validCount}
               invalidCount={clientParseResult.invalidCount}
             />
+            <p className="form-hint">{t('adminUx.localValidation')}</p>
 
             {/* Bottom confirmation action */}
             <div
@@ -252,7 +269,7 @@ const StudentImportContent: React.FC = () => {
                   onClick={() => handleConfirmImport()}
                   loading={isSubmitting}
                   icon={<Send size={16} />}
-                  disabled={clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
+                  disabled={unknown || clientParseResult.rows.length === 0 || clientParseResult.hasErrors}
                 >
                   {t('import.confirmImportBtn', { count: clientParseResult.validCount })}
                 </Button>

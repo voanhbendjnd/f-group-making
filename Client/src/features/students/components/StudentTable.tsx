@@ -51,6 +51,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
             <th>{t('students.colFullName')}</th>
             <th>{t('students.colEmail')}</th>
             <th>{t('students.colMajor')}</th>
+            <th>{t('classes.className')}</th>
             <th>{t('students.colMemberCode')}</th>
             <th>{t('students.colAccountStatus')}</th>
             <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>{t('students.colActions')}</th>
@@ -95,6 +96,7 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                   </span>
                 </td>
 
+                <td>{student.groupName || '—'}</td>
                 <td style={{ color: 'var(--color-text-subtle)', fontSize: '0.8125rem' }}>
                   {student.memberCode}
                 </td>
