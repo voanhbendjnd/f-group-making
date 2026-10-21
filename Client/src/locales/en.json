@@ -333,6 +333,26 @@
     "import": "Import from Excel"
   },
   "auth": {
+    "university": "FPT University",
+    "welcomeBack": "Welcome back!",
+    "welcomeSubtitle": "Sign in to continue to F-Group Making",
+    "campusIllustration": "FPT University campus, the FPT mascot and students learning and working together.",
+    "visualDescription": "A smart and collaborative way to form student groups, manage rules and create better learning experiences at FPT University.",
+    "loginFeatures": {
+      "matching": "Smart Group Matching",
+      "rules": "Flexible Rules & Constraints",
+      "workflow": "Complete Academic Workflow"
+    },
+    "notActivatedPrompt": "Account not activated yet?",
+    "activationModalTitle": "Request account activation",
+    "activationModalDesc": "Enter your school-provided email to request an activation link and set up your password.",
+    "activationEmailPlaceholder": "student@fpt.edu.vn",
+    "activationEmailSentSuccess": "Request received. Please check your email.",
+    "activationEmailSentError": "Unable to request an activation email.",
+    "activationRequestSuccessTitle": "Request received",
+    "activationRequestSuccessDesc": "If this email belongs to an inactive account, an activation link has been sent. Please check your inbox and spam folder.",
+    "sendActivationLink": "Send activation email",
+    "cooldownSeconds": "Wait ({{seconds}}s)",
     "loginTitle": "Sign in to System",
     "loginSubtitle": "Enter your credentials to continue",
     "emailPlaceholder": "e.g. an@fpt.edu.vn or admin@djnd.tech",

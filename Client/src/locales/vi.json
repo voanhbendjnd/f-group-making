@@ -333,6 +333,26 @@
     "import": "Nhập từ Excel"
   },
   "auth": {
+    "university": "Đại học FPT",
+    "welcomeBack": "Chào mừng trở lại!",
+    "welcomeSubtitle": "Đăng nhập để tiếp tục với F-Group Making",
+    "campusIllustration": "Khuôn viên Đại học FPT, Cóc FPT và sinh viên cùng học tập, làm việc nhóm.",
+    "visualDescription": "Giải pháp thông minh và cộng tác để tạo nhóm sinh viên, quản lý quy định và nâng cao trải nghiệm học tập tại Đại học FPT.",
+    "loginFeatures": {
+      "matching": "Ghép nhóm thông minh",
+      "rules": "Quy định và ràng buộc linh hoạt",
+      "workflow": "Quy trình học tập trọn vẹn"
+    },
+    "notActivatedPrompt": "Chưa kích hoạt tài khoản?",
+    "activationModalTitle": "Yêu cầu kích hoạt tài khoản",
+    "activationModalDesc": "Nhập địa chỉ email trường đã cấp cho bạn để nhận liên kết kích hoạt và thiết lập mật khẩu tài khoản.",
+    "activationEmailPlaceholder": "student@fpt.edu.vn",
+    "activationEmailSentSuccess": "Đã tiếp nhận yêu cầu. Vui lòng kiểm tra email của bạn!",
+    "activationEmailSentError": "Không thể gửi email kích hoạt.",
+    "activationRequestSuccessTitle": "Đã tiếp nhận yêu cầu",
+    "activationRequestSuccessDesc": "Nếu email tồn tại trong hệ thống và chưa được kích hoạt, liên kết kích hoạt đã được gửi tới hộp thư của bạn. Vui lòng kiểm tra hộp thư đến (hoặc thư rác).",
+    "sendActivationLink": "Gửi email kích hoạt",
+    "cooldownSeconds": "Đợi ({{seconds}} giây)",
     "loginTitle": "Đăng nhập hệ thống",
     "loginSubtitle": "Nhập thông tin tài khoản được cấp để tiếp tục",
     "emailPlaceholder": "ví dụ: an@fpt.edu.vn hoặc admin@djnd.tech",

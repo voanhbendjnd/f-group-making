@@ -1,10 +1,13 @@
 import React from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 
 export const AuthLayout: React.FC = () => {
   const { t } = useTranslation();
+  const { pathname } = useLocation();
+
+  if (pathname === '/login') return <Outlet />;
 
   return (
     <div
