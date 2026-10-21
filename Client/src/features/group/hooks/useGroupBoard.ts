@@ -10,6 +10,7 @@ import { translateErrorMessage } from '@/services/api/errorTranslator';
 import { groupApi } from '../api/groupApi';
 import type { GroupDTO, GroupMemberDTO, WorkspaceDTO } from '../types/groupTypes';
 import { useGroupWebSocket } from './useGroupWebSocket';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export class AmbiguousGroupSessionError extends Error {
   constructor() { super('Multiple grouping sessions'); }
@@ -19,6 +20,7 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
   const { t } = useTranslation(); const toast = useToast(); const client = useQueryClient(); const { user } = useAuth();
   const { lockTermSelection } = useTerm();
   const [pending, setPending] = useState(false); const busy = useRef(false);
+  useUnsavedChanges(false, pending);
   const session = useQuery({
     queryKey: ['lecturer-deadlines-for-workspace', user?.id, classId, termId],
     enabled: !!classId && !requestedDeadline,

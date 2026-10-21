@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Mail, CheckCircle2, AlertCircle, Send } from 'lucide-react';
 import { useTranslation, Trans } from 'react-i18next';
 import { Button } from '@/components/common/Button';
@@ -6,6 +6,8 @@ import { Modal } from '@/components/common/Modal';
 import { studentApi } from '../api/studentApi';
 import type { Student } from '../types';
 import { useTerm } from '@/app/providers/TermContext';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { getApiError } from '@/services/api/types';
 
 export interface SingleActivationModalProps {
   termId: number;
@@ -27,11 +29,15 @@ export const SingleActivationModal: React.FC<SingleActivationModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const busy = useRef(false);
+  const [unknown, setUnknown] = useState(false);
+  useUnsavedChanges(false, isSending);
 
   if (!open || !student) return null;
 
   const handleSend = async () => {
-    if (isSending) return;
+    if (busy.current || unknown) return;
+    busy.current = true;
     const unlock = lockTermSelection();
     setIsSending(true);
     setErrorMsg(null);
@@ -39,9 +45,13 @@ export const SingleActivationModal: React.FC<SingleActivationModalProps> = ({
       await studentApi.sendSingleActivation(student.userId, student.email, termId);
       setIsSuccess(true);
       onSuccess();
-    } catch (err: any) {
-      setErrorMsg(err.message || t('errors.generalFailure'));
+    } catch (err: unknown) {
+      const error = getApiError(err);
+      const uncertain = Boolean(error.outcomeUnknown || error.status === 0 || error.status >= 500);
+      setUnknown(uncertain);
+      setErrorMsg(uncertain ? t('adminUx.unknownActivation') : error.message || t('errors.generalFailure'));
     } finally {
+      busy.current = false;
       setIsSending(false);
       unlock();
     }
@@ -72,6 +82,7 @@ export const SingleActivationModal: React.FC<SingleActivationModalProps> = ({
               variant="primary"
               onClick={handleSend}
               loading={isSending}
+              disabled={unknown}
               icon={<Send size={16} />}
             >
               {t('modals.singleSubmit')}

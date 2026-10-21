@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, RotateCcw } from 'lucide-react';
 import type { LecturerFilterParams } from '../types';
+import { useTranslation } from 'react-i18next';
 
 export interface LecturerFilterBarProps {
   filters: LecturerFilterParams;
@@ -11,9 +12,9 @@ export interface LecturerFilterBarProps {
 type StatusValue = 'all' | 'active' | 'pending';
 
 const STATUS_OPTIONS: { value: StatusValue; label: string }[] = [
-  { value: 'all', label: 'Tất cả' },
-  { value: 'active', label: 'Đã kích hoạt' },
-  { value: 'pending', label: 'Chờ kích hoạt' },
+  { value: 'all', label: 'students.allActivationStatus' },
+  { value: 'active', label: 'students.activated' },
+  { value: 'pending', label: 'students.unactivated' },
 ];
 
 /**
@@ -81,7 +82,12 @@ export const LecturerFilterBar: React.FC<LecturerFilterBarProps> = ({
                                                                       onChange,
                                                                       onReset,
                                                                     }) => {
+  const { t } = useTranslation();
   const [searchTerm, setSearchTerm] = useState(filters.search || '');
+  const [externalSearch, setExternalSearch] = useState(filters.search || '');
+  if (externalSearch !== (filters.search || '')) {
+    setExternalSearch(filters.search || ''); setSearchTerm(filters.search || '');
+  }
 
   // Debounce search update
   useEffect(() => {
@@ -124,16 +130,17 @@ export const LecturerFilterBar: React.FC<LecturerFilterBarProps> = ({
             <input
                 type="text"
                 className="lf-input"
-                placeholder="Tìm theo mã giảng viên / mentor hoặc email..."
-                aria-label="Tìm giảng viên"
+                placeholder={t('classAssignment.searchPlaceholder')}
+                aria-label={t('classAssignment.search')}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); onChange({ search: searchTerm.trim(), page: 1 }); } }}
             />
             {searchTerm && (
                 <button
                     type="button"
                     className="lf-clear"
-                    aria-label="Xóa nội dung tìm kiếm"
+                    aria-label={t('students.clearSearchAria')}
                     onClick={() => setSearchTerm('')}
                 >
                   <X size={14} />
@@ -142,7 +149,7 @@ export const LecturerFilterBar: React.FC<LecturerFilterBarProps> = ({
           </div>
 
           {/* Status Filter */}
-          <div className="lf-segment" role="group" aria-label="Lọc theo trạng thái">
+          <div className="lf-segment" role="group" aria-label={t('students.activationStatusLabel')}>
             {STATUS_OPTIONS.map((opt) => (
                 <button
                     key={opt.value}
@@ -151,7 +158,7 @@ export const LecturerFilterBar: React.FC<LecturerFilterBarProps> = ({
                     aria-pressed={currentStatus === opt.value}
                     onClick={() => handleStatusChange(opt.value)}
                 >
-                  {opt.label}
+                  {t(opt.label)}
                 </button>
             ))}
           </div>
@@ -167,7 +174,7 @@ export const LecturerFilterBar: React.FC<LecturerFilterBarProps> = ({
                 }}
             >
               <RotateCcw size={14} />
-              Xóa bộ lọc
+              {t('students.clearFilters')}
             </button>
         )}
       </div>

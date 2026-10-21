@@ -9,6 +9,7 @@ import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { allocationApi } from '../api/allocationApi';
 import { allocationErrorKey, isAllocationComplete, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
 import type { ApplyResult, PlanDetail, Preview } from '../types';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export function useAllocationFlow(classId: number, deadlineId: number) {
   const { user } = useAuth(); const { selectedTermId, lockTermSelection } = useTerm();
@@ -21,6 +22,7 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const [preview, setPreview] = useState<Preview | null>(null); const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<unknown>(null); const [applyError, setApplyError] = useState<unknown>(null);
   const [applying, setApplying] = useState(false); const [applied, setApplied] = useState<ApplyResult | null>(null);
+  useUnsavedChanges(false, applying);
   const generation = useRef(0); const controller = useRef<AbortController | null>(null);
   const calculating = useRef(false); const [confirmedTarget, setConfirmedTarget] = useState<number | null>(null);
   const [savedPlan, setSavedPlan] = useState<PlanDetail['summary'] | null>(null);

@@ -48,6 +48,7 @@ export function GroupPreviewExportModal({
   const toast = useToast();
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'assigned' | 'unassigned'>('all');
+  const [exportScope, setExportScope] = useState<'all' | 'filtered'>('all');
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['class-allocation-preview', classId, deadlineId, termId],
@@ -99,13 +100,14 @@ export function GroupPreviewExportModal({
   }, [allRows, filterType, search]);
 
   const handleExport = () => {
-    if (!data || allRows.length === 0) {
+    const rows = exportScope === 'filtered' ? filteredRows : allRows;
+    if (!data || rows.length === 0) {
       toast.error(t('groupExport.noDataToExport', 'Không có dữ liệu sinh viên để xuất file.'));
       return;
     }
 
     try {
-      exportGroupResultExcel(allRows, data.meta);
+      exportGroupResultExcel(rows, data.meta);
       toast.success(t('groupReview.exportSuccess', 'Đã xuất file Excel kết quả phân nhóm thành công!'));
     } catch {
       toast.error(t('groupReview.exportError', 'Có lỗi xảy ra khi tạo file Excel.'));
@@ -302,6 +304,12 @@ export function GroupPreviewExportModal({
           </div>
 
           <div className="export-modal-footer">
+            <label className="form-label">{t('adminUx.exportScope')}
+              <select className="form-control" value={exportScope} onChange={event => setExportScope(event.target.value as 'all' | 'filtered')}>
+                <option value="all">{t('adminUx.exportAll', { count: allRows.length })}</option>
+                <option value="filtered">{t('adminUx.exportFiltered', { count: filteredRows.length })}</option>
+              </select>
+            </label>
             <p className="export-footer-hint">
               <Info size={16} aria-hidden="true" />
               <span>
@@ -319,9 +327,9 @@ export function GroupPreviewExportModal({
                 variant="primary"
                 icon={<Download size={16} />}
                 onClick={handleExport}
-                disabled={allRows.length === 0}
+                disabled={(exportScope === 'filtered' ? filteredRows : allRows).length === 0 || isLoading || isError}
               >
-                {t('groupExport.exportBtn', 'Xuất file Excel (.xlsx)')}
+                {t(exportScope === 'filtered' ? 'adminUx.exportFiltered' : 'adminUx.exportAll', { count: (exportScope === 'filtered' ? filteredRows : allRows).length })}
               </Button>
             </div>
           </div>

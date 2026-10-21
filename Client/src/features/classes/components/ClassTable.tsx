@@ -8,6 +8,7 @@ export interface ClassTableProps {
   onSelectClass: (schoolClass: SchoolClass) => void;
   page: number;
   pageSize: number;
+  onAssignLecturer?: (schoolClass: SchoolClass) => void;
 }
 
 export const ClassTable: React.FC<ClassTableProps> = ({
@@ -15,6 +16,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
   onSelectClass,
   page,
   pageSize,
+  onAssignLecturer,
 }) => {
   const { t } = useTranslation();
   return (
@@ -149,6 +151,8 @@ export const ClassTable: React.FC<ClassTableProps> = ({
 
                   {/* Nút hành động */}
                   <td style={{ textAlign: 'right' }}>
+                    {cls.lecturerId === null && onAssignLecturer && <button type="button" className="btn btn-primary btn-sm"
+                      onClick={event => { event.stopPropagation(); onAssignLecturer(cls); }}>{t('classAssignment.choose')}</button>}
                     <button
                       type="button"
                       aria-label={t('classes.openClass', { name: cls.name })}
@@ -164,7 +168,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                         fontWeight: 600,
                       }}
                     >
-                      <span>{t('classes.viewStudents')}</span>
+                      <span>{t('adminUx.classDetail')}</span>
                       <ArrowRight size={14} />
                     </button>
                   </td>

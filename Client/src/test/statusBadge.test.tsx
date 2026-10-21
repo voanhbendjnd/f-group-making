@@ -9,18 +9,22 @@ describe('StatusBadge', () => {
     expect(screen.getByText('Đã kích hoạt')).toBeInTheDocument();
   });
 
-  it('renders "Đã gửi email" when hasActivationKey is true and not expired', () => {
+  it('shows an available link without claiming email delivery', () => {
     render(<StatusBadge activated={false} hasActivationKey={true} isKeyExpired={false} />);
-    expect(screen.getByText('Đã gửi email')).toBeInTheDocument();
+    expect(screen.getByText('Có liên kết kích hoạt')).toBeInTheDocument();
   });
 
-  it('renders "Email hết hạn" when key is expired', () => {
+  it('shows an expired activation link', () => {
     render(<StatusBadge activated={false} hasActivationKey={true} isKeyExpired={true} />);
-    expect(screen.getByText('Email hết hạn')).toBeInTheDocument();
+    expect(screen.getByText('Liên kết đã hết hạn')).toBeInTheDocument();
   });
 
-  it('renders "Chưa gửi email" when account is unactivated and no key', () => {
+  it('shows no valid link instead of inferring mail history', () => {
     render(<StatusBadge activated={false} hasActivationKey={false} />);
-    expect(screen.getByText('Chưa gửi email')).toBeInTheDocument();
+    expect(screen.getByText('Chưa có liên kết còn hạn')).toBeInTheDocument();
+  });
+  it('preserves expiry when the server also reports no valid key', () => {
+    render(<StatusBadge activated={false} hasActivationKey={false} isKeyExpired />);
+    expect(screen.getByText('Liên kết đã hết hạn')).toBeInTheDocument();
   });
 });

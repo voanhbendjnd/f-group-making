@@ -9,6 +9,7 @@ import { Button } from '@/components/common/Button';
 import { getApiError } from '@/services/api/types';
 import { lecturerApi } from '../api/lecturerApi';
 import type { CreateLecturerValues } from '../types';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export function CreateLecturerModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const { t } = useTranslation();
@@ -18,13 +19,14 @@ export function CreateLecturerModal({ onClose, onSuccess }: { onClose: () => voi
   const sending = useRef(false);
   const [serverError, setServerError] = useState('');
   const [unknownResult, setUnknownResult] = useState(false);
-  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<CreateLecturerValues>({
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting, isDirty } } = useForm<CreateLecturerValues>({
     defaultValues: { code: '', email: '' },
   });
   const mutation = useMutation({ mutationFn: lecturerApi.createLecturer, retry: false });
   const busy = isSubmitting || mutation.isPending;
   useEffect(() => { const previous = previousFocus.current; return () => previous?.focus(); }, []);
-  const close = () => { if (!busy) onClose(); };
+  const discard = useUnsavedChanges(isDirty, busy);
+  const close = () => { if (!busy) discard(onClose); };
 
   async function save(values: CreateLecturerValues) {
     if (sending.current || unknownResult) return;

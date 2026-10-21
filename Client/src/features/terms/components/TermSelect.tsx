@@ -11,6 +11,7 @@ import { useToast } from '@/app/providers/ToastContext';
 interface TermSelectProps {
   compact?: boolean;
   disabled?: boolean;
+  allowCreate?: boolean;
 }
 
 const SEASONS = [
@@ -122,6 +123,7 @@ const STYLES = `
 export const TermSelect: React.FC<TermSelectProps> = ({
                                                         compact = false,
                                                         disabled = false,
+                                                        allowCreate = !compact,
                                                       }) => {
   const { success, error: toastError } = useToast();
   const { t } = useTranslation();
@@ -241,12 +243,12 @@ export const TermSelect: React.FC<TermSelectProps> = ({
     const cleanName = newTermName.trim().toUpperCase();
 
     if (!cleanName) {
-      setFormError('Vui lòng nhập tên học kỳ.');
+      setFormError(t('adminUx.termRequired'));
       return;
     }
 
     if (!TERM_REGEX.test(cleanName)) {
-      setFormError('Định dạng học kỳ không hợp lệ. Ví dụ: SP27, SU27, FALL27');
+      setFormError(t('adminUx.termInvalid'));
       return;
     }
 
@@ -255,7 +257,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
       setIsCreating(true);
       setFormError(null);
       const created = await termApi.createTerm({ name: cleanName });
-      success(`Đã tạo thành công học kỳ ${created.name}`);
+      success(t('adminUx.termCreated', { name: created.name }));
       setIsModalOpen(false);
 
       // Refresh terms list and select newly created term
@@ -266,7 +268,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
         onSelectTerm(created.id);
       }
     } catch (err: any) {
-      const msg = err?.message || 'Tạo học kỳ thất bại. Vui lòng kiểm tra lại.';
+      const msg = err?.message || t('errors.generalFailure');
       setFormError(msg);
     } finally {
       setIsCreating(false);
@@ -331,17 +333,17 @@ export const TermSelect: React.FC<TermSelectProps> = ({
         {isError && <div role="alert" className="ts-error">{t('terms.loadError')}{' '}
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => void refreshTerms()}>{t('common.retry')}</button>
         </div>}
-        {!compact && <span className="ts-sep" />}
+        {allowCreate && <span className="ts-sep" />}
 
-        {!compact && <button
+        {allowCreate && <button
             type="button"
             className="ts-add"
             onClick={handleOpenModal}
             disabled={disabled || isLocked || isLoading || isError}
-            title="Tạo học kỳ tương lai"
+            title={t('adminUx.createTerm')}
         >
           <Plus size={16} />
-          <span>Tạo kỳ mới</span>
+          <span>{t('adminUx.createTerm')}</span>
         </button>}
 
         <Modal
@@ -349,12 +351,12 @@ export const TermSelect: React.FC<TermSelectProps> = ({
             onClose={() => {
               if (!isCreating) setIsModalOpen(false);
             }}
-            title="Tạo học kỳ mới"
+            title={t('adminUx.createTerm')}
             maxWidth="480px"
         >
           <form onSubmit={handleCreateTerm} className="ts-form">
             <div>
-              <p className="ts-field-title">Chọn kỳ</p>
+              <p className="ts-field-title">{t('adminUx.termSeason')}</p>
               <div className="ts-seasons">
                 {SEASONS.map((s) => {
                   const active = activeSeason === s.code;
@@ -368,7 +370,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
                       >
                         {active && <Check className="ts-season-check" />}
                         <span className="ts-season-code">{s.code}</span>
-                        <span className="ts-season-range">{s.range}</span>
+                        <span className="ts-season-range">{t(`adminUx.season${s.code}`)}</span>
                       </button>
                   );
                 })}
@@ -377,7 +379,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
 
             <div>
               <label htmlFor="term-name" className="ts-field-title" style={{ display: 'block' }}>
-                Tên học kỳ <span style={{ color: '#ef4444' }}>*</span>
+                {t('adminUx.termName')} <span style={{ color: '#ef4444' }}>*</span>
               </label>
               <div className="ts-input-wrap">
                 <input
@@ -389,7 +391,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
                       setNewTermName(e.target.value.toUpperCase());
                       if (formError) setFormError(null);
                     }}
-                    placeholder="VD: SP27 hoặc FALL27"
+                    placeholder="SP27 / SU27 / FALL27"
                     maxLength={10}
                     aria-invalid={!!formError}
                     autoFocus
@@ -408,8 +410,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
                   <p className="ts-hint">
                     <Info />
                     <span>
-                  Mỗi năm có 3 kỳ: SP (tháng 1–4), SU (tháng 5–8), FALL (tháng 9–12), theo sau là 2
-                  số cuối của năm.
+                  {t('adminUx.termHelp')}
                 </span>
                   </p>
               )}
@@ -423,7 +424,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
                   onClick={() => setIsModalOpen(false)}
                   disabled={isCreating}
               >
-                Hủy
+                {t('common.cancel')}
               </Button>
               <Button
                   type="submit"
@@ -432,7 +433,7 @@ export const TermSelect: React.FC<TermSelectProps> = ({
                   loading={isCreating}
                   disabled={!newTermName.trim()}
               >
-                Tạo học kỳ
+                {t('adminUx.createTerm')}
               </Button>
             </div>
           </form>

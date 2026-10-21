@@ -12,6 +12,7 @@ export interface ConfirmDialogProps {
   cancelText?: string;
   isDanger?: boolean;
   isLoading?: boolean;
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -24,6 +25,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelText,
   isDanger = false,
   isLoading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }) => {
@@ -45,6 +47,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             variant={isDanger ? 'danger' : 'primary'}
             onClick={onConfirm}
             loading={isLoading}
+            disabled={confirmDisabled}
           >
             {displayConfirm}
           </Button>

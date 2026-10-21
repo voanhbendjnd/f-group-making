@@ -21,6 +21,7 @@ vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.
 vi.mock('@/features/terms/api/termApi', () => ({ termApi: { getCurrentTerm: vi.fn(), getTerms: vi.fn() } }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: {
   getClasses: vi.fn(), getClassById: vi.fn(), getClassStudents: vi.fn(), assignLecturer: vi.fn(),
+  getAllClasses: vi.fn(),
 } }));
 vi.mock('@/features/lecturers/api/lecturerApi', () => ({ lecturerApi: { getLecturers: vi.fn() } }));
 vi.mock('@/features/rules/api/ruleApi', () => ({ ruleApi: { getRules: vi.fn(), saveRules: vi.fn() } }));
@@ -30,9 +31,9 @@ const unassigned: SchoolClass = { id: 7, name: 'Assignment class', termId: 2, te
   createdDate: '2026-10-13T00:00:00Z' };
 const assigned = { ...unassigned, lecturerId: 100, lecturerCode: 'GV100', lecturerName: 'Test Lecturer', lecturerEmail: 'lecturer@example.test' };
 let client: QueryClient;
-function renderPage(list = false) {
+function renderPage(list = false, tab = 'settings') {
   client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
-  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[list ? '/classes' : '/classes/7']}>
+  return render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[list ? '/classes' : `/classes/7?tab=${tab}`]}>
     <TermProvider><LanguageSwitcher /><TermSelect compact /><Routes>
       <Route path="/classes" element={<ClassListPage />} />
       <Route path="/classes/:id" element={<ClassDetailPage />} />
@@ -43,9 +44,10 @@ async function open() {
   fireEvent.click(await screen.findByRole('button', { name: /^(Chọn|Đổi) giảng viên$/ }));
 }
 async function choose(id = '100') {
-  const select = await screen.findByRole('combobox', { name: 'Chọn giảng viên phụ trách' });
-  await screen.findByRole('option', { name: /GV100/ });
-  fireEvent.change(select, { target: { value: id } });
+  const select = await screen.findByRole('combobox', { name: i18n.t('classAssignment.select') });
+  await waitFor(() => expect(select.closest('.ant-select')).not.toHaveClass('ant-select-loading'));
+  fireEvent.mouseDown(select);
+  fireEvent.click(await screen.findByText(id === '100' ? /GV100 · Test Lecturer/ : /GV200 · Replacement Lecturer/, { selector: '.ant-select-item-option-content' }));
 }
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -54,15 +56,18 @@ function deferred<T>() {
 }
 beforeEach(async () => {
   vi.resetAllMocks(); localStorage.clear(); await i18n.changeLanguage('vi');
+  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  vi.stubGlobal('matchMedia', () => ({ matches: false, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {} }));
   vi.mocked(termApi.getCurrentTerm).mockResolvedValue(term);
   vi.mocked(termApi.getTerms).mockResolvedValue([term]);
   vi.mocked(classApi.getClassById).mockResolvedValue(unassigned);
   vi.mocked(classApi.getClasses).mockResolvedValue({ result: [unassigned],
     meta: { page: 1, pageSize: 10, pages: 1, total: 1 } });
+  vi.mocked(classApi.getAllClasses).mockResolvedValue([unassigned]);
   vi.mocked(classApi.getClassStudents).mockResolvedValue([]);
   vi.mocked(classApi.assignLecturer).mockResolvedValue(assigned);
   vi.mocked(lecturerApi.getLecturers).mockResolvedValue({
-    meta: { page: 1, pageSize: 10, pages: 2, total: 11 },
+    meta: { page: 1, pageSize: 100, pages: 1, total: 2 },
     result: [{ userId: 100, code: 'GV100', name: 'Test Lecturer', email: 'lecturer@example.test', activated: false,
       hasActivationKey: false, activationKeyExpiresAt: null, isKeyExpired: false, createdDate: null, lastModifiedDate: null },
       { userId: 200, code: 'GV200', name: 'Replacement Lecturer', email: 'replacement@example.test', activated: false,
@@ -88,7 +93,7 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     await open();
     fireEvent.click(screen.getByRole('button', { name: 'Quy định nhóm' }));
     expect(screen.getAllByRole('spinbutton')[0]).toHaveValue(5);
-    expect(screen.getByRole('combobox', { name: 'Chọn giảng viên phụ trách' })).toHaveValue('200');
+    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') }).closest('.ant-select')).toHaveTextContent('GV200');
     expect(ruleApi.getRules).toHaveBeenCalledTimes(1);
     expect(lecturerApi.getLecturers).toHaveBeenCalledTimes(1);
     expect(classApi.assignLecturer).not.toHaveBeenCalled();
@@ -98,7 +103,7 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     expect(lecturerApi.getLecturers).not.toHaveBeenCalled();
     await open(); await choose();
     expect(ruleApi.getRules).not.toHaveBeenCalled();
-    expect(lecturerApi.getLecturers).toHaveBeenCalledWith({ search: '', page: 1, size: 10 });
+    expect(lecturerApi.getLecturers).toHaveBeenCalledWith({ search: '', page: 1, size: 100 });
     expect(classApi.assignLecturer).not.toHaveBeenCalled();
   });
   it('displays the current lecturer and allows choosing a different lecturer', async () => {
@@ -116,16 +121,13 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     expect(screen.getByRole('combobox', { name: 'Chọn giảng viên phụ trách' })).toHaveValue('');
     expect(screen.getByRole('button', { name: 'Lưu giảng viên' })).toBeDisabled();
   });
-  it('requires an explicit selection, searches globally and clears selection across pages', async () => {
-    renderPage(); await open(); await screen.findByRole('option', { name: /GV100/ });
+  it('requires an explicit selection and searches the complete global catalog in one control', async () => {
+    renderPage(); await open();
+    const select = await screen.findByRole('combobox', { name: 'Chọn giảng viên phụ trách' });
     expect(screen.getByRole('button', { name: 'Lưu giảng viên' })).toBeDisabled();
-    await choose();
-    fireEvent.click(screen.getByRole('button', { name: '2' }));
-    await waitFor(() => expect(lecturerApi.getLecturers).toHaveBeenLastCalledWith({ search: '', page: 2, size: 10 }));
-    expect(await screen.findByRole('combobox', { name: 'Chọn giảng viên phụ trách' })).toHaveValue('');
-    fireEvent.change(screen.getByLabelText('Tìm giảng viên'), { target: { value: '  GV100  ' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Tìm kiếm' }));
-    await waitFor(() => expect(lecturerApi.getLecturers).toHaveBeenLastCalledWith({ search: 'GV100', page: 1, size: 10 }));
+    fireEvent.change(select, { target: { value: 'GV100' } });
+    await waitFor(() => expect(lecturerApi.getLecturers).toHaveBeenLastCalledWith({ search: 'GV100', page: 1, size: 100 }));
+    expect(classApi.assignLecturer).not.toHaveBeenCalled();
   });
   it('blocks duplicate submits and term switching, then updates the overview and permits future changes', async () => {
     const pending = deferred<SchoolClass>(); vi.mocked(classApi.assignLecturer).mockReturnValue(pending.promise);
@@ -150,7 +152,7 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     renderPage(); await open(); await choose();
     fireEvent.click(screen.getByRole('button', { name: 'Lưu giảng viên' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Chọn lại giảng viên.');
-    expect(screen.getByRole('combobox', { name: 'Chọn giảng viên phụ trách' })).toHaveValue('100');
+    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') }).closest('.ant-select')).toHaveTextContent('GV100');
     expect(screen.getByRole('button', { name: 'Lưu giảng viên' })).not.toBeDisabled();
     expect(classApi.assignLecturer).toHaveBeenCalledTimes(1);
   });
@@ -214,32 +216,32 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     await screen.findByRole('heading', { name: i18n.t('classes.title') });
     expect(await screen.findByRole('columnheader', { name: i18n.t('classes.className') })).toBeInTheDocument();
     expect(screen.getByText(i18n.t('classes.unassigned'))).toBeInTheDocument();
-    fireEvent.change(screen.getByRole('textbox', { name: i18n.t('classes.searchLabel') }), { target: { value: 'EXE' } });
-    await waitFor(() => expect(classApi.getClasses).toHaveBeenCalledWith(expect.objectContaining({ search: 'EXE' })));
-    const requests = vi.mocked(classApi.getClasses).mock.calls.length;
+    fireEvent.change(screen.getByRole('textbox', { name: i18n.t('classes.searchLabel') }), { target: { value: 'Assignment' } });
+    await waitFor(() => expect(screen.getByRole('textbox', { name: i18n.t('classes.searchLabel') })).toHaveValue('Assignment'));
+    const requests = vi.mocked(classApi.getAllClasses).mock.calls.length;
     fireEvent.click(screen.getByRole('radio', { name: language === 'vi' ? 'EN' : 'VI' }));
     await screen.findByRole('heading', { name: i18n.t('classes.title') });
-    expect(screen.getByRole('textbox', { name: i18n.t('classes.searchLabel') })).toHaveValue('EXE');
+    expect(screen.getByRole('textbox', { name: i18n.t('classes.searchLabel') })).toHaveValue('Assignment');
     expect(screen.getByRole('button', { name: i18n.t('students.clearFilters') })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: i18n.t('classAssignment.title') })).toBeInTheDocument();
-    expect(classApi.getClasses).toHaveBeenCalledTimes(requests);
+    expect(classApi.getAllClasses).toHaveBeenCalledTimes(requests);
   });
   it.each(['vi', 'en'])('localizes class details, student statuses and both controls (%s)', async language => {
     await i18n.changeLanguage(language);
     vi.mocked(classApi.getClassStudents).mockResolvedValue([{ userId: 500, rollNumber: 'SE500', fullName: 'Fixture Student',
       email: 'student@example.test', memberCode: 'M500', majorId: 1, majorCode: 'SE', activated: false,
       hasActivationKey: false, activationKeyExpiresAt: null, isKeyExpired: false, createdDate: null, lastModifiedDate: null }]);
-    renderPage(); await screen.findByText('Fixture Student');
+    renderPage(false, 'students'); await screen.findByText('Fixture Student');
     expect(screen.getByRole('heading', { name: i18n.t('classes.detailTitle', { name: unassigned.name }) })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: i18n.t('students.colFullName') })).toBeInTheDocument();
     expect(screen.getByText(i18n.t('students.unactivated'))).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: i18n.t('classAssignment.choose') }));
-    const select = await screen.findByRole('combobox', { name: i18n.t('classAssignment.select') });
-    fireEvent.change(select, { target: { value: '200' } });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('adminUx.settings') }));
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('classAssignment.choose') }));
+    await choose('200');
     fireEvent.click(screen.getByRole('radio', { name: language === 'vi' ? 'EN' : 'VI' }));
     expect(screen.getByRole('button', { name: i18n.t('rules.configureButton') })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: i18n.t('classAssignment.choose') })).toBeInTheDocument();
-    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') })).toHaveValue('200');
+    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') }).closest('.ant-select')).toHaveTextContent('GV200');
     expect(screen.getByRole('button', { name: i18n.t('classAssignment.save') })).toBeEnabled();
     expect(classApi.getClassById).toHaveBeenCalledTimes(1);
     expect(classApi.getClassStudents).toHaveBeenCalledTimes(1);
@@ -252,7 +254,7 @@ describe('Admin lecturer assignment beside grouping rules', () => {
     await screen.findByRole('alert');
     fireEvent.click(screen.getByRole('radio', { name: 'EN' }));
     expect(screen.getByRole('alert')).toHaveTextContent(i18n.t('classAssignment.unknown'));
-    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') })).toHaveValue('100');
+    expect(screen.getByRole('combobox', { name: i18n.t('classAssignment.select') }).closest('.ant-select')).toHaveTextContent('GV100');
     expect(classApi.assignLecturer).toHaveBeenCalledTimes(1);
   });
 });

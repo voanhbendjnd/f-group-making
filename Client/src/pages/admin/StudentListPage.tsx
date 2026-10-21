@@ -20,6 +20,7 @@ import { BulkActionToolbar } from '@/features/students/components/BulkActionTool
 import { StudentTable } from '@/features/students/components/StudentTable';
 import { BatchActivationModal } from '@/features/students/components/BatchActivationModal';
 import { SingleActivationModal } from '@/features/students/components/SingleActivationModal';
+import { useListFilters } from '@/components/common/useListFilters';
 
 export const StudentListPage: React.FC = () => <TermScope><StudentListContent /></TermScope>;
 
@@ -32,15 +33,16 @@ const StudentListContent: React.FC = () => {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   // Filters state
-  const [filters, setFilters] = useState<StudentFilterParams>({
+  const [filters, setFilters] = useListFilters<StudentFilterParams>({
     page: 1,
     size: 10,
     search: '',
     majorSearch: '',
-  });
+  }, selectedTermId!);
 
   // Selection state
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<Record<number, Student>>({});
   const [isAllMatchingSelected, setIsAllMatchingSelected] = useState<boolean>(false);
 
   // Modal states
@@ -56,13 +58,15 @@ const StudentListContent: React.FC = () => {
   const students = data?.result || [];
   const meta = data?.meta || { page: filters.page || 1, pageSize: filters.size || 10, pages: 1, total: 0 };
 
-  // Calculate selection stats on current page
-  const selectedStudents = students.filter((s) => selectedUserIds.includes(s.userId));
+  // Selected records only live in memory, including selections on previous pages.
+  const selectedStudents = selectedUserIds.map(id => selectedRecords[id]).filter(Boolean);
   const activeInSelected = selectedStudents.filter((s) => s.activated).length;
   const eligibleSelectedCount = selectedStudents.length - activeInSelected;
 
   // Selection handlers
   const handleToggleSelect = (userId: number) => {
+    const record = students.find(student => student.userId === userId);
+    if (record) setSelectedRecords(previous => ({ ...previous, [userId]: record }));
     setIsAllMatchingSelected(false);
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
@@ -70,6 +74,7 @@ const StudentListContent: React.FC = () => {
   };
 
   const handleToggleSelectAllPage = () => {
+    setSelectedRecords(previous => ({ ...previous, ...Object.fromEntries(students.map(student => [student.userId, student])) }));
     setIsAllMatchingSelected(false);
     const currentPageIds = students.map((s) => s.userId);
     const allSelected = currentPageIds.every((id) => selectedUserIds.includes(id));
@@ -89,6 +94,7 @@ const StudentListContent: React.FC = () => {
 
   const handleClearSelection = () => {
     setSelectedUserIds([]);
+    setSelectedRecords({});
     setIsAllMatchingSelected(false);
   };
 
@@ -181,18 +187,18 @@ const StudentListContent: React.FC = () => {
         <EmptyState
           title={t('students.emptyTitle')}
           description={
-            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined || filters.hasActivationKey !== undefined
               ? t('students.emptyFiltered')
               : t('students.emptyNoData')
           }
           icon={<Users size={32} />}
           actionText={
-            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined || filters.hasActivationKey !== undefined
               ? t('students.clearFilters')
               : t('students.importBtn')
           }
           onAction={
-            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined
+            filters.search || (filters.majorSearch || filters.majorId) || filters.activated !== undefined || filters.hasActivationKey !== undefined
               ? handleResetFilters
               : () => navigate('/admin/students/import')
           }
@@ -224,6 +230,7 @@ const StudentListContent: React.FC = () => {
         onClose={() => setIsBatchModalOpen(false)}
         onSuccess={handleActivationSuccess}
         userIds={selectedUserIds}
+        selectedStudents={selectedStudents}
         totalSelected={selectedUserIds.length}
         alreadyActiveCount={activeInSelected}
         isAllMatching={isAllMatchingSelected}

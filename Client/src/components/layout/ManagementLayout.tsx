@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopNavbar } from './TopNavbar';
 import { TermProvider } from '@/app/providers/TermContext';
 import { TermFilterNotice } from '@/features/terms/components/TermFilterNotice';
 import { useAuth } from '@/app/providers/AuthContext';
+import { NavigationGuardProvider } from '@/app/providers/NavigationGuard';
 
 export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFilter?: boolean }> = ({
   area,
@@ -12,7 +13,7 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
 }) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
-  const isGroupBoard = area === 'lecturer' && (pathname === '/lecturer/group-review/advanced' || pathname === '/lecturer/groups' || /\/classes\/\d+\/deadlines\/\d+\/groups$/.test(pathname));
+  const isGroupBoard = /\/(group-review\/advanced|groups)$/.test(pathname) || /\/classes\/\d+\/deadlines\/\d+\/groups$/.test(pathname);
   const [isCollapsed, setIsCollapsed] = useState<boolean>(() => {
     try {
       return localStorage.getItem('sidebar_collapsed') === 'true';
@@ -21,6 +22,12 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
     }
   });
   const [mobileOpen, setMobileOpen] = useState(false);
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [mobileOpen]);
 
   const handleToggleSidebar = () => {
     if (window.innerWidth <= 900) {
@@ -47,7 +54,7 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
         />
       )}
 
-      <Sidebar area={area} isOpen={mobileOpen} onClose={() => setMobileOpen(false)} showTermFilter={showTermFilter} />
+      <Sidebar area={area} isOpen={mobileOpen} onClose={() => setMobileOpen(false)} showTermFilter={showTermFilter && area !== 'admin'} />
 
       <div className="main-content">
         <TopNavbar
@@ -64,7 +71,7 @@ export const ManagementLayout: React.FC<{ area: 'admin' | 'lecturer'; showTermFi
   );
 
   if (showTermFilter || area === 'admin') {
-    return <TermProvider key={user?.id}>{layout}</TermProvider>;
+    return <NavigationGuardProvider key={user?.id}><TermProvider>{layout}</TermProvider></NavigationGuardProvider>;
   }
 
   return layout;

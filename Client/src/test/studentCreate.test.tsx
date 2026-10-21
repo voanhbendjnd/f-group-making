@@ -43,7 +43,7 @@ async function fill() {
   fireEvent.click(form.getByRole('combobox', { name: /^Major/ }));
   fireEvent.click(screen.getByRole('option', { name: 'SE — Software Engineering' }));
   fireEvent.click(form.getByRole('combobox', { name: /^Class/ }));
-  fireEvent.click(screen.getByRole('option', { name: 'CLASS2' }));
+  fireEvent.click(screen.getByRole('option', { name: 'CLASS1' }));
 }
 beforeEach(async () => {
   vi.clearAllMocks(); state.current = { id: 2, name: 'FALL26', isCurrent: true };
@@ -99,14 +99,14 @@ describe('Add Student Modal', () => {
   it('supports keyboard selection, Escape, outside close and focus containment', async () => {
     renderModal();
     const term = screen.getByRole('combobox', { name: /Academic Term/ });
-    await waitFor(() => expect(term).toHaveTextContent('FALL26'));
+    await waitFor(() => expect(term).toHaveTextContent('SP26'));
     term.focus();
     fireEvent.keyDown(term, { key: 'ArrowDown' });
     expect(term).toHaveAttribute('aria-expanded', 'true');
     const menu = screen.getByRole('listbox');
     expect(screen.getByRole('dialog')).toContainElement(menu);
     expect(menu.closest('.modal-card')).toBeNull();
-    expect(screen.getByRole('option', { name: /FALL26/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: 'SP26' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(term, { key: 'End' });
     fireEvent.keyDown(term, { key: 'Enter' });
     expect(term).toHaveTextContent('SP27');
@@ -133,18 +133,18 @@ describe('Add Student Modal', () => {
     expect(success).not.toHaveBeenCalled();
   });
 
-  it('defaults to Backend CURRENT rather than global Selected Term and resets Class when Term changes', async () => {
+  it('defaults to the viewed Term and resets Class when the destination Term changes', async () => {
     renderModal(); await fill();
-    expect(screen.getByRole('combobox', { name: /Academic Term/ })).toHaveTextContent('FALL26');
+    expect(screen.getByRole('combobox', { name: /Academic Term/ })).toHaveTextContent('SP26');
     expect(screen.getByLabelText(/Assigned lecturer/)).toHaveValue('Test Lecturer');
     fireEvent.click(screen.getByRole('combobox', { name: /Academic Term/ }));
     fireEvent.click(screen.getByRole('option', { name: 'SP27' }));
-    expect(screen.getByRole('combobox', { name: /^Class/ })).not.toHaveTextContent('CLASS2');
+    expect(screen.getByRole('combobox', { name: /^Class/ })).not.toHaveTextContent('CLASS1');
     await waitFor(() => expect(screen.getByRole('combobox', { name: /^Class/ })).toBeEnabled());
     fireEvent.click(screen.getByRole('combobox', { name: /^Class/ }));
     await screen.findByRole('option', { name: 'CLASS3' });
     expect(classApi.getClasses).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 3 }), expect.any(AbortSignal));
-    expect(screen.queryByRole('option', { name: 'CLASS2' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: 'CLASS1' })).not.toBeInTheDocument();
   });
 
   it('creates with a generated code and translates the new helper content', async () => {
@@ -159,7 +159,7 @@ describe('Add Student Modal', () => {
     await act(async () => { await i18n.changeLanguage('en'); });
     fireEvent.click(screen.getByRole('button', { name: 'Create student' }));
     await waitFor(() => expect(success).toHaveBeenCalledOnce());
-    expect(studentApi.createStudent).toHaveBeenCalledWith(expect.objectContaining({ memberCode: 'TranLHBCS192013', termId: 2, schoolClassId: 20 }), expect.anything());
+    expect(studentApi.createStudent).toHaveBeenCalledWith(expect.objectContaining({ memberCode: 'TranLHBCS192013', termId: 1, schoolClassId: 10 }), expect.anything());
   });
 
   it('still requires a manually cleared Member Code and validates email before creating', async () => {
@@ -172,11 +172,11 @@ describe('Add Student Modal', () => {
     expect(studentApi.createStudent).not.toHaveBeenCalled();
   });
 
-  it('does not choose an arbitrary term when CURRENT cannot be determined', async () => {
+  it('uses the valid viewed Term even when CURRENT is not supplied', async () => {
     state.current = null; renderModal();
     await waitFor(() => expect(screen.getByRole('combobox', { name: /^Major/ })).toBeEnabled());
-    expect(screen.getByRole('combobox', { name: /Academic Term/ })).toHaveTextContent(i18n.t('addStudent.chooseTerm'));
-    expect(classApi.getClasses).not.toHaveBeenCalled();
+    expect(screen.getByRole('combobox', { name: /Academic Term/ })).toHaveTextContent('SP26');
+    await waitFor(() => expect(classApi.getClasses).toHaveBeenCalledWith(expect.objectContaining({ termId: 1 }), expect.any(AbortSignal)));
     expect(screen.getByRole('button', { name: 'Create student' })).toBeDisabled();
   });
 
@@ -198,7 +198,7 @@ describe('Add Student Modal', () => {
     const submit = screen.getByRole('button', { name: 'Create student' }); fireEvent.click(submit); fireEvent.click(submit);
     await waitFor(() => expect(studentApi.createStudent).toHaveBeenCalledTimes(1));
     expect(studentApi.createStudent).toHaveBeenCalledWith({ fullName: 'Test Student', rollNumber: 'TEST001', memberCode: 'MEMBER001',
-      email: 'test@example.test', majorId: 1, termId: 2, schoolClassId: 20 }, expect.anything());
+      email: 'test@example.test', majorId: 1, termId: 1, schoolClassId: 10 }, expect.anything());
     expect(success).not.toHaveBeenCalled();
     fireEvent.keyDown(window, { key: 'Escape' }); expect(close).not.toHaveBeenCalled();
     await act(async () => resolve({ userId: 100 } as Awaited<ReturnType<typeof studentApi.createStudent>>));

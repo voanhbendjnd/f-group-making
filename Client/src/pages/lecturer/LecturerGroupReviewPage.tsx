@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input as AntInput, Select, Table } from 'antd';
@@ -8,6 +8,7 @@ import { useTerm } from '@/app/providers/TermContext';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useRealtime } from '@/app/providers/realtimeContext';
 import { useToast } from '@/app/providers/ToastContext';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 import { TermScope } from '@/features/terms/components/TermScope';
 import { PageHeader } from '@/components/common/PageHeader';
 import { Button } from '@/components/common/Button';
@@ -34,6 +35,7 @@ export function LecturerGroupReviewPage() {
 
 function ReviewContent() {
   const { t, i18n } = useTranslation();
+  const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
   const { selectedTermId, selectedTerm, lockTermSelection } = useTerm();
   const { user } = useAuth();
   const toast = useToast();
@@ -80,7 +82,7 @@ function ReviewContent() {
   const selectedClass = classes.data?.result.find(c => c.id === filters.classId);
   const openBoard = (cid: number) => {
     const deadlineId = rows.find(row => row.group.schoolClassId === cid)?.group.deadlineId;
-    navigate(advancedGroupPath(cid, filterQuery, deadlineId));
+    navigate(advancedGroupPath(cid, filterQuery, deadlineId, area));
   };
   const topics = [...new Set([...(classes.data?.result ?? []).map(item => item.id), ...rows.map(row => row.group.schoolClassId)])].sort((a, b) => a - b).join(',');
   useEffect(() => {
@@ -94,6 +96,9 @@ function ReviewContent() {
       if (request.kind === 'reopen') return groupApi.revokeGroup(deadlineId, schoolClassId, id);
       return groupApi.rejectGroup(deadlineId, schoolClassId, id, { reason: reason.trim() });
     } });
+  const discardReview = useUnsavedChanges(Boolean(action && reason.trim()), mutation.isPending);
+  const reviewError = actionError ? getApiError(actionError) : null;
+  const reviewUnknown = Boolean(reviewError && (reviewError.outcomeUnknown || reviewError.status === 0 || reviewError.status >= 500));
   const [previewClassId, setPreviewClassId] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
@@ -113,15 +118,13 @@ function ReviewContent() {
       return;
     }
     const targetClass = classes.data?.result.find(c => c.id === targetClassId);
-    const deadlineId = rows.find(row => row.group.schoolClassId === targetClassId)?.group.deadlineId;
 
     setIsExporting(true);
     try {
       const result = await fetchClassAllocationData(targetClassId, {
-        deadlineId,
         termId: selectedTermId ?? undefined,
         termName: selectedTerm?.name,
-        lecturerCode: user?.name || user?.email?.split('@')[0] || '',
+        lecturerCode: targetClass?.lecturerCode || '',
         className: targetClass?.name,
       });
 
@@ -140,7 +143,7 @@ function ReviewContent() {
   };
 
   const confirm = async () => {
-    if (!action || busy.current) return;
+    if (!action || busy.current || reviewUnknown) return;
     if (action.kind === 'reject' && !reason.trim()) { setReasonRequired(true); return; }
     setReasonRequired(false);
     busy.current = true;
@@ -320,11 +323,12 @@ function ReviewContent() {
         </section>
       </div>}
     </Modal>
-    <Modal title={t(`groupReview.${action?.kind ?? 'approve'}`)} open={Boolean(action)} onCancel={() => { if (!busy.current) setAction(null); }}
-      confirmLoading={mutation.isPending} onOk={() => { void confirm(); }} okText={t(`groupReview.${action?.kind ?? 'approve'}`)} cancelText={t('groupReview.cancel')} cancelButtonProps={{ disabled: mutation.isPending }} closable={!mutation.isPending} mask={{ closable: !mutation.isPending }}>
+    <Modal title={t(`groupReview.${action?.kind ?? 'approve'}`)} open={Boolean(action)} onCancel={() => { if (!busy.current) discardReview(() => setAction(null)); }}
+      confirmLoading={mutation.isPending} okButtonProps={{ disabled: reviewUnknown }} onOk={() => { void confirm(); }} okText={t(`groupReview.${action?.kind ?? 'approve'}`)} cancelText={t('groupReview.cancel')} cancelButtonProps={{ disabled: mutation.isPending }} closable={!mutation.isPending} mask={{ closable: !mutation.isPending }}>
       <p>{t(action?.kind === 'reopen' ? 'groupReview.reopenConfirm' : action?.kind === 'reject' ? 'groupReview.rejectConfirm' : 'groupReview.approveConfirm', { name: action?.row.group.name })}</p>
       {action?.kind === 'reject' && <label className="review-reason">{t('groupReview.reason')}<AntInput.TextArea aria-label={t('groupReview.reason')} rows={4} maxLength={2000} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} /></label>}
       {(reasonRequired || Boolean(actionError)) && <p className="alert alert-error" role="alert">{reasonRequired ? t('groupReview.reasonRequired') : translateErrorMessage(actionError)}</p>}
+      {reviewUnknown && <p role="status">{t('adminUx.unknownWrite')}</p>}
     </Modal>
     {previewClassId && (
       <GroupPreviewExportModal
@@ -332,10 +336,9 @@ function ReviewContent() {
         onClose={() => setPreviewClassId(null)}
         classId={previewClassId}
         className={classes.data?.result.find(c => c.id === previewClassId)?.name || `Class_${previewClassId}`}
-        deadlineId={rows.find(row => row.group.schoolClassId === previewClassId)?.group.deadlineId}
         termId={selectedTermId ?? undefined}
         termName={selectedTerm?.name}
-        lecturerCode={user?.name || user?.email?.split('@')[0] || ''}
+        lecturerCode={classes.data?.result.find(c => c.id === previewClassId)?.lecturerCode || ''}
       />
     )}
   </div>;

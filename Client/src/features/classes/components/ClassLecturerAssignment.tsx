@@ -1,17 +1,16 @@
-import { useId, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useTerm } from '@/app/providers/TermContext';
 import { Button } from '@/components/common/Button';
-import { Input } from '@/components/common/Input';
-import { Select } from '@/components/common/Select';
-import { Pagination } from '@/components/common/Pagination';
+import { Select } from 'antd';
 import { ErrorState } from '@/components/common/ErrorState';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
 import { getApiError } from '@/services/api/types';
 import { classApi } from '../api/classApi';
 import type { SchoolClass } from '../types';
+import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export function ClassLecturerAssignment({ schoolClass }: { schoolClass: SchoolClass }) {
   const { t } = useTranslation();
@@ -21,17 +20,25 @@ export function ClassLecturerAssignment({ schoolClass }: { schoolClass: SchoolCl
   const busy = useRef(false);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
-  const [page, setPage] = useState(1);
   const [lecturerId, setLecturerId] = useState('');
   const [notice, setNotice] = useState<{ key: string; message?: string } | null>(null);
   const [saved, setSaved] = useState(false);
   const [needsReload, setNeedsReload] = useState(false);
   const [reloading, setReloading] = useState(false);
   const assigned = schoolClass.lecturerId !== null;
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearch(searchInput.trim()), 350);
+    return () => window.clearTimeout(timer);
+  }, [searchInput]);
   const list = useQuery({
     // Global catalog includes lecturers who do not have a class in the selected term yet.
-    queryKey: ['lecturers', 'class-assignment', search, page],
-    queryFn: () => lecturerApi.getLecturers({ search, page, size: 10 }),
+    queryKey: ['lecturers', 'class-assignment', search],
+    queryFn: async () => {
+      const first = await lecturerApi.getLecturers({ search, page: 1, size: 100 });
+      const records = [...first.result];
+      for (let page = 2; page <= first.meta.pages; page++) records.push(...(await lecturerApi.getLecturers({ search, page, size: 100 })).result);
+      return { ...first, result: records };
+    },
     retry: false,
   });
   const updateClass = (data: SchoolClass) => {
@@ -46,6 +53,7 @@ export function ClassLecturerAssignment({ schoolClass }: { schoolClass: SchoolCl
     mutationFn: (id: number) => classApi.assignLecturer(schoolClass.id, id, schoolClass.lecturerId),
     retry: false,
   });
+  useUnsavedChanges(Boolean(lecturerId && Number(lecturerId) !== schoolClass.lecturerId), mutation.isPending || reloading);
   const submit = async () => {
     const id = Number(lecturerId);
     if (busy.current || needsReload || id === schoolClass.lecturerId || !Number.isSafeInteger(id) || id <= 0
@@ -104,27 +112,22 @@ export function ClassLecturerAssignment({ schoolClass }: { schoolClass: SchoolCl
         {t('classAssignment.reload')}
       </Button>}
       <fieldset disabled={mutation.isPending || reloading || needsReload} className="class-assignment-fields">
-        <form className="class-assignment-search" onSubmit={event => {
-          event.preventDefault(); setSearch(searchInput.trim()); setPage(1); setLecturerId('');
-        }}>
-          <Input label={t('classAssignment.search')} placeholder={t('classAssignment.searchPlaceholder')}
-            value={searchInput} onChange={event => setSearchInput(event.target.value)} />
-          <Button type="submit" variant="secondary">{t('classAssignment.searchButton')}</Button>
-        </form>
-        {list.isPending ? <LoadingSpinner message={t('classAssignment.loading')} />
-          : list.isError ? <ErrorState message={getApiError(list.error).message || t('classAssignment.loadFailed')}
+        {list.isPending && <LoadingSpinner message={t('classAssignment.loading')} />}
+        {list.isError ? <ErrorState message={getApiError(list.error).message || t('classAssignment.loadFailed')}
             onRetry={() => void list.refetch()} /> : <>
-            <Select id={selectId} label={t('classAssignment.select')} value={lecturerId}
-              onChange={event => setLecturerId(event.target.value)} options={[
-                { value: '', label: t('classAssignment.placeholder') },
+            <label htmlFor={selectId} className="form-label">{t('classAssignment.select')}</label>
+            <Select id={selectId} aria-label={t('classAssignment.select')} value={lecturerId || undefined}
+              style={{ width: '100%' }} showSearch filterOption={false} allowClear loading={list.isFetching}
+              placeholder={t('classAssignment.searchPlaceholder')} disabled={mutation.isPending || reloading || needsReload}
+              getPopupContainer={trigger => trigger.closest('[role="dialog"]') as HTMLElement || trigger.parentElement!}
+              onSearch={setSearchInput} onChange={value => setLecturerId(value ?? '')} options={[
                 ...(list.data?.result ?? []).map(lecturer => ({ value: lecturer.userId,
                   label: [lecturer.code, lecturer.name, lecturer.email].filter(Boolean).join(' · ') })),
-              ]} />
-            {!list.data?.result.length && <p>{t('classAssignment.empty')}</p>}
-            {list.data && <Pagination meta={list.data.meta} currentPage={page}
-              onPageChange={next => { setPage(next); setLecturerId(''); }} />}
+              ].map(option => ({ ...option, value: String(option.value) }))} />
+            {!list.isFetching && !list.data?.result.length && <p>{t('classAssignment.empty')}</p>}
+            {lecturerId && <p className="form-hint">{schoolClass.name} · {schoolClass.termName} → {list.data?.result.find(item => item.userId === Number(lecturerId))?.code}</p>}
             <Button type="button" loading={mutation.isPending}
-              disabled={!lecturerId || Number(lecturerId) === schoolClass.lecturerId || list.isFetching}
+              disabled={!lecturerId || !list.data?.result.some(item => item.userId === Number(lecturerId)) || Number(lecturerId) === schoolClass.lecturerId || list.isFetching || searchInput.trim() !== search}
               onClick={() => void submit()}>{t('classAssignment.save')}</Button>
           </>}
       </fieldset>

@@ -27,6 +27,7 @@ export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true }:
         <thead><tr>
           <th scope="col" className="deadline-name-column">{t('deadline.table.name')}</th>
           <th scope="col" className="deadline-status-column">{t('deadline.table.status')}</th>
+          <th scope="col" className="deadline-classes-column">{t('deadline.table.classes')}</th>
           <th scope="col" className="deadline-end-column">{t('deadline.table.endTime')}</th>
           <th scope="col" className="deadline-actions-column">{t('deadline.table.actions')}</th>
         </tr></thead>
@@ -38,6 +39,9 @@ export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true }:
               {view.mixedStatus ? <span className="badge badge-neutral">{t('deadlineScope.mixed')}</span>
                 : <DeadlineStatusBadge status={view.status} />}
             </td>
+            <td data-label={t('deadline.table.classes')}><button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelected(deadline)}>
+              {t('adminUx.applyToClasses', { count: view.windows.length })}
+            </button></td>
             <td data-label={t('deadline.table.endTime')}>
               <span className="deadline-list-summary">{view.differentEnds ? t('deadlineDetail.perClass')
                 : formatDeadlineDate(view.windows[0]?.endTime ?? deadline.endTime, locale)}</span>

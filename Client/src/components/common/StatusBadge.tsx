@@ -24,15 +24,15 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
     );
   }
 
-  if (hasActivationKey) {
-    if (isKeyExpired) {
+  if (isKeyExpired) {
       return (
         <span className="badge badge-error">
           <AlertCircle size={13} />
           <span>{t('statusBadge.expired')}</span>
         </span>
       );
-    }
+  }
+  if (hasActivationKey) {
     return (
       <span className="badge badge-info">
         <Mail size={13} />

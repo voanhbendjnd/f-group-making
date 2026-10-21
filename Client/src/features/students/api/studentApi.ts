@@ -6,7 +6,7 @@ export const studentApi = {
   async createStudent(values: CreateStudentValues): Promise<Student> {
     return apiClient.post<unknown, Student>('/api/students', values);
   },
-  async getStudents(params: StudentFilterParams = {}): Promise<PaginatedStudents> {
+  async getStudents(params: StudentFilterParams = {}, signal?: AbortSignal): Promise<PaginatedStudents> {
     const queryParams: Record<string, any> = {};
     if (params.termId !== undefined) queryParams.termId = params.termId;
 
@@ -33,7 +33,7 @@ export const studentApi = {
     }
 
     const data = await apiClient.get<any, PaginatedStudents>('/api/students', {
-      params: queryParams,
+      params: queryParams, signal,
     });
     return data;
   },

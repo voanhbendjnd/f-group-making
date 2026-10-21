@@ -26,8 +26,7 @@ export function MajorPagination({ meta, currentPage, isLoading, onPageChange, on
   if (meta.total === 0) return null;
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap',
-      gap: '1rem', padding: '1rem 0.5rem', fontSize: '0.875rem', color: 'var(--color-text-muted)' }}>
+    <div className="major-pagination">
       <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
         <span>{t('majors.showing', { start: startRecord, end: endRecord, total: meta.total })}</span>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>

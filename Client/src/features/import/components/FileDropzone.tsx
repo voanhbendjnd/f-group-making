@@ -1,13 +1,15 @@
 import React, { useRef, useState } from 'react';
-import { UploadCloud, FileSpreadsheet, X, Download, AlertCircle } from 'lucide-react';
+import { UploadCloud, FileSpreadsheet, X, AlertCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/common/Button';
+import { ImportTemplateGuide } from './ImportTemplateGuide';
 
 export interface FileDropzoneProps {
   selectedFile: File | null;
   onFileSelect: (file: File) => void;
   onFileRemove: () => void;
   disabled?: boolean;
+  kind?: 'students' | 'lecturers';
 }
 
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -17,6 +19,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
   onFileSelect,
   onFileRemove,
   disabled = false,
+  kind = 'students',
 }) => {
   const { t } = useTranslation();
   const [isDragOver, setIsDragOver] = useState(false);
@@ -69,6 +72,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
     if (e.target.files && e.target.files.length > 0) {
       validateAndSelect(e.target.files[0]);
     }
+    e.target.value = '';
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -79,6 +83,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+      <ImportTemplateGuide kind={kind} />
       {errorMessage && (
         <div className="alert alert-error" role="alert">
           <AlertCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
@@ -142,7 +147,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled}
             >
-              {t('common.cancel')}
+              {t('adminUx.replaceFile')}
             </Button>
             <button
               type="button"
@@ -158,8 +163,8 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
                 display: 'flex',
                 alignItems: 'center',
               }}
-              title={t('common.cancel')}
-              aria-label={t('common.cancel')}
+              title={t('adminUx.removeFile')}
+              aria-label={t('adminUx.removeFile')}
             >
               <X size={18} />
             </button>
@@ -168,10 +173,17 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
       ) : (
         // Dropzone area
         <div
+          role="button"
+          tabIndex={disabled ? -1 : 0}
+          aria-disabled={disabled}
+          aria-label={t('adminUx.chooseFile')}
+          onKeyDown={event => {
+            if (!disabled && ['Enter', ' '].includes(event.key)) { event.preventDefault(); fileInputRef.current?.click(); }
+          }}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => { if (!disabled) fileInputRef.current?.click(); }}
           style={{
             padding: '3rem 2rem',
             border: `2px dashed ${isDragOver ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -211,7 +223,7 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
           </h3>
 
           <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', maxWidth: '420px' }}>
-            {t('import.dropHint')}
+            {t(kind === 'lecturers' ? 'adminUx.lecturerDropHint' : 'import.dropHint')}
           </p>
         </div>
       )}
@@ -221,39 +233,11 @@ export const FileDropzone: React.FC<FileDropzoneProps> = ({
         ref={fileInputRef}
         type="file"
         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        disabled={disabled}
         style={{ display: 'none' }}
         onChange={handleFileInputChange}
       />
 
-      {/* Sample download banner */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: '0.875rem 1.25rem',
-          backgroundColor: '#f8fafc',
-          borderRadius: 'var(--radius-md)',
-          border: '1px solid var(--color-border)',
-          fontSize: '0.875rem',
-          color: 'var(--color-text-muted)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <FileSpreadsheet size={18} style={{ color: 'var(--color-success)' }} />
-          <span>{t('import.samplePrompt')}</span>
-        </div>
-
-        <a
-          href="/sample-students.xlsx"
-          download="mau_danh_sach_sinh_vien.xlsx"
-          className="btn btn-outline btn-sm"
-          style={{ textDecoration: 'none' }}
-        >
-          <Download size={14} />
-          <span>{t('import.sampleDownloadBtn')}</span>
-        </a>
-      </div>
     </div>
   );
 };
