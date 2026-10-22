@@ -10,7 +10,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { classApi } from '@/features/classes/api/classApi';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { allocationErrorKey, isAllocationComplete, newRequestKey, validTarget } from '@/features/allocation/utils';
-import { overviewFixture, setupFixture, previewFixture, applyFixture, planFixture } from './allocationFixtures';
+import { overviewFixture, setupFixture, previewFixture, applyFixture, planFixture, recommendationFixture } from './allocationFixtures';
 import i18n from '@/locales/i18n';
 
 const context = vi.hoisted(() => ({ term: 8, role: 'ROLE_LECTURE', success: vi.fn(), unlock: vi.fn(), subscribe: vi.fn(() => () => {}) }));
@@ -18,7 +18,7 @@ vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1,
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId: context.term, lockTermSelection: () => context.unlock }) }));
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: context.success }) }));
 vi.mock('@/app/providers/realtimeContext', () => ({ useRealtime: () => ({ subscribe: context.subscribe }) }));
-vi.mock('@/features/allocation/api/allocationApi', () => ({ allocationApi: { overview: vi.fn(), setup: vi.fn(), preview: vi.fn(), apply: vi.fn(), history: vi.fn(), historyDetail: vi.fn(), plans: vi.fn(), plan: vi.fn() } }));
+vi.mock('@/features/allocation/api/allocationApi', () => ({ allocationApi: { overview: vi.fn(), setup: vi.fn(), preview: vi.fn(), apply: vi.fn(), history: vi.fn(), historyDetail: vi.fn(), plans: vi.fn(), plan: vi.fn(), recommendation: vi.fn() } }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 let client: QueryClient;
@@ -52,12 +52,74 @@ beforeEach(async () => {
   vi.mocked(allocationApi.historyDetail).mockResolvedValue(applyFixture());
   vi.mocked(allocationApi.plans).mockResolvedValue({ meta: { page: 1, pageSize: 10, total: 1, pages: 1 }, result: [planFixture().summary] });
   vi.mocked(allocationApi.plan).mockResolvedValue(planFixture());
+  vi.mocked(allocationApi.recommendation).mockResolvedValue({ snapshotFingerprint: overviewFixture.snapshotFingerprint,
+    planId: null, targetGroupCount: null, eligiblePlans: 0, equivalentPlans: 0, metrics: null, reasons: [] });
   vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [{ id: 2, name: 'Class A', termId: 8, lecturerId: 1, studentCount: 8 }], meta: { page: 1, pageSize: 50, total: 1, pages: 1 } } as Awaited<ReturnType<typeof classApi.getMyClasses>>);
   vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({ result: [{ id: 3, schoolClassIds: [2] }], meta: { page: 1, pageSize: 50, total: 1, pages: 1 } } as Awaited<ReturnType<typeof deadlineApi.getDeadlines>>);
 });
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('automatic allocation workflow', () => {
+  it('marks only the globally recommended history row and explains real counts in VI/EN without auto Apply', async () => {
+    vi.mocked(allocationApi.recommendation).mockResolvedValue(recommendationFixture());
+    vi.mocked(allocationApi.plans).mockResolvedValue({ meta: { page: 1, pageSize: 10, total: 2, pages: 1 }, result: [planFixture().summary,
+      { ...planFixture().summary, planId: 'other-plan', targetGroupCount: 3 }] });
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    const panel = await screen.findByRole('tabpanel', { name: i18n.t('allocation.randomHistory') });
+    await within(panel).findByText(i18n.t('allocation.recommendation.target', { count: 2 }));
+    const rows = within(panel).getAllByRole('row');
+    const cells = within(rows[1]).getAllByRole('cell');
+    expect(cells[2]).toHaveTextContent(/^2$/);
+    expect(within(cells[2]).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(cells[4]).getByText(i18n.t('allocation.planStatuses.UNAPPLIED'))).toBeInTheDocument();
+    expect(within(cells[4]).getByRole('button', { name: i18n.t('allocation.recommendation.why') })).toBeInTheDocument();
+    expect(within(rows[1]).getByRole('button', { name: i18n.t('allocation.recommendation.why') })).toBeInTheDocument();
+    expect(within(rows[2]).queryByRole('button', { name: i18n.t('allocation.recommendation.why') })).not.toBeInTheDocument();
+    fireEvent.click(within(rows[1]).getByRole('button', { name: i18n.t('allocation.recommendation.why') }));
+    expect(await screen.findByText(i18n.t('allocation.recommendation.reasons.BALANCED_SIZES', {
+      difference: 0, distribution: i18n.t('allocation.recommendation.sizeBucket', { groups: 2, members: 4 }) }))).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('allocation.recommendation.reasons.ALL_RULES_PASSED', { groups: 2 }))).toBeInTheDocument();
+    await act(async () => i18n.changeLanguage('vi'));
+    expect(cells[2]).toHaveTextContent(/^2$/);
+    expect(within(cells[4]).getByRole('button', { name: i18n.t('allocation.recommendation.why') })).toBeInTheDocument();
+    expect(await screen.findByText(i18n.t('allocation.recommendation.reasons.PROTECTED_UNCHANGED', { groups: 1 }))).toBeInTheDocument();
+    expect(allocationApi.preview).not.toHaveBeenCalled(); expect(allocationApi.apply).not.toHaveBeenCalled();
+  }, 15000);
+  it('opens the global recommended plan even when it is not on the visible history page', async () => {
+    vi.mocked(allocationApi.recommendation).mockResolvedValue({ ...recommendationFixture(), planId: 'off-page' });
+    vi.mocked(allocationApi.plan).mockResolvedValue({ ...planFixture(), summary: { ...planFixture().summary, planId: 'off-page' } });
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    const target = await screen.findByText(i18n.t('allocation.recommendation.target', { count: 2 }));
+    const banner = target.closest('.allocation-recommendation')!;
+    fireEvent.click(within(banner as HTMLElement).getByRole('button', { name: i18n.t('allocation.viewPlan') }));
+    await screen.findByText(i18n.t('allocation.savedPlan'));
+    expect(allocationApi.plan).toHaveBeenCalledWith(3, 2, 'off-page', expect.anything());
+    expect(allocationApi.preview).not.toHaveBeenCalled(); expect(allocationApi.apply).not.toHaveBeenCalled();
+  }, 15000);
+  it('hides stale recommendation badges after a realtime snapshot change and refreshes the comparison', async () => {
+    vi.mocked(allocationApi.recommendation).mockResolvedValue(recommendationFixture());
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    await screen.findByText(i18n.t('allocation.recommendation.target', { count: 2 }));
+    vi.mocked(allocationApi.overview).mockResolvedValue({ ...overviewFixture, snapshotFingerprint: 'new-snapshot' });
+    const listener = context.subscribe.mock.calls.find(call => call[0] === '/topic/classes/2/deadlines/3/groups')?.[1] as unknown as (value: unknown) => void;
+    act(() => listener({ eventType: 'GROUP_UPDATED', deadlineId: 3, schoolClassId: 2 }));
+    await screen.findByText(i18n.t('allocation.recommendation.none'));
+    expect(screen.queryByRole('button', { name: i18n.t('allocation.recommendation.why') })).not.toBeInTheDocument();
+    expect(vi.mocked(allocationApi.recommendation).mock.calls.length).toBeGreaterThan(1);
+  }, 15000);
+  it('keeps history usable if recommendations fail and shows an explicit no-candidate state', async () => {
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    await screen.findByText(i18n.t('allocation.recommendation.none'));
+    vi.mocked(allocationApi.recommendation).mockRejectedValue({ status: 500 });
+    fireEvent.click(screen.getByRole('tabpanel', { name: i18n.t('allocation.randomHistory') }).querySelector('.allocation-heading button')!);
+    await screen.findByText(i18n.t('allocation.recommendation.error'));
+    expect(screen.getByRole('button', { name: i18n.t('allocation.viewPlan') })).toBeEnabled();
+    expect(allocationApi.apply).not.toHaveBeenCalled();
+  }, 15000);
   it.each(['OPEN', 'REVOKED', 'PENDING', 'ACCEPTED'] as const)('shows the leader first for %s without changing saved member order', async status => {
     const group = structuredClone(overviewFixture.groups[0]);
     group.status = status;

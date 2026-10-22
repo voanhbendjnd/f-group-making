@@ -45,3 +45,13 @@ export interface PlanSummary { planId: string; actorId: number; actorName: strin
   available: boolean; canApply: boolean; invalidReason: string | null }
 export interface PlanDetail { summary: PlanSummary; preview: Preview }
 export interface PlanPage { meta: HistoryPage['meta']; result: PlanSummary[] }
+export interface PlanRecommendation {
+  snapshotFingerprint: string | null; planId: string | null; targetGroupCount: number | null;
+  eligiblePlans: number; equivalentPlans: number;
+  metrics: { students: number; groups: number; sizeDistribution: { members: number; groups: number }[]; sizeDifference: number;
+    sameMajorPairs: number; evenDistributionLowerBound: number; excessMajorPairs: number;
+    groupsWithThreePlusSameMajor: number; groupsWithFourPlusSameMajor: number; unknownMajorStudents: number;
+    validDraftsPreserved: number; validDraftsBefore: number; leadersPreserved: number; leadersBefore: number;
+    movedStudents: number; unassignedAllocated: number; protectedGroups: number; averageGroupScore: number | null } | null;
+  reasons: { code: string; parameters: Record<string, number> }[];
+}

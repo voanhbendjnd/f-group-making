@@ -104,6 +104,50 @@ class AllocationResourceTest {
         return users.saveAndFlush(user);
     }
     String path(String action) { return "/api/deadlines/" + deadline.getId() + "/classes/" + own.getId() + "/allocation/" + action; }
+    @Test void recommendationUsesAllSavedHistoryRevalidatesAndNeverRunsRandomOrMutatesGroups() throws Exception {
+        var first = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        var second = preview("{\"targetGroupCount\":2,\"seed\":43}");
+        long memberCount = members.count(), groupCount = groups.count(), statusCount = statusHistory.count();
+        clearInvocations(engine, events);
+        var response = mvc.perform(get(path("plans/recommendation")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        var recommended = mapper.readTree(response).path("data");
+        assertThat(recommended.path("planId").asText()).isIn(first.path("previewId").asText(), second.path("previewId").asText());
+        assertThat(recommended.path("eligiblePlans").asInt()).isEqualTo(2);
+        assertThat(recommended.path("metrics").path("students").asInt()).isEqualTo(8);
+        assertThat(recommended.path("metrics").path("sizeDifference").asInt()).isZero();
+        assertThat(response).doesNotContain("password", "activationKey", "secret-for-test-only", "payload");
+        mvc.perform(get(path("plans")).param("size", "1").param("page", "2").with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.meta.total").value(2));
+        assertThat(members.count()).isEqualTo(memberCount); assertThat(groups.count()).isEqualTo(groupCount);
+        assertThat(statusHistory.count()).isEqualTo(statusCount);
+        verify(engine, never()).allocate(any(), anyInt(), anyLong()); verifyNoInteractions(events);
+        var student = students.findById(studentIds.getFirst()).orElseThrow(); student.setFullName("Changed after Random"); students.saveAndFlush(student); em.clear();
+        mvc.perform(get(path("plans/recommendation")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.planId").isEmpty()).andExpect(jsonPath("$.data.eligiblePlans").value(0));
+    }
+
+    @Test void recommendationRetainsFormatOneSupportAndFailsClosedForCorruptPayloads() throws Exception {
+        var saved = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        var row = em.find(AllocationPreview.class, saved.path("previewId").asText()); row.setFormatVersion(1); em.flush(); em.clear();
+        mvc.perform(get(path("plans/recommendation")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.planId").value(saved.path("previewId").asText()));
+        row = em.find(AllocationPreview.class, saved.path("previewId").asText()); row.setPayload("{broken json"); em.flush(); em.clear();
+        mvc.perform(get(path("plans/recommendation")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.planId").isEmpty());
+    }
+
+    @ParameterizedTest @ValueSource(strings = {"LECTURE", "LECTURE_MASTER"})
+    void recommendationDoesNotExposeAnotherLecturersClass(String role) throws Exception {
+        var otherTeacher = users.findById(other.getLecturerId()).orElseThrow();
+        mvc.perform(get(path("plans/recommendation")).with(user(otherTeacher.getEmail()).roles(role)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test void recommendationDeniesStudentsAndUnauthenticatedAccess() throws Exception {
+        mvc.perform(get(path("plans/recommendation"))).andExpect(status().isUnauthorized());
+        mvc.perform(get(path("plans/recommendation")).with(user("student@example.test").roles("STUDENT"))).andExpect(status().isForbidden());
+    }
     JsonNode overview() throws Exception {
         return mapper.readTree(mvc.perform(get(path("overview")).with(user(teacher.getEmail()).roles("ADMIN")))
             .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data");

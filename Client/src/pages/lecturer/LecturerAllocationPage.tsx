@@ -196,7 +196,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     </section>}
     <Tabs className="allocation-content-nav" activeKey={contentTab} onChange={setContentTab} items={[
       { key: 'current', label: <span className="allocation-tab-label"><UsersRound size={16} aria-hidden="true" />{t('allocation.currentData')}</span>, children: <section className="allocation-panel allocation-current-panel"><div className="allocation-heading"><div><h2>{t('allocation.currentData')}</h2><p>{t('allocation.scoreHint')}</p></div></div><AllocationGroups groups={data.groups} /></section> },
-      { key: 'history', label: <span className="allocation-tab-label"><History size={16} aria-hidden="true" />{t('allocation.randomHistory')}</span>, children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} disabled={flow.applying || !!flow.attempt}
+      { key: 'history', label: <span className="allocation-tab-label"><History size={16} aria-hidden="true" />{t('allocation.randomHistory')}</span>, children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} snapshotFingerprint={data.snapshotFingerprint} disabled={flow.applying || !!flow.attempt}
         onSelect={flow.restorePlan} onApply={detail => { flow.restorePlan(detail); setConfirming(true); }} /> },
       { key: 'audit', label: <span className="allocation-tab-label"><ClipboardCheck size={16} aria-hidden="true" />{t('allocation.applyAudit')}</span>, children: <AllocationApplyHistory classId={classId} deadlineId={deadlineId} /> },
     ]} />

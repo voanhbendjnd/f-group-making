@@ -494,7 +494,7 @@ public class SmartAllocationService {
     }
 
     /** Sum of same-major pairs; minimizing it is equivalent to minimizing per-major variance across fixed slots. */
-    private static long majorConcentration(List<GroupMemberDTO> members) {
+    static long majorConcentration(List<GroupMemberDTO> members) {
         return members.stream().map(GroupMemberDTO::getMajorId).filter(Objects::nonNull)
             .collect(Collectors.groupingBy(Function.identity(), Collectors.counting())).values().stream()
             .mapToLong(count -> count * (count - 1) / 2).sum();

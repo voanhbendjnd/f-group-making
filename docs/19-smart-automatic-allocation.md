@@ -1088,3 +1088,102 @@ target 8, seed 42 và SearchLimits mặc định. Mỗi ô là `(SE, IB, GD)`; �
   Các reason codes/keys VI/EN giữ nguyên; không tạo Markdown khác, không commit/push.
   Không chạy Random/Apply hoặc truy cập MySQL ứng dụng. Chưa kiểm tra E2E trên database thật;
   H2 không chứng minh các đặc tính locking MySQL và local search không bảo đảm tối ưu toàn cục cho mọi lớp.
+
+### 8.13. Recommended Plan trong Random History (22/10/2026)
+
+#### Phạm vi và dữ liệu
+
+- Bổ sung `GET /api/deadlines/{deadlineId}/classes/{classId}/allocation/plans/recommendation`.
+  Đây là API read-only, dùng cùng management authorization/snapshot như Preview, không nhận assignments,
+  không chạy lại engine, không ghi History/Preview/nhóm và không tự Apply.
+- Chỉ so sánh phương án cùng lớp/phiên, đúng owner hiện tại (theo quyền Apply đang có), chưa Apply,
+  đúng snapshot fingerprint hiện tại, payload format 1/2 đọc được và đúng plan fingerprint.
+  Scope sai vẫn trả lỗi quyền/resource theo conventions hiện có. Scope có xung đột dữ liệu, lớp đã hoàn tất
+  hoặc deadline CANCELLED không có đề xuất. Không áp giới hạn thời gian sau Deadline EXPIRED.
+- Repository lọc scope/owner/fingerprint/applied tại DB, đọc `Slice` 50 bản ghi/lô qua **tất cả các trang**.
+  Mỗi request chỉ capture một snapshot; mỗi payload được kiểm tra trong bộ nhớ, không query theo từng nhóm/thành viên.
+  Detach bản ghi staging sau khi đọc để không giữ toàn bộ payload trong persistence context.
+  Chi phí so sánh tăng tuyến tính theo tổng số thành viên của các phương án còn cùng snapshot; chưa benchmark
+  hàng chục nghìn payload trên MySQL. Không tự thêm index/migration hoặc cache có thể bỏ sót phương án tốt hơn.
+
+#### Eligibility và tiêu chí so sánh
+
+- Dùng Student/Major từ snapshot hiện tại để đánh giá, không tin `allRulesPassed`, Group Score, optimization
+  hoặc report đã lưu. Kiểm tra đầy đủ sinh viên, không trùng/thiếu, Leader/role, virtual group/name,
+  số slot mới, status hiện tại và bất biến membership/Leader/status của PENDING/ACCEPTED.
+- Tái sử dụng `GroupRuleValidationService.evaluateRules`, MIN/MAX_GROUPS đang bật và
+  `AllocationBalancePolicy.isBalanced` (chênh sĩ số tối đa 1). Mọi rule đang bật phải đạt để được Recommended,
+  kể cả rule được gắn nhãn soft và rule của protected group. Điều này có thể lọc bỏ một phương án mà engine
+  giữ protected với warning; **không thay đổi** khả năng Review/Apply hay policy của engine.
+- Giữ nguyên công thức `P = Σ nhóm Σ ngành n × (n−1)/2` của engine. Chỉ mở visibility helper trong package
+  để tái sử dụng, không đổi Random/search/repair hoặc thứ tự tối ưu của engine.
+- So sánh History khác target cần trừ lower bound phân bố đều: với ngành có `N` sinh viên và target `G`,
+  đặt `q=floor(N/G)`, `r=N mod G`; `L_ngành = G×q×(q−1)/2 + r×q`.
+  `Excess = P − Σ L_ngành`. Lower bound này chỉ dựa trên nguồn ngành và target, chưa xét protected/Leader/rules;
+  không khẳng định lower bound luôn đạt được. Unknown Major không tự gán ngành; trả số lượng và warning riêng.
+- Xếp hạng theo thứ tự: Excess thấp hơn → giữ nguyên nhiều draft vốn hợp lệ hơn → giữ nhiều Leader cũ hơn
+  → ít sinh viên đang có nhóm phải chuyển hơn. Unassigned không tính là sinh viên chuyển từ nhóm cũ.
+  Chất lượng bằng nhau dùng `planFingerprint`, rồi `previewId` theo thứ tự từ điển; không dùng target/time làm ưu tiên.
+  `equivalentPlans` cho biết có bao nhiêu phương án cùng chất lượng trước bước chọn ổn định.
+- Đây là ưu tiên **chọn giữa các phương án đã lưu** theo yêu cầu Recommended; không sửa chính sách của engine
+  ưu tiên giữ draft/Leader/movements trước bước cân ngành. Không sửa nội dung bất kỳ History nào.
+- Group Score 40/35/25 được tính lại và hiển thị trung bình nếu applicable, không cộng thêm vào ranking vì
+  validator đã kiểm tra chính các rule đó. Candidate Compatibility Score là đánh giá admission theo nhu cầu
+  của một nhóm; utility cũ phụ thuộc sĩ số/target nên không cộng tổng để so sánh toàn phương án khác target.
+  Giữ nguyên cả hai công thức, không tạo một điểm tổng phần trăm mới hoặc khác biệt giả khi tất cả đạt 100%.
+
+#### Response và giao diện
+
+- `AllocationRecommendationDTO`: `snapshotFingerprint`, `planId`, `targetGroupCount`, `eligiblePlans`,
+  `equivalentPlans`, `metrics`, `reasons[{code,parameters}]`. Không có ứng viên: ID/target/metrics null,
+  counts bằng 0, reasons rỗng. Không thay contract `/plans`, `/plans/{id}`, Preview hoặc Apply.
+- Metrics gồm sĩ số/size histogram, P/lower bound/Excess, số nhóm có ≥3/≥4 sinh viên cùng ngành,
+  unknown Major, draft giữ nguyên, Leader giữ nguyên, sinh viên chuyển nhóm, Unassigned được phân bổ,
+  protected và Group Score trung bình. Lý do tạo từ các số liệu này, không hardcode diễn giải VI/EN tại Backend.
+- Bảng Random History giữ nguyên, thêm badge “Đề xuất tốt nhất” trên đúng dòng đủ điều kiện và một dải thông tin nhỏ.
+  Nếu phương án tốt nhất ở trang khác, vẫn có thể Xem phương án từ dải thông tin; không chọn lại “tốt nhất trong trang”.
+  Hover/focus/click badge mở Popover có histogram, các lý do, điểm mạnh, cảnh báo và giải thích phương án tương đương.
+  Cả VI/EN nhấn mạnh chỉ tốt nhất trong History đã đánh giá, không phải tối ưu tuyệt đối và không tự Apply.
+- Query key cùng prefix allocation/plans; refresh, Random/Random Again, Apply và realtime invalidation hiện có
+  đánh giá lại. Khi Overview fingerprint đổi, query key đổi; không hiển thị badge trong khi đang fetch/lỗi
+  hoặc fingerprint không khớp. API Apply vẫn phải kiểm tra lại scope/quyền/fingerprint/rules trong transaction.
+  Recommendation lỗi không khóa khả năng xem/chọn History hiện có.
+
+#### Số liệu kiểm thử và giới hạn
+
+Fixture thuần gồm 36 sinh viên, 12 SE/12 IB/12 GD, cùng rules 4–6 người, ≥2 ngành, ≥1 SE:
+
+| Target | Sĩ số | P | Lower bound | Excess |
+| --- | --- | ---: | ---: | ---: |
+| 6 | 6 nhóm × 6 | 18 | 18 | 0 |
+| 7 | 6 nhóm × 5 + 1 nhóm × 6 | 15 | 15 | 0 |
+| 8 | 4 nhóm × 4 + 4 nhóm × 5 | 12 | 12 | 0 |
+| 9 | 9 nhóm × 4 | 9 | 9 | 0 |
+
+Cả bốn phương án đều đạt rules, Group Score 100%, ngang chất lượng khi không có nhóm cũ.
+Trong fixture, fingerprint nhỏ nhất thuộc phương án 8 nhóm nên được chọn; đây không phải quy tắc ưu tiên 8 nhóm.
+Một fixture 8 nhóm khác đổi phân bố SE của hai nhóm từ 2/2 sang 1/3, vẫn đạt rules/sĩ số nhưng P=13,
+Excess=1; phương án P=12/Excess=0 được chọn trước. Có test protected buộc giữ cụm 3 SE: vẫn chỉ đề xuất
+phương án hợp lệ đã lưu và báo hạn chế, không sửa protected hoặc tuyên bố đã tối ưu toàn cục.
+
+Tests dùng validators/Group Score thật, repository mocks và H2 riêng; bao gồm toàn bộ trang (55 phương án),
+equivalent/stable tie, scope/owner, stale/applied, rules bật/tắt, số nhóm, Major/SE, Leader, duplicate/missing members,
+protected, no-candidate, format 1, payload hỏng và không mutation. Frontend có tests badge đúng dòng, best ở trang khác,
+Popover VI/EN, realtime fingerprint mismatch, API GET/envelope, lỗi/empty, và hồi quy Preview/Apply/History.
+Kết quả: **186 Backend tests passed** (Recommendation 12, Allocation HTTP/API 44, Atomic Apply/History 33,
+engine 42, Group Score 17, Group Session Policy 32, class-rule status 6); `bootJar` thành công.
+**52 Frontend tests / 3 files passed**; `npm run build` (TypeScript + Vite) thành công.
+`npm run lint` exit 0, còn các warning có sẵn ngoài phần thay đổi; Vite còn warning bundle lớn.
+Chưa kiểm thử trực quan bằng browser hoặc E2E trên MySQL ứng dụng; không chạy migration, ghi MySQL thật hoặc commit/push.
+
+Files bổ sung/sửa trong lượt Recommended Plan:
+
+- Backend: `AllocationRecommendationService.java`, `dto/AllocationRecommendationDTO.java`,
+  `AllocationPlanHistoryService.java` (reuse decode và xử lý member thiếu ID), `SmartAllocationService.java`
+  (chỉ visibility helper), `repository/AllocationPreviewRepository.java`, `web/rest/AllocationResource.java`.
+- Frontend: `features/allocation/api/allocationApi.ts`, `features/allocation/types.ts`,
+  `features/allocation/components/AllocationPlanHistory.tsx`, `features/allocation/components/RecommendedPlanBadge.tsx`,
+  `pages/lecturer/LecturerAllocationPage.tsx`, CSS cùng trang và `locales/vi.json`, `locales/en.json`.
+- Tests: `AllocationRecommendationServiceTest.java`, `AllocationResourceTest.java`,
+  `Client/src/test/allocationFlow.test.tsx`, `allocationApi.test.ts`, `allocationFixtures.ts`.
+- Tài liệu: chỉ cập nhật file thống nhất này.

@@ -1,12 +1,20 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiClient } from '@/services/api/client';
 import { allocationApi } from '@/features/allocation/api/allocationApi';
-import { applyFixture, overviewFixture, planFixture, previewFixture, setupFixture } from './allocationFixtures';
+import { applyFixture, overviewFixture, planFixture, previewFixture, setupFixture, recommendationFixture } from './allocationFixtures';
 import type { InternalAxiosRequestConfig } from 'axios';
 
 const originalAdapter = apiClient.defaults.adapter;
 afterEach(() => { apiClient.defaults.adapter = originalAdapter; });
 describe('allocation actual Axios and Java DTO contracts', () => {
+  it('reads the class/session-wide recommendation through the response wrapper with no mutation', async () => {
+    const requests: InternalAxiosRequestConfig[] = [];
+    apiClient.defaults.adapter = async config => { requests.push(config); return { config, headers: {}, status: 200, statusText: 'OK', data: { statusCode: 200, data: recommendationFixture() } }; };
+    const signal = new AbortController().signal;
+    expect(await allocationApi.recommendation(3, 2, signal)).toEqual(recommendationFixture());
+    expect(requests[0].url).toBe('/api/deadlines/3/classes/2/allocation/plans/recommendation');
+    expect(requests[0].method).toBe('get'); expect(requests[0].signal).toBe(signal); expect(requests[0].data).toBeUndefined();
+  });
   it('uses the existing envelope interceptor, exact paths/params and minimal Apply payload', async () => {
     const requests: InternalAxiosRequestConfig[] = [];
     apiClient.defaults.adapter = async config => {

@@ -160,6 +160,11 @@
 .allocation-history-overlay .ant-drawer-header { border-color: var(--color-primary-border); background: var(--color-primary-light); }
 .allocation-history-summary { display: grid; justify-items: start; gap: .5rem; margin-bottom: 1rem; font-size: .8125rem; }
 .allocation-history-summary > span:not(.ant-tag) { color: var(--color-text-muted); line-height: 1.6; }
+.allocation-recommendation { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .75rem; padding: .625rem .75rem; margin-bottom: 1rem; border: 1px solid var(--color-primary-border); border-radius: var(--radius-md); background: var(--color-primary-light); color: var(--color-text-muted); font-size: .8125rem; }
+.allocation-recommended-badge.ant-btn { display: inline-flex; border-radius: var(--radius-full); background: var(--color-primary-light); color: var(--color-primary); font-size: .75rem; font-weight: 600; }
+.allocation-recommendation-reasons { max-width: min(24rem, calc(100vw - 3rem)); max-height: min(32rem, 65vh); overflow-y: auto; font-size: .8125rem; line-height: 1.65; overflow-wrap: anywhere; }
+.allocation-recommendation-reasons ul { padding-left: 1.125rem; margin-block: .5rem; }
+.allocation-recommendation-reasons li + li { margin-top: .375rem; }
 .allocation-content-nav > .ant-tabs-nav { margin-bottom: 1rem; border-bottom: 1px solid var(--color-border); }
 .allocation-content-nav > .ant-tabs-nav .ant-tabs-tab { padding: .875rem .125rem; font-size: .8125rem; }
 .allocation-tab-label { display: inline-flex; align-items: center; gap: .5rem; }
@@ -179,6 +184,16 @@
 .allocation-history-panel .allocation-history-action-cell .ant-btn { white-space: nowrap; flex: 0 0 auto; }
 .allocation-table-actions > .allocation-action-hint { flex: 0 0 auto; }
 .allocation-history-status.ant-tag { border-radius: var(--radius-full); margin: 0; padding-inline: .625rem; font-size: .75rem; white-space: nowrap; }
+.allocation-plan-history-table .ant-table-tbody > tr > td { padding: .625rem .75rem; vertical-align: middle; }
+.allocation-plan-history-table .ant-table-thead > tr > th { padding: .625rem .75rem; vertical-align: middle; }
+.allocation-plan-history-table td.allocation-history-number { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.allocation-plan-status { display: flex; align-items: center; flex-wrap: wrap; gap: .375rem; }
+.allocation-plan-status > .allocation-history-status { flex: 0 0 auto; }
+.allocation-plan-applied-time { flex-basis: 100%; font-size: .6875rem; line-height: 1.5; }
+.allocation-plan-history-table .allocation-plan-status .allocation-recommended-badge.ant-btn { flex: 0 0 auto; height: 1.375rem; min-height: 1.375rem; padding: 0 .4375rem; gap: .25rem; border: 0; border-radius: var(--radius-full); font-size: .6875rem; font-weight: 500; line-height: 1; white-space: nowrap; }
+.allocation-plan-history-table .allocation-recommended-badge .ant-btn-icon { display: inline-flex; align-items: center; }
+.allocation-plan-history-table .allocation-recommended-badge svg { width: .75rem; height: .75rem; }
+.allocation-plan-history-table .allocation-table-actions .allocation-action-hint .ant-btn { min-height: 2rem; padding-inline: .625rem; font-size: .75rem; }
 .allocation-history-panel .ant-table-pagination { margin-bottom: 0; }
 .allocation-page .ant-tabs-content-holder, .allocation-page .ant-table-wrapper { min-width: 0; }
 .allocation-page .ant-alert { margin-block: .5rem; }

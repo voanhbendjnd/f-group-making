@@ -81,7 +81,7 @@ public class AllocationPlanHistoryService {
         return snapshots.captureForHistory(deadlineId, classId).map(AllocationPreviewService.Captured::overview).orElse(null);
     }
 
-    private AllocationPreviewDTO decode(AllocationPreview row) {
+    AllocationPreviewDTO decode(AllocationPreview row) {
         if ((row.getFormatVersion() != 1 && row.getFormatVersion() != 2) || row.getPayload() == null) return null;
         try {
             var plan = mapper.readValue(row.getPayload(), AllocationPreviewDTO.class);
@@ -89,6 +89,7 @@ public class AllocationPlanHistoryService {
                 || plan.result().status() != AllocationResultDTO.Status.FEASIBLE || plan.groups().size() != row.getTargetCount()
                 || !Objects.equals(plan.scope().classId(), row.getSchoolClassId()) || !Objects.equals(plan.scope().deadlineId(), row.getDeadlineId())
                 || plan.groups().stream().anyMatch(group -> group == null || group.members() == null
+                    || group.members().stream().anyMatch(member -> member == null || member.getStudentId() == null)
                     || (group.groupId() == null && (!group.newGroup() || group.planGroupKey() == null || group.protectedGroup())))
                 || plan.groups().stream().map(AllocationPreviewDTO.GroupView::key).distinct().count() != plan.groups().size()
                 || !row.getSnapshotFingerprint().equals(plan.snapshotFingerprint())

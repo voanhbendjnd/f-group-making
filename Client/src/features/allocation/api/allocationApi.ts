@@ -1,8 +1,10 @@
 import { apiClient } from '@/services/api/client';
-import type { ApplyResult, HistoryPage, Overview, PlanDetail, PlanPage, Preview, PreviewRequest, Setup } from '../types';
+import type { ApplyResult, HistoryPage, Overview, PlanDetail, PlanPage, PlanRecommendation, Preview, PreviewRequest, Setup } from '../types';
 
 const path = (deadlineId: number, classId: number) => `/api/deadlines/${deadlineId}/classes/${classId}/allocation`;
 export const allocationApi = {
+  recommendation: (deadlineId: number, classId: number, signal?: AbortSignal) =>
+    apiClient.get<unknown, PlanRecommendation>(`${path(deadlineId, classId)}/plans/recommendation`, { signal }),
   plans: (deadlineId: number, classId: number, page: number, signal?: AbortSignal) =>
     apiClient.get<unknown, PlanPage>(`${path(deadlineId, classId)}/plans`, { params: { page, size: 10 }, signal }),
   plan: (deadlineId: number, classId: number, planId: string, signal?: AbortSignal) =>
