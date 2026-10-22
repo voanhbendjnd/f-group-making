@@ -4,7 +4,6 @@ import { Sidebar } from './Sidebar';
 import { TopNavbar } from './TopNavbar';
 import { TermProvider } from '@/app/providers/TermContext';
 import { useAuth } from '@/app/providers/AuthContext';
-import { TermFilterNotice } from '@/features/terms/components/TermFilterNotice';
 
 export const StudentLayout: React.FC = () => {
   const { user } = useAuth();
@@ -52,7 +51,6 @@ export const StudentLayout: React.FC = () => {
           onToggleSidebar={handleToggleSidebar}
         />
         <main className="page-container">
-          <TermFilterNotice area="student" />
           <Outlet />
         </main>
       </div>

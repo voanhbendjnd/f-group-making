@@ -1,5 +1,5 @@
 // Test-only fixtures shaped after the actual Phase 3–4 Java DTOs. Never imported by production UI.
-import type { AllocationGroup, AllocationReportData, ApplyResult, Overview, PlanDetail, Preview, Score, Setup } from '@/features/allocation/types';
+import type { AllocationGroup, AllocationReportData, ApplyResult, Overview, PlanDetail, PlanRecommendation, Preview, Score, Setup } from '@/features/allocation/types';
 const score: Score = { scorePercent: 100, applicable: true, compositionRulesPassed: true, breakdown: [
   { code: 'MEMBERS', baseWeight: 40, effectiveWeightPercent: 40, fulfillmentPercent: 100, contributionPercent: 40,
     rules: [{ code: 'MIN_MEMBERS_PER_GROUP', actualValue: 4, targetValue: 4, passed: true, fulfillmentPercent: 100 }] },
@@ -50,4 +50,14 @@ export function applyFixture(): ApplyResult {
   return { runId: 9, previewId: previewFixture().previewId!, actorId: 1, classId: 2, deadlineId: 3, targetGroupCount: 2, seed: 17,
     appliedAt: new Date().toISOString(), snapshotFingerprint: overviewFixture.snapshotFingerprint, planFingerprint: 'b'.repeat(64),
     approvedGroupIds: [2], cancelledInvitationIds: [], report: reportFixture };
+}
+export function recommendationFixture(): PlanRecommendation {
+  return { snapshotFingerprint: overviewFixture.snapshotFingerprint, planId: planFixture().summary.planId, targetGroupCount: 2,
+    eligiblePlans: 3, equivalentPlans: 1,
+    metrics: { students: 8, groups: 2, sizeDistribution: [{ members: 4, groups: 2 }], sizeDifference: 0,
+      sameMajorPairs: 4, evenDistributionLowerBound: 4, excessMajorPairs: 0, groupsWithThreePlusSameMajor: 0,
+      groupsWithFourPlusSameMajor: 0, unknownMajorStudents: 0, validDraftsPreserved: 0, validDraftsBefore: 0,
+      leadersPreserved: 2, leadersBefore: 3, movedStudents: 2, unassignedAllocated: 0, protectedGroups: 1, averageGroupScore: 100 },
+    reasons: [{ code: 'ALL_RULES_PASSED', parameters: { groups: 2 } }, { code: 'BALANCED_SIZES', parameters: { difference: 0 } },
+      { code: 'MAJOR_DISTRIBUTION', parameters: { three: 0, four: 0, excess: 0 } }, { code: 'PROTECTED_UNCHANGED', parameters: { groups: 1 } }] };
 }

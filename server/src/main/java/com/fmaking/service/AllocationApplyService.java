@@ -49,7 +49,7 @@ public class AllocationApplyService {
         var preview = previews.findForUpdate(request.getPreviewId()).orElseThrow(AllocationApplyService::notFound);
         checkOwner(preview, actor, classId, deadlineId);
         if (preview.getAppliedAt() != null) throw conflict("allocationPreviewUsed");
-        if (preview.getFormatVersion() != 1 || preview.getPayload() == null) throw conflict("allocationPreviewInvalid");
+        if ((preview.getFormatVersion() != 1 && preview.getFormatVersion() != 2) || preview.getPayload() == null) throw conflict("allocationPreviewInvalid");
         request.setStatus(AllocationApplyRequest.Status.PROCESSING);
         locks.data(classId, deadlineId);
         var current = snapshots.capture(deadlineId, classId);
@@ -69,14 +69,16 @@ public class AllocationApplyService {
         current.overview().groups().stream().filter(g -> g.status() == GroupStatus.OPEN || g.status() == GroupStatus.REVOKED)
             .forEach(g -> affected.add(g.groupId()));
         var cancelled = invitations.cancelForAllocation(deadlineId, classId, affected);
-        var approved = groups.applyAllocationPlan(deadlineId, classId, plan.groups());
+        var materialized = groups.materializeAllocationGroups(deadlineId, classId, plan.groups());
+        var approved = groups.applyAllocationPlan(deadlineId, classId, materialized.groups());
+        var report = snapshots.resolveReport(plan.report(), materialized.createdGroupIds());
         var run = new AllocationRun();
         run.setPreviewId(preview.getId()); run.setApplyRequestId(requestId); run.setActorId(actor);
         run.setSchoolClassId(classId); run.setDeadlineId(deadlineId); run.setTargetCount(preview.getTargetCount()); run.setSeed(preview.getSeed());
         run.setAppliedAt(clock.instant()); run.setSnapshotFingerprint(preview.getSnapshotFingerprint()); run.setPlanFingerprint(preview.getPlanFingerprint());
         run.setResultJson("{}"); runs.saveAndFlush(run);
         var result = new AllocationApplyDTO(run.getId(), preview.getId(), actor, classId, deadlineId, preview.getTargetCount(), preview.getSeed(),
-            run.getAppliedAt(), preview.getSnapshotFingerprint(), preview.getPlanFingerprint(), approved, cancelled, plan.report());
+            run.getAppliedAt(), preview.getSnapshotFingerprint(), preview.getPlanFingerprint(), approved, cancelled, report);
         String json = write(result);
         run.setResultJson(json); preview.setAppliedAt(run.getAppliedAt());
         request.setStatus(AllocationApplyRequest.Status.SUCCEEDED); request.setResultJson(json); request.setFailureCode(null);

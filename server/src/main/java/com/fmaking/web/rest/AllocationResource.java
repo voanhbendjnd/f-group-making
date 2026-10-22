@@ -4,6 +4,8 @@ import com.fmaking.service.AllocationPreviewService;
 import com.fmaking.service.AllocationApplyCoordinator;
 import com.fmaking.service.AllocationHistoryService;
 import com.fmaking.service.AllocationPlanHistoryService;
+import com.fmaking.service.AllocationRecommendationService;
+import com.fmaking.service.dto.AllocationRecommendationDTO;
 import com.fmaking.service.dto.AllocationApplyDTO;
 import com.fmaking.service.dto.ResultPaginationDTO;
 import org.springframework.data.domain.Pageable;
@@ -23,9 +25,19 @@ public class AllocationResource {
     private final AllocationApplyCoordinator apply;
     private final AllocationHistoryService history;
     private final AllocationPlanHistoryService plans;
+    private final AllocationRecommendationService recommendations;
 
-    public AllocationResource(AllocationPreviewService service, AllocationApplyCoordinator apply, AllocationHistoryService history, AllocationPlanHistoryService plans) {
+    public AllocationResource(AllocationPreviewService service, AllocationApplyCoordinator apply, AllocationHistoryService history, AllocationPlanHistoryService plans,
+            AllocationRecommendationService recommendations) {
         this.service = service; this.apply = apply; this.history = history; this.plans = plans;
+        this.recommendations = recommendations;
+    }
+
+    @GetMapping("/plans/recommendation")
+    @ApiMessage("Saved allocation recommendation retrieved")
+    public ResponseEntity<AllocationRecommendationDTO> recommendation(@PathVariable("deadlineId") Integer deadlineId,
+            @PathVariable("classId") Integer classId) {
+        return ResponseEntity.ok(recommendations.recommend(deadlineId, classId));
     }
 
     @GetMapping("/plans")

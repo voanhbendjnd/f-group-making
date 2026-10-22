@@ -595,6 +595,10 @@ select.form-control {
   vertical-align: middle;
 }
 
+.table .table-action-cell { width: 1%; white-space: nowrap; }
+.table-row-actions { display: inline-flex; align-items: center; justify-content: flex-end; flex-wrap: nowrap; gap: 0.5rem; }
+.table-row-actions > .btn { flex: 0 0 auto; }
+
 .table tbody tr {
   transition: background-color var(--transition-fast);
 }
@@ -1073,8 +1077,9 @@ select.form-control {
   padding: 1.5rem 2rem;
   border-radius: 16px;
   margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: linear-gradient(135deg, var(--color-text-main) 0%, #1e3a8a 45%, #2563eb 100%);
+  color: var(--color-text-inverse);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .student-group-header-content {
@@ -1093,7 +1098,7 @@ select.form-control {
 .student-group-header-title {
   font-size: 1.75rem;
   font-weight: 800;
-  color: var(--color-text-main, #0f172a);
+  color: var(--color-text-inverse);
   margin: 0 0 6px;
   line-height: 1.25;
   word-break: break-word;
@@ -1104,20 +1109,38 @@ select.form-control {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  color: var(--color-text-muted, #64748b);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.875rem;
+}
+
+.student-group-header-meta strong {
+  color: var(--color-text-inverse);
 }
 
 .student-group-countdown-box {
   display: flex;
   align-items: center;
   gap: 8px;
-  background-color: #ffffff;
+  background-color: rgba(15, 23, 42, 0.45);
+  color: #93c5fd;
   padding: 8px 16px;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(255, 255, 255, 0.18);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
   flex-shrink: 0;
+}
+
+.student-group-countdown-value {
+  display: flex;
+  gap: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text-inverse);
+  font-variant-numeric: tabular-nums;
+}
+
+.student-group-countdown-seconds {
+  color: #60a5fa;
 }
 
 .student-group-actions-bar {

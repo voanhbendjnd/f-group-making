@@ -192,16 +192,8 @@ export function GroupPreviewExportModal({
     },
   ];
 
-  return (
-    <Modal
-      className="group-export-modal"
-      open={open}
-      onCancel={onClose}
-      width={1060}
-      footer={null}
-      destroyOnHidden
-    >
-      <div className="export-modal-header">
+  const modalTitle = (
+    <div className="export-modal-header">
         <h2 className="export-modal-title">
           <FileSpreadsheet size={24} aria-hidden="true" />
           <span>
@@ -214,7 +206,54 @@ export function GroupPreviewExportModal({
             'Kiểm tra thông tin phân nhóm của toàn bộ sinh viên trong lớp trước khi xuất file Excel'
           )}
         </p>
+    </div>
+  );
+
+  const modalFooter = !isLoading && !isError ? (
+    <div className="export-modal-footer">
+      <label className="form-label">{t('adminUx.exportScope')}
+        <select className="form-control" value={exportScope} onChange={event => setExportScope(event.target.value as 'all' | 'filtered')}>
+          <option value="all">{t('adminUx.exportAll', { count: allRows.length })}</option>
+          <option value="filtered">{t('adminUx.exportFiltered', { count: filteredRows.length })}</option>
+        </select>
+      </label>
+      <p className="export-footer-hint">
+        <Info size={16} aria-hidden="true" />
+        <span>
+          {t(
+            'groupExport.footerHint',
+            'Cột Group Mentor trong file Excel sẽ lưu tên nhóm của sinh viên (để trống nếu chưa có nhóm).'
+          )}
+        </span>
+      </p>
+      <div className="export-footer-actions">
+        <Button variant="secondary" onClick={onClose}>
+          {t('groupExport.closeBtn', 'Đóng')}
+        </Button>
+        <Button
+          variant="primary"
+          icon={<Download size={16} />}
+          onClick={handleExport}
+          disabled={(exportScope === 'filtered' ? filteredRows : allRows).length === 0 || isLoading || isError}
+        >
+          {t(exportScope === 'filtered' ? 'adminUx.exportFiltered' : 'adminUx.exportAll', { count: (exportScope === 'filtered' ? filteredRows : allRows).length })}
+        </Button>
       </div>
+    </div>
+  ) : null;
+
+  return (
+    <Modal
+      className="group-export-modal"
+      open={open}
+      onCancel={onClose}
+      width={1000}
+      style={{ maxWidth: 'calc(100vw - 2rem)' }}
+      centered
+      title={modalTitle}
+      footer={modalFooter}
+      destroyOnHidden
+    >
 
       {isLoading ? (
         <div style={{ padding: '60px 0', textAlign: 'center' }}>
@@ -298,41 +337,12 @@ export function GroupPreviewExportModal({
               columns={columns}
               dataSource={filteredRows}
               pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50] }}
-              size="middle"
+              scroll={{ x: 1240 }}
+              size="small"
               locale={{ emptyText: t('groupExport.empty', 'Không có dữ liệu sinh viên') }}
             />
           </div>
 
-          <div className="export-modal-footer">
-            <label className="form-label">{t('adminUx.exportScope')}
-              <select className="form-control" value={exportScope} onChange={event => setExportScope(event.target.value as 'all' | 'filtered')}>
-                <option value="all">{t('adminUx.exportAll', { count: allRows.length })}</option>
-                <option value="filtered">{t('adminUx.exportFiltered', { count: filteredRows.length })}</option>
-              </select>
-            </label>
-            <p className="export-footer-hint">
-              <Info size={16} aria-hidden="true" />
-              <span>
-                {t(
-                  'groupExport.footerHint',
-                  'Cột Group Mentor trong file Excel sẽ lưu tên nhóm của sinh viên (để trống nếu chưa có nhóm).'
-                )}
-              </span>
-            </p>
-            <div className="export-footer-actions">
-              <Button variant="secondary" onClick={onClose}>
-                {t('groupExport.closeBtn', 'Đóng')}
-              </Button>
-              <Button
-                variant="primary"
-                icon={<Download size={16} />}
-                onClick={handleExport}
-                disabled={(exportScope === 'filtered' ? filteredRows : allRows).length === 0 || isLoading || isError}
-              >
-                {t(exportScope === 'filtered' ? 'adminUx.exportFiltered' : 'adminUx.exportAll', { count: (exportScope === 'filtered' ? filteredRows : allRows).length })}
-              </Button>
-            </div>
-          </div>
         </>
       )}
     </Modal>

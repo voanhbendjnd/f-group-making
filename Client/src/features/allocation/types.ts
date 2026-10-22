@@ -9,7 +9,7 @@ export interface Score {
     rules: { code: GroupingRuleCode; actualValue: number; targetValue: number; passed: boolean; fulfillmentPercent: number }[] }[];
 }
 export interface RuleView { code: GroupingRuleCode; scope: 'GROUP' | 'CLASS'; actualValue: number; targetValue: number; passed: boolean; hardRule: boolean }
-export interface AllocationGroup { groupId: number; name: string; status: GroupStatus; leaderId: number; leaderName: string | null;
+export interface AllocationGroup { groupId: number | null; planGroupKey?: string | null; newGroup?: boolean; name: string; status: GroupStatus; leaderId: number; leaderName: string | null;
   protectedGroup: boolean; members: GroupMemberDTO[]; score: Score; rules: RuleView[]; allRulesPassed: boolean }
 export interface Scope { classId: number; className: string; termId: number | null; lecturerId: number | null; rulesVersion: number;
   deadlineId: number; deadlineName: string; deadlineStatus: string; startTime: string; endTime: string; deadlineVersion: number }
@@ -22,11 +22,11 @@ export interface Setup { scope: Scope; snapshotFingerprint: string; seed: number
   limits: { maximumSearchNodes: number; maximumSearchDepth: number; createsNewGroups: boolean }; warnings: Reason[] }
 export interface AllocationReportData {
   groupsBefore: number; groupsAfter: number; studentsBefore: number; studentsAfter: number; unassignedBefore: number; unassignedAfter: number;
-  keptGroupIds: number[]; disbandedGroupIds: number[]; createdGroupIds: number[]; protectedGroupIds: number[];
+  keptGroupIds: number[]; disbandedGroupIds: number[]; createdGroupIds: number[]; createdGroupKeys?: string[] | null; protectedGroupIds: number[];
   movements: { studentId: number; fullName: string; rollNumber: string; fromGroupId: number | null; fromGroupName: string | null;
-    toGroupId: number; toGroupName: string; previouslyUnassigned: boolean }[];
-  leaderChanges: { groupId: number; previousLeaderId: number | null; previousLeaderName: string | null; leaderId: number; leaderName: string | null }[];
-  groupChanges: { groupId: number; name: string; protectedGroup: boolean; disbanded: boolean; leaderBefore: number | null;
+    toGroupId: number | null; toGroupKey?: string | null; toGroupName: string; previouslyUnassigned: boolean }[];
+  leaderChanges: { groupId: number | null; planGroupKey?: string | null; previousLeaderId: number | null; previousLeaderName: string | null; leaderId: number; leaderName: string | null }[];
+  groupChanges: { groupId: number | null; planGroupKey?: string | null; newGroup?: boolean; name: string; protectedGroup: boolean; disbanded: boolean; leaderBefore: number | null;
     leaderNameBefore: string | null; leaderAfter: number | null; leaderNameAfter: string | null; scoreBefore: Score | null; scoreAfter: Score | null;
     rulesBefore: RuleView[]; rulesAfter: RuleView[] }[];
 }
@@ -45,3 +45,13 @@ export interface PlanSummary { planId: string; actorId: number; actorName: strin
   available: boolean; canApply: boolean; invalidReason: string | null }
 export interface PlanDetail { summary: PlanSummary; preview: Preview }
 export interface PlanPage { meta: HistoryPage['meta']; result: PlanSummary[] }
+export interface PlanRecommendation {
+  snapshotFingerprint: string | null; planId: string | null; targetGroupCount: number | null;
+  eligiblePlans: number; equivalentPlans: number;
+  metrics: { students: number; groups: number; sizeDistribution: { members: number; groups: number }[]; sizeDifference: number;
+    sameMajorPairs: number; evenDistributionLowerBound: number; excessMajorPairs: number;
+    groupsWithThreePlusSameMajor: number; groupsWithFourPlusSameMajor: number; unknownMajorStudents: number;
+    validDraftsPreserved: number; validDraftsBefore: number; leadersPreserved: number; leadersBefore: number;
+    movedStudents: number; unassignedAllocated: number; protectedGroups: number; averageGroupScore: number | null } | null;
+  reasons: { code: string; parameters: Record<string, number> }[];
+}

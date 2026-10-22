@@ -71,7 +71,7 @@ public class AllocationPreviewService {
         Overview overview = overview(loaded);
         var limits = SmartAllocationService.SearchLimits.defaults();
         return new Setup(loaded.scope(), loaded.fingerprint(), seed, overview.summary(), engine.preliminaryRange(loaded.snapshot()),
-            engine.suggest(loaded.snapshot(), seed), new SmartLimits(limits.maximumNodes(), limits.maximumDepth(), false), overview.warnings());
+            engine.suggest(loaded.snapshot(), seed), new SmartLimits(limits.maximumNodes(), limits.maximumDepth(), true), overview.warnings());
     }
 
     @Transactional(isolation = Isolation.REPEATABLE_READ)
@@ -84,8 +84,13 @@ public class AllocationPreviewService {
         requireAllocationNeeded(before);
         var result = engine.allocate(loaded.snapshot(), request.targetGroupCount(), seed);
         boolean feasible = result.status() == AllocationResultDTO.Status.FEASIBLE;
-        List<GroupView> proposed = feasible ? result.groups().stream().map(group -> view(loaded.snapshot().rules(), group.groupId(),
-            group.name(), group.status(), group.leaderId(), group.members(), result.groups().size())).toList() : List.of();
+        List<GroupView> proposed = feasible ? result.groups().stream().map(group -> {
+            var evaluated = view(loaded.snapshot().rules(), group.groupId(), group.name(), group.status(), group.leaderId(),
+                group.members(), result.groups().size());
+            return new GroupView(evaluated.groupId(), evaluated.name(), evaluated.status(), evaluated.leaderId(), evaluated.leaderName(),
+                evaluated.protectedGroup(), evaluated.members(), evaluated.score(), evaluated.rules(), evaluated.allRulesPassed(),
+                group.planGroupKey(), group.newGroup());
+        }).toList() : List.of();
         String planFingerprint = feasible ? planFingerprint(loaded.fingerprint(), proposed) : null;
         boolean same = feasible && planFingerprint.equals(request.previousPlanFingerprint());
         List<Reason> warnings = new ArrayList<>(before.warnings()); warnings.addAll(result.reasons());
@@ -111,6 +116,12 @@ public class AllocationPreviewService {
         catch (ConflictAlertException exception) { return Optional.empty(); }
     }
     public String planFingerprint(String snapshotFingerprint, List<GroupView> proposed) {
+        if (proposed.stream().anyMatch(group -> group.planGroupKey() != null || group.newGroup())) {
+            return hash(new PlanIdentityV2(snapshotFingerprint, proposed.stream().sorted(Comparator.comparing(GroupView::key)).map(group ->
+                new PlannedAssignment(group.key(), group.groupId(), group.name(), group.newGroup(), group.status(), group.leaderId(),
+                    group.members().stream().map(GroupMemberDTO::getStudentId).sorted().toList())).toList()));
+        }
+        // Existing format-1 histories keep their original fingerprint algorithm.
         return hash(new PlanIdentity(snapshotFingerprint, proposed.stream().sorted(Comparator.comparing(GroupView::groupId)).map(group ->
             new Assignment(group.groupId(), group.status(), group.leaderId(), group.members().stream().map(GroupMemberDTO::getStudentId).sorted().toList())).toList()));
     }
@@ -121,6 +132,8 @@ public class AllocationPreviewService {
     private record InvitationState(Long id, Long groupId, Long studentId, Long inviterId, Instant createdAt) {}
     private record Assignment(Long groupId, GroupStatus status, Long leaderId, List<Long> members) {}
     private record PlanIdentity(String snapshotFingerprint, List<Assignment> assignments) {}
+    private record PlannedAssignment(String key, Long groupId, String name, boolean newGroup, GroupStatus status, Long leaderId, List<Long> members) {}
+    private record PlanIdentityV2(String snapshotFingerprint, List<PlannedAssignment> assignments) {}
 
     private Loaded load(Integer deadlineId, Integer classId) {
         if (classId == null || deadlineId == null || classId < 1 || deadlineId < 1)
@@ -203,30 +216,50 @@ public class AllocationPreviewService {
 
     private Report report(Overview before, List<GroupView> after, List<Long> disbanded) {
         Map<Long, GroupView> original = before.groups().stream().collect(Collectors.toMap(GroupView::groupId, Function.identity()));
-        Map<Long, GroupView> proposed = after.stream().collect(Collectors.toMap(GroupView::groupId, Function.identity()));
+        Map<Long, GroupView> proposed = after.stream().filter(group -> group.groupId() != null)
+            .collect(Collectors.toMap(GroupView::groupId, Function.identity()));
         Map<Long, GroupView> origins = new HashMap<>();
         before.groups().forEach(group -> group.members().forEach(member -> origins.put(member.getStudentId(), group)));
         List<Movement> movements = new ArrayList<>(); List<LeaderChange> leaders = new ArrayList<>();
         for (var group : after) {
             var old = original.get(group.groupId());
-            if (!Objects.equals(old.leaderId(), group.leaderId())) leaders.add(new LeaderChange(group.groupId(), old.leaderId(),
-                old.leaderName(), group.leaderId(), group.leaderName()));
+            if (old == null || !Objects.equals(old.leaderId(), group.leaderId())) leaders.add(new LeaderChange(group.groupId(),
+                old == null ? null : old.leaderId(), old == null ? null : old.leaderName(), group.leaderId(), group.leaderName(), group.key()));
             for (var member : group.members()) {
                 var from = origins.get(member.getStudentId());
                 if (from == null || !from.groupId().equals(group.groupId())) movements.add(new Movement(member.getStudentId(), member.getFullName(),
-                    member.getRollNumber(), from == null ? null : from.groupId(), from == null ? null : from.name(), group.groupId(), group.name(), from == null));
+                    member.getRollNumber(), from == null ? null : from.groupId(), from == null ? null : from.name(), group.groupId(), group.name(), from == null, group.key()));
             }
         }
-        List<GroupChange> changes = before.groups().stream().map(old -> {
+        List<GroupChange> changes = new ArrayList<>(before.groups().stream().map(old -> {
             var updated = proposed.get(old.groupId());
             return new GroupChange(old.groupId(), old.name(), old.protectedGroup(), updated == null,
                 old.leaderId(), old.leaderName(), updated == null ? null : updated.leaderId(), updated == null ? null : updated.leaderName(), old.score(),
                 updated == null ? null : updated.score(), old.rules(), updated == null ? List.of() : updated.rules());
-        }).toList();
+        }).toList());
+        after.stream().filter(GroupView::newGroup).forEach(group -> changes.add(new GroupChange(null, group.name(), false, false,
+            null, null, group.leaderId(), group.leaderName(), null, group.score(), List.of(), group.rules(), group.key(), true)));
         return new Report(before.summary().totalGroups(), after.size(), before.summary().totalStudents(),
             after.stream().mapToInt(group -> group.members().size()).sum(), before.summary().unassignedStudents(), 0,
-            after.stream().map(GroupView::groupId).toList(), disbanded, List.of(),
-            after.stream().filter(GroupView::protectedGroup).map(GroupView::groupId).toList(), List.copyOf(movements), List.copyOf(leaders), changes);
+            after.stream().filter(group -> !group.newGroup()).map(GroupView::groupId).toList(), disbanded, List.of(),
+            after.stream().filter(GroupView::protectedGroup).map(GroupView::groupId).toList(), List.copyOf(movements), List.copyOf(leaders), List.copyOf(changes),
+            after.stream().filter(GroupView::newGroup).map(GroupView::key).toList());
+    }
+
+    /** Apply audit uses real IDs; the immutable saved Random plan keeps its virtual keys. */
+    public Report resolveReport(Report report, Map<String, Long> created) {
+        if (created.isEmpty()) return report;
+        var movements = report.movements().stream().map(value -> new Movement(value.studentId(), value.fullName(), value.rollNumber(),
+            value.fromGroupId(), value.fromGroupName(), value.toGroupId() == null ? created.get(value.toGroupKey()) : value.toGroupId(),
+            value.toGroupName(), value.previouslyUnassigned(), value.toGroupKey())).toList();
+        var leaders = report.leaderChanges().stream().map(value -> new LeaderChange(value.groupId() == null ? created.get(value.planGroupKey()) : value.groupId(),
+            value.previousLeaderId(), value.previousLeaderName(), value.leaderId(), value.leaderName(), value.planGroupKey())).toList();
+        var changes = report.groupChanges().stream().map(value -> new GroupChange(value.groupId() == null ? created.get(value.planGroupKey()) : value.groupId(),
+            value.name(), value.protectedGroup(), value.disbanded(), value.leaderBefore(), value.leaderNameBefore(), value.leaderAfter(),
+            value.leaderNameAfter(), value.scoreBefore(), value.scoreAfter(), value.rulesBefore(), value.rulesAfter(), value.planGroupKey(), value.newGroup())).toList();
+        return new Report(report.groupsBefore(), report.groupsAfter(), report.studentsBefore(), report.studentsAfter(), report.unassignedBefore(),
+            report.unassignedAfter(), report.keptGroupIds(), report.disbandedGroupIds(), List.copyOf(created.values()), report.protectedGroupIds(),
+            movements, leaders, changes, report.createdGroupKeys());
     }
 
     private static GroupMemberDTO student(StudentRow row) {

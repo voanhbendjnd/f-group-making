@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { Modal, Input as AntInput, Select, Table } from 'antd';
-import { AlertTriangle, CheckCircle2, ClipboardCheck, Clock3, Eye, FileSpreadsheet, GraduationCap, Info, Layers, RefreshCw, Search, SlidersHorizontal, Sparkles, Target, Users } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ClipboardCheck, Eye, FileSpreadsheet, GraduationCap, Info, Layers, RefreshCw, Search, SlidersHorizontal, Sparkles, Target, Users } from 'lucide-react';
 import { useTerm } from '@/app/providers/TermContext';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useRealtime } from '@/app/providers/realtimeContext';
@@ -168,7 +168,7 @@ function ReviewContent() {
     { title: t('groupReview.rules'), key: 'rules', render: (_: unknown, row: GroupReviewRow) => eligibility(row) },
     { title: t('groupReview.status'), key: 'status', render: (_: unknown, row: GroupReviewRow) => statusBadge(row.group.status) },
     { title: t('groupReview.submittedAt'), key: 'submitted', render: (_: unknown, row: GroupReviewRow) => row.submittedAt ? new Date(row.submittedAt).toLocaleString(i18n.language) : t('groupReview.notSubmitted') },
-    { title: t('groupReview.actions'), key: 'actions', render: (_: unknown, row: GroupReviewRow) => <div className="review-actions">
+    { title: t('groupReview.actions'), key: 'actions', className: 'review-actions-cell', render: (_: unknown, row: GroupReviewRow) => <div className="review-actions">
       <Button size="sm" variant="secondary" onClick={() => setViewId(row.group.id)}>{t('groupReview.view')}</Button>
       {row.canReview && <>
         <Button size="sm" disabled={!row.eligible || mutation.isPending} onClick={() => begin('approve', row)}>{t('groupReview.approve')}</Button>
@@ -179,7 +179,7 @@ function ReviewContent() {
   ];
   return <div className="group-review-page">
     <PageHeader title={t('groupReview.title')} description={t('groupReview.description')} />
-    <section className="card review-classes-card" aria-label={t('groupReview.myClassesTitle')}>
+    {area === 'lecturer' && <section className="card review-classes-card" aria-label={t('groupReview.myClassesTitle')}>
       <div className="review-classes-header">
         <div className="review-classes-title-group">
           <div className="review-classes-icon" aria-hidden="true"><GraduationCap size={22} /></div>
@@ -197,6 +197,7 @@ function ReviewContent() {
       ) : (
         <div className="review-classes-grid">
           <button type="button" className={`review-class-item ${!filters.classId ? 'is-active' : ''}`}
+            aria-pressed={!filters.classId}
             onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>
             <div className="review-class-item-top">
               <div className="review-class-badge-icon" aria-hidden="true"><Layers size={18} /></div>
@@ -208,6 +209,7 @@ function ReviewContent() {
           {classes.data?.result.map(cls => {
             const isSelected = filters.classId === cls.id;
             return <button key={cls.id} type="button" className={`review-class-item ${isSelected ? 'is-active' : ''}`}
+              aria-pressed={isSelected}
               onClick={() => { setFilters(old => ({ ...old, classId: cls.id, page: 1 })); setViewId(null); }}>
               <div className="review-class-item-top">
                 <div className="review-class-badge-icon" aria-hidden="true"><GraduationCap size={18} /></div>
@@ -219,7 +221,7 @@ function ReviewContent() {
           })}
         </div>
       )}
-    </section>
+    </section>}
     {selectedClass ? (
       <div className="card review-selected-class-banner" role="region" aria-label={t('groupReview.selectedClassHeading')}>
         <div className="selected-class-info">
@@ -243,16 +245,6 @@ function ReviewContent() {
     ) : (
       <div className="review-class-prompt-banner"><Info size={18} aria-hidden="true" /><span>{t('groupReview.selectClassPrompt')}</span></div>
     )}
-    <div className="review-summary" aria-label={t('groupReview.pageSummary')}>
-      {[
-        { key: 'pending', count: rows.filter(row => row.group.status === 'PENDING').length, Icon: Clock3 },
-        { key: 'accepted', count: rows.filter(row => row.group.status === 'ACCEPTED').length, Icon: CheckCircle2 },
-        { key: 'warnings', count: rows.filter(row => !row.eligible).length, Icon: AlertTriangle },
-      ].map(({ key, count, Icon }) => <div className={`card review-stat review-stat-${key}`} key={key}>
-        <div className="review-stat-content"><span>{t(`groupReview.${key}`)}</span><strong>{reviews.isPending ? '…' : reviews.data ? count : '—'}</strong><small>{t('groupReview.pageSummary')}</small></div>
-        <span className="review-stat-icon" aria-hidden="true"><Icon size={23} /></span>
-      </div>)}
-    </div>
     <form className="card review-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, search: search.trim(), page: 1 })); setViewId(null); }}>
       <label className="review-search-field">{t('groupReview.search')}<AntInput prefix={<Search size={16} aria-hidden="true" />} value={search} onChange={event => setSearch(event.target.value)} /></label>
       <label>{t('groupReview.class')}<Select allowClear showSearch aria-label={t('groupReview.class')} placeholder={t('groupReview.allClasses')} loading={classes.isFetching} optionFilterProp="label"

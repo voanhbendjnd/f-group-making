@@ -994,6 +994,44 @@ public class GroupService {
         if (active) deadlinePolicy.requireStudentWrite(deadline, classId);
     }
 
+    public record MaterializedAllocation(List<AllocationPreviewDTO.GroupView> groups, Map<String, Long> createdGroupIds) {}
+
+    /** Called only inside Atomic Apply, after scope/data locks and the live fingerprint check. */
+    public MaterializedAllocation materializeAllocationGroups(Integer deadlineId, Integer classId,
+                                                               List<AllocationPreviewDTO.GroupView> plan) {
+        validateManagementDeadline(deadlineId, classId);
+        List<Group> existing = groupRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId).stream()
+            .filter(group -> group.getStatus() != GroupStatus.DISBANDED).toList();
+        long newCount = plan.stream().filter(AllocationPreviewDTO.GroupView::newGroup).count();
+        if (newCount != Math.max(0, plan.size() - existing.size())
+                || plan.stream().map(AllocationPreviewDTO.GroupView::key).distinct().count() != plan.size()) throw allocationConflict();
+        if (newCount == 0) return new MaterializedAllocation(plan, Map.of());
+        int nextSequence = compactGroupSequence(classId, deadlineId);
+        Map<String, Long> created = new LinkedHashMap<>();
+        List<AllocationPreviewDTO.GroupView> resolved = new ArrayList<>();
+        String actor = getCurrentUserLogin();
+        for (var proposed : plan) {
+            if (!proposed.newGroup()) { resolved.add(proposed); continue; }
+            String name = proposed.name() == null ? "" : proposed.name().trim();
+            if (proposed.groupId() != null || proposed.protectedGroup() || proposed.status() != GroupStatus.OPEN
+                    || proposed.planGroupKey() == null || !proposed.planGroupKey().startsWith("new:")
+                    || name.length() < 2 || name.length() > 100 || proposed.members().isEmpty()
+                    || !Objects.equals(proposed.leaderId(), proposed.members().stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow())
+                    || groupRepository.existsBySchoolClassIdAndDeadlineIdAndNameIgnoreCaseAndStatusNot(classId, deadlineId, name, GroupStatus.DISBANDED))
+                throw allocationConflict();
+            Group group = new Group(); group.setSchoolClassId(classId); group.setDeadlineId(deadlineId);
+            group.setSequenceNo(++nextSequence); group.setName(name); group.setLeaderId(proposed.leaderId());
+            group.setStatus(GroupStatus.OPEN); group.setIsLecturerCreated(true);
+            group = groupRepository.saveAndFlush(group);
+            created.put(proposed.key(), group.getId());
+            saveStatusHistory(group.getId(), GroupStatus.OPEN, GroupStatus.OPEN, actor, "Automatic allocation created draft group");
+            eventPublisher.publish("GROUP_CREATED", group.getId(), deadlineId, classId, actor, null);
+            resolved.add(new AllocationPreviewDTO.GroupView(group.getId(), name, GroupStatus.OPEN, proposed.leaderId(), proposed.leaderName(),
+                false, proposed.members(), proposed.score(), proposed.rules(), proposed.allRulesPassed(), proposed.key(), true));
+        }
+        return new MaterializedAllocation(List.copyOf(resolved), Collections.unmodifiableMap(created));
+    }
+
     /** Internal atomic allocation path: domain checks precede writes and ordinary submit/accept enforce completion. */
     public List<Long> applyAllocationPlan(Integer deadlineId, Integer classId, List<AllocationPreviewDTO.GroupView> plan) {
         validateManagementDeadline(deadlineId, classId);

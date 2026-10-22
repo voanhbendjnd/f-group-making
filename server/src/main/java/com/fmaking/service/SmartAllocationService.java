@@ -48,15 +48,17 @@ public class SmartAllocationService {
         PreliminaryRange range = range(context);
         List<Reason> failures = targetFailures(context, target);
         if (!failures.isEmpty()) return result(PROVEN_INFEASIBLE, target, seed, range, List.of(), List.of(), failures, 0, true, null);
-        if (context.pool.size() + context.drafts.size() > limits.maximumDepth()) {
+        int searchDepth = context.pool.size() + Math.max(context.drafts.size(), target - context.protectedGroups.size());
+        if (searchDepth > limits.maximumDepth()) {
             return result(SEARCH_LIMIT_REACHED, target, seed, range, List.of(), List.of(),
-                List.of(reason(SEARCH_DEPTH_LIMIT, context.pool.size() + context.drafts.size(), limits.maximumDepth())), 0, false, null);
+                List.of(reason(SEARCH_DEPTH_LIMIT, searchDepth, limits.maximumDepth())), 0, false, null);
         }
         Search search = new Search(context, target, seed, limits);
         search.select(0, new ArrayList<>());
         if (search.best == null) return result(search.limited ? SEARCH_LIMIT_REACHED : PROVEN_INFEASIBLE,
             target, seed, range, List.of(), List.of(), List.of(reason(search.limited ? SEARCH_BUDGET_EXHAUSTED : NO_PARTITION,
                 search.nodes, limits.maximumNodes())), search.nodes, !search.limited, null);
+        search.improveMajorBalance();
         var reasons = new ArrayList<>(context.warnings);
         if (search.limited) reasons.add(reason(SEARCH_BUDGET_EXHAUSTED, search.nodes, limits.maximumNodes()));
         return result(FEASIBLE, target, seed, range, search.best, search.disbanded, reasons,
@@ -69,7 +71,7 @@ public class SmartAllocationService {
         PreliminaryRange range = range(context);
         if (!range.hasCandidates()) return new Suggestion(null, PROVEN_INFEASIBLE, range.reasons(), List.of());
         int preferred = context.groups.size();
-        if (context.validDraftIds.size() != context.drafts.size()) {
+        if (context.drafts.isEmpty() || context.validDraftIds.size() != context.drafts.size()) {
             int average = context.maximumMembers == Integer.MAX_VALUE ? context.minimumMembers
                 : (int) (((long) context.minimumMembers + context.maximumMembers) / 2);
             preferred = context.protectedGroups.size() + ceil(context.pool.size(), Math.max(1, average));
@@ -84,11 +86,15 @@ public class SmartAllocationService {
         for (int count : candidates.stream().limit(12).toList()) {
             var allocation = allocate(snapshot, count, seed);
             checked.add(new CheckedTarget(count, allocation.status()));
-            if (allocation.status() == FEASIBLE) return new Suggestion(count, FEASIBLE,
-                List.of(reason(VALIDATED_SUGGESTION, count, context.students.size()),
-                    reason(SUGGESTED_BALANCED_SIZE, context.pool.size(), count - context.protectedGroups.size()),
-                    reason(SUGGESTED_PRESERVES_VALID_GROUPS, allocation.optimization().validGroupsPreserved(), context.validDraftIds.size()),
-                    reason(PROTECTED_COUNTS_INCLUDED, context.protectedGroups.size(), count)), List.copyOf(checked));
+            if (allocation.status() == FEASIBLE) {
+                var reasons = new ArrayList<Reason>();
+                reasons.add(reason(VALIDATED_SUGGESTION, count, context.students.size()));
+                if (!context.pool.isEmpty()) reasons.add(reason(SUGGESTED_BALANCED_SIZE, context.pool.size(), count - context.protectedGroups.size()));
+                if (!context.validDraftIds.isEmpty()) reasons.add(reason(SUGGESTED_PRESERVES_VALID_GROUPS,
+                    allocation.optimization().validGroupsPreserved(), context.validDraftIds.size()));
+                if (!context.protectedGroups.isEmpty()) reasons.add(reason(PROTECTED_COUNTS_INCLUDED, context.protectedGroups.size(), count));
+                return new Suggestion(count, FEASIBLE, List.copyOf(reasons), List.copyOf(checked));
+            }
             unknown |= allocation.status() == SEARCH_LIMIT_REACHED;
         }
         Status status = unknown || checked.size() < candidates.size() ? SEARCH_LIMIT_REACHED : PROVEN_INFEASIBLE;
@@ -98,7 +104,7 @@ public class SmartAllocationService {
     private PreliminaryRange range(Context c) {
         int fixed = c.protectedGroups.size();
         int lower = Math.max(1, Math.max(c.minimumGroups, fixed + ceil(c.pool.size(), c.maximumMembers)));
-        int upper = Math.min(c.maximumGroups, fixed + Math.min(c.drafts.size(), c.pool.size() / c.minimumMembers));
+        int upper = Math.min(c.maximumGroups, fixed + c.pool.size() / c.minimumMembers);
         if (c.minimumSe > 0) upper = Math.min(upper, fixed + (int) (c.pool.stream().filter(SmartAllocationService::isSe).count() / c.minimumSe));
         List<Reason> reasons = new ArrayList<>();
         Map<Integer, Long> majorCounts = c.pool.stream().filter(s -> s.getMajorId() != null)
@@ -131,7 +137,6 @@ public class SmartAllocationService {
         int editable = target - fixed;
         if (target < 1) reasons.add(reason(TARGET_MUST_BE_POSITIVE, target, 1));
         if (editable < 0) reasons.add(reason(TARGET_BELOW_PROTECTED, target, fixed));
-        if (target > c.groups.size()) reasons.add(reason(NEW_GROUPS_NOT_ALLOWED, target, c.groups.size()));
         if (target < c.minimumGroups || target > c.maximumGroups) reasons.add(reason(CLASS_GROUP_BOUND, target,
             target < c.minimumGroups ? c.minimumGroups : c.maximumGroups));
         if (c.minimumMembers > c.maximumMembers || c.minimumMajors > c.maximumMajors) reasons.add(reason(RULE_BOUNDS_CONFLICT, 0, 0));
@@ -240,14 +245,18 @@ public class SmartAllocationService {
         boolean valid(List<GroupMemberDTO> members) { return validator.areAllRulesPassed(validator.evaluateRules(rules, members)); }
     }
 
-    private record ExistingGroup(Long id, String name, GroupStatus status, Long leaderId, List<GroupMemberDTO> members) {}
+    private record ExistingGroup(Long id, String name, GroupStatus status, Long leaderId, List<GroupMemberDTO> members) {
+        String key() { return id == null ? "new:" + name : "group:" + id; }
+    }
 
     private final class Search {
         final Context c; final int target; final SearchLimits limits; final Random random;
         final List<ExistingGroup> candidates; final List<GroupMemberDTO> ordered;
+        List<GroupMemberDTO> assignmentOrder;
         final int minimumMembers, maximumMembers;
         long nodes; boolean limited;
         List<PlannedGroup> best; List<Long> disbanded; Optimization bestObjective;
+        long bestMajorConcentration;
 
         Search(Context c, int target, long seed, SearchLimits limits) {
             this.c = c; this.target = target; this.limits = limits;
@@ -258,6 +267,15 @@ public class SmartAllocationService {
             candidates = new ArrayList<>(c.drafts); candidates.sort(Comparator.comparing(ExistingGroup::id));
             Collections.shuffle(candidates, random);
             candidates.sort(Comparator.comparing((ExistingGroup g) -> !c.validDraftIds.contains(g.id())));
+            // Existing slots are always reused before adding slots. A virtual group never has a database ID.
+            Set<String> names = c.groups.stream().map(g -> g.name().trim().toLowerCase(Locale.ROOT)).collect(Collectors.toSet());
+            int nextName = 1;
+            for (int count = Math.max(0, target - c.groups.size()); count > 0; count--) {
+                String name;
+                do { name = "Group " + String.format(Locale.ROOT, "%02d", nextName++); }
+                while (!names.add(name.toLowerCase(Locale.ROOT)));
+                candidates.add(new ExistingGroup(null, name, GroupStatus.OPEN, null, List.of()));
+            }
             ordered = new ArrayList<>(c.pool);
             Map<Integer, Long> frequency = c.pool.stream().filter(s -> s.getMajorId() != null)
                 .collect(Collectors.groupingBy(GroupMemberDTO::getMajorId, Collectors.counting()));
@@ -280,6 +298,23 @@ public class SmartAllocationService {
             if (need == 0) {
                 List<List<GroupMemberDTO>> slots = new ArrayList<>();
                 chosen.forEach(group -> slots.add(new ArrayList<>()));
+                Set<Long> preserved = new HashSet<>();
+                for (int i = 0; i < chosen.size(); i++) {
+                    var group = chosen.get(i);
+                    if (c.validDraftIds.contains(group.id()) && group.members().size() >= minimumMembers
+                            && group.members().size() <= maximumMembers) {
+                        slots.get(i).addAll(group.members());
+                        group.members().forEach(member -> preserved.add(member.getStudentId()));
+                    }
+                }
+                // Seed the search with intact complete groups, then retain the existing lexicographic objective.
+                if (!preserved.isEmpty()) {
+                    assignmentOrder = ordered.stream().filter(member -> !preserved.contains(member.getStudentId())).toList();
+                    assign(0, chosen, slots);
+                    if (limited) return;
+                }
+                slots.forEach(List::clear);
+                assignmentOrder = ordered;
                 assign(0, chosen, slots);
                 return;
             }
@@ -290,13 +325,15 @@ public class SmartAllocationService {
 
         void assign(int index, List<ExistingGroup> chosen, List<List<GroupMemberDTO>> slots) {
             if (limited || !visit() || !canComplete(index, slots)) return;
-            if (index == ordered.size()) { consider(chosen, slots); return; }
-            var student = ordered.get(index);
+            if (index == assignmentOrder.size()) { consider(chosen, slots); return; }
+            var student = assignmentOrder.get(index);
             List<Integer> positions = new ArrayList<>();
             for (int i = 0; i < slots.size(); i++) positions.add(i);
             Collections.shuffle(positions, random);
             positions.sort(Comparator.comparing((Integer i) -> !Objects.equals(c.origins.get(student.getStudentId()), chosen.get(i).id()))
-                .thenComparing(Comparator.comparingInt((Integer i) -> admissionUtility(c, slots.get(i), student)).reversed()));
+                .thenComparing(Comparator.comparingInt((Integer i) -> admissionUtility(c, slots.get(i), student)).reversed())
+                .thenComparingLong(i -> majorCount(slots.get(i), student.getMajorId()))
+                .thenComparingInt(i -> slots.get(i).size()));
             for (int position : positions) {
                 var members = slots.get(position);
                 if (members.size() >= maximumMembers) continue;
@@ -309,10 +346,10 @@ public class SmartAllocationService {
         }
 
         boolean canComplete(int index, List<List<GroupMemberDTO>> slots) {
-            int remaining = ordered.size() - index;
+            int remaining = assignmentOrder.size() - index;
             long seLeft = 0; Set<Integer> remainingMajors = new HashSet<>(); int knownMajors = 0;
-            for (int j = index; j < ordered.size(); j++) {
-                var student = ordered.get(j);
+            for (int j = index; j < assignmentOrder.size(); j++) {
+                var student = assignmentOrder.get(j);
                 if (isSe(student)) seLeft++;
                 if (student.getMajorId() != null) { remainingMajors.add(student.getMajorId()); knownMajors++; }
             }
@@ -341,12 +378,13 @@ public class SmartAllocationService {
                     : members.stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow();
                 if (leader.equals(group.leaderId())) leaders++;
                 for (var student : members) {
-                    if (!Objects.equals(c.origins.get(student.getStudentId()), group.id())) movements++;
+                    if (group.id() == null || !Objects.equals(c.origins.get(student.getStudentId()), group.id())) movements++;
                     utility += admissionUtility(c, members.stream().filter(s -> !s.getStudentId().equals(student.getStudentId())).toList(), student);
                 }
             }
             var objective = new Optimization(preserved, leaders, movements, utility);
-            if (bestObjective != null && !better(objective, bestObjective)) return;
+            long concentration = slots.stream().mapToLong(SmartAllocationService::majorConcentration).sum();
+            if (bestObjective != null && !better(objective, concentration, bestObjective, bestMajorConcentration)) return;
             List<PlannedGroup> plan = new ArrayList<>();
             for (var group : c.protectedGroups) plan.add(planned(c, group, group.leaderId(), group.members(), true));
             for (int i = 0; i < chosen.size(); i++) {
@@ -355,11 +393,69 @@ public class SmartAllocationService {
                     : members.stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow();
                 plan.add(planned(c, group, leader, members, false));
             }
-            plan.sort(Comparator.comparing(PlannedGroup::groupId));
-            best = List.copyOf(plan); bestObjective = objective;
+            plan.sort(Comparator.comparing(PlannedGroup::groupId, Comparator.nullsLast(Long::compareTo))
+                .thenComparing(PlannedGroup::planGroupKey));
+            best = List.copyOf(plan); bestObjective = objective; bestMajorConcentration = concentration;
             Set<Long> retained = chosen.stream().map(ExistingGroup::id).collect(Collectors.toSet());
             disbanded = c.drafts.stream().map(ExistingGroup::id).filter(id -> !retained.contains(id)).sorted().toList();
         }
+
+        /** Soft local improvement of a validated witness. Protected and intact valid drafts are never touched. */
+        void improveMajorBalance() {
+            Map<String, ExistingGroup> byKey = candidates.stream().collect(Collectors.toMap(ExistingGroup::key, Function.identity()));
+            List<ExistingGroup> chosen = best.stream().filter(group -> !group.protectedGroup()).map(group -> byKey.get(group.planGroupKey())).toList();
+            List<List<GroupMemberDTO>> slots = best.stream().filter(group -> !group.protectedGroup())
+                .<List<GroupMemberDTO>>map(group -> new ArrayList<>(group.members())).toList();
+            List<Integer> order = new ArrayList<>();
+            for (int index = 0; index < chosen.size(); index++) order.add(index);
+            Collections.shuffle(order, random);
+            // Separate bounded repair checks, not additional backtracking nodes; deterministic even after search exhaustion.
+            long checksLeft = Math.min(20000, limits.maximumNodes());
+            while (checksLeft > 0 && !Thread.currentThread().isInterrupted()) {
+                Swap bestSwap = null;
+                searchSwaps:
+                for (int a = 0; a < order.size(); a++) for (int b = a + 1; b < order.size(); b++) {
+                    int left = order.get(a), right = order.get(b);
+                    var leftGroup = chosen.get(left); var rightGroup = chosen.get(right);
+                    var leftMembers = slots.get(left); var rightMembers = slots.get(right);
+                    if (intactValidDraft(leftGroup, leftMembers) || intactValidDraft(rightGroup, rightMembers)) continue;
+                    for (int i = 0; i < leftMembers.size(); i++) for (int j = 0; j < rightMembers.size(); j++) {
+                        if (checksLeft-- <= 0 || Thread.currentThread().isInterrupted()) break searchSwaps;
+                        var first = leftMembers.get(i); var second = rightMembers.get(j);
+                        if (first.getMajorId() == null || second.getMajorId() == null || first.getMajorId().equals(second.getMajorId())
+                                || first.getStudentId().equals(leftGroup.leaderId()) || second.getStudentId().equals(rightGroup.leaderId())) continue;
+                        long delta = majorCount(leftMembers, second.getMajorId()) - majorCount(leftMembers, first.getMajorId())
+                            + majorCount(rightMembers, first.getMajorId()) - majorCount(rightMembers, second.getMajorId()) + 2;
+                        if (delta >= 0) continue;
+                        int movementDelta = movement(first, rightGroup) + movement(second, leftGroup)
+                            - movement(first, leftGroup) - movement(second, rightGroup);
+                        if (movementDelta > 0) continue;
+                        leftMembers.set(i, second); rightMembers.set(j, first);
+                        boolean valid = c.valid(leftMembers) && c.valid(rightMembers);
+                        leftMembers.set(i, first); rightMembers.set(j, second);
+                        if (valid && (bestSwap == null || movementDelta < bestSwap.movementDelta()
+                                || movementDelta == bestSwap.movementDelta() && delta < bestSwap.majorDelta()))
+                            bestSwap = new Swap(left, right, i, j, movementDelta, delta);
+                    }
+                }
+                if (bestSwap == null) break;
+                var left = slots.get(bestSwap.left()); var right = slots.get(bestSwap.right());
+                var first = left.get(bestSwap.leftStudent());
+                left.set(bestSwap.leftStudent(), right.get(bestSwap.rightStudent())); right.set(bestSwap.rightStudent(), first);
+            }
+            consider(chosen, slots);
+        }
+
+        boolean intactValidDraft(ExistingGroup group, List<GroupMemberDTO> members) {
+            return c.validDraftIds.contains(group.id()) && members.stream().map(GroupMemberDTO::getStudentId).collect(Collectors.toSet())
+                .equals(group.members().stream().map(GroupMemberDTO::getStudentId).collect(Collectors.toSet()));
+        }
+
+        int movement(GroupMemberDTO student, ExistingGroup group) {
+            return group.id() == null || !Objects.equals(c.origins.get(student.getStudentId()), group.id()) ? 1 : 0;
+        }
+
+        private record Swap(int left, int right, int leftStudent, int rightStudent, int movementDelta, long majorDelta) {}
     }
 
     private PlannedGroup planned(Context c, ExistingGroup group, Long leader, List<GroupMemberDTO> members, boolean fixed) {
@@ -371,7 +467,8 @@ public class SmartAllocationService {
             }
             return copy;
         }).toList();
-        return new PlannedGroup(group.id(), group.name(), group.status(), leader, fixed, copies, scores.evaluateRules(c.rules, copies));
+        return new PlannedGroup(group.id(), group.name(), group.status(), leader, fixed, copies, scores.evaluateRules(c.rules, copies),
+            group.key(), group.id() == null);
     }
 
     /** Rule-deficit heuristic, consistent with recommendation priorities; never grants eligibility. Bio is excluded. */
@@ -384,11 +481,23 @@ public class SmartAllocationService {
         return Math.min(100, score);
     }
 
-    private static boolean better(Optimization a, Optimization b) {
+    private static boolean better(Optimization a, long majorConcentration, Optimization b, long previousConcentration) {
         if (a.validGroupsPreserved() != b.validGroupsPreserved()) return a.validGroupsPreserved() > b.validGroupsPreserved();
         if (a.leadersPreserved() != b.leadersPreserved()) return a.leadersPreserved() > b.leadersPreserved();
         if (a.movedStudents() != b.movedStudents()) return a.movedStudents() < b.movedStudents();
+        if (majorConcentration != previousConcentration) return majorConcentration < previousConcentration;
         return a.compatibilityUtility() > b.compatibilityUtility();
+    }
+
+    private static long majorCount(List<GroupMemberDTO> members, Integer majorId) {
+        return majorId == null ? 0 : members.stream().filter(member -> majorId.equals(member.getMajorId())).count();
+    }
+
+    /** Sum of same-major pairs; minimizing it is equivalent to minimizing per-major variance across fixed slots. */
+    static long majorConcentration(List<GroupMemberDTO> members) {
+        return members.stream().map(GroupMemberDTO::getMajorId).filter(Objects::nonNull)
+            .collect(Collectors.groupingBy(Function.identity(), Collectors.counting())).values().stream()
+            .mapToLong(count -> count * (count - 1) / 2).sum();
     }
 
     private static Set<Integer> majors(List<GroupMemberDTO> members) {

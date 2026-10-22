@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { Controller, useForm } from 'react-hook-form';
+import { Input as AntInput } from 'antd';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { LogIn, Info, ShieldAlert, MailCheck, Send } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LockKeyhole, LogIn, Info, Mail, ShieldAlert, MailCheck, Send, UserRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useToast } from '@/app/providers/ToastContext';
@@ -11,6 +12,7 @@ import { Modal } from '@/components/common/Modal';
 import { activationApi } from '@/features/activation/api/activationApi';
 import type { LoginRequest } from '../types';
 import { canAccessPath, getHomeRoute } from '../utils/roleRouting';
+import { LoginBrand } from './LoginBrand';
 
 export const LoginForm: React.FC = () => {
   const { login } = useAuth();
@@ -19,6 +21,7 @@ export const LoginForm: React.FC = () => {
   const { t } = useTranslation();
   const toast = useToast();
   const [formError, setFormError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Activation Request Modal State
   const [isActivationModalOpen, setIsActivationModalOpen] = useState(false);
@@ -46,7 +49,7 @@ export const LoginForm: React.FC = () => {
   }, [cooldownSeconds]);
 
   const {
-    register,
+    control,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginRequest>({
@@ -108,135 +111,52 @@ export const LoginForm: React.FC = () => {
   };
 
   return (
-    <div className="card" style={{ padding: '2rem' }}>
-      <div style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
-        <h2 style={{ fontSize: '1.375rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
-          {t('auth.loginTitle')}
-        </h2>
-        <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', marginTop: '0.25rem' }}>
-          {t('auth.loginSubtitle')}
-        </p>
+    <div className="login-form-card">
+      <LoginBrand />
+      <div className="login-form-heading">
+        <h1>{t('auth.welcomeBack')}</h1>
+        <div className="login-form-status">
+          {formError ? <div className="alert alert-error login-form-error" role="alert">
+            <ShieldAlert size={18} aria-hidden="true" /><div className="alert-content">{formError}</div>
+          </div> : <p>{t('auth.welcomeSubtitle')}</p>}
+        </div>
       </div>
 
-      {formError && (
-        <div className="alert alert-error" role="alert" style={{ marginBottom: '1.25rem' }}>
-          <ShieldAlert size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
-          <div className="alert-content">{formError}</div>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
-        <Input
-          label={t('common.email')}
-          type="email"
-          placeholder={t('auth.emailPlaceholder')}
-          required
-          autoComplete="username"
-          autoFocus
-          error={errors.username?.message}
-          {...register('username', {
+        <div className="login-field">
+          <label htmlFor="login-email">{t('common.email')}<span className="login-field-required" aria-hidden="true">*</span></label>
+          <Controller name="username" control={control} rules={{
             required: t('auth.emailRequired'),
-            pattern: {
-              value: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/,
-              message: t('auth.emailInvalid'),
-            },
-          })}
-        />
-
-        <Input
-          label={t('common.password')}
-          type="password"
-          placeholder={t('auth.passwordPlaceholder')}
-          required
-          autoComplete="current-password"
-          error={errors.password?.message}
-          {...register('password', {
-            required: t('auth.passwordRequired'),
-            minLength: {
-              value: 4,
-              message: t('auth.passwordMinLength'),
-            },
-          })}
-        />
-
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginTop: '-0.375rem',
-            marginBottom: '1rem',
-            flexWrap: 'wrap',
-            gap: '0.5rem',
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => {
-              setActivationSentSuccess(false);
-              setIsActivationModalOpen(true);
-            }}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              fontSize: '0.8125rem',
-              color: 'var(--color-primary)',
-              cursor: 'pointer',
-              fontWeight: 500,
-              textDecoration: 'underline',
-            }}
-          >
-            {t('auth.notActivatedPrompt', 'Chưa kích hoạt tài khoản?')}
-          </button>
-
-          <Link
-            to="/forgot-password"
-            style={{
-              fontSize: '0.8125rem',
-              color: 'var(--color-text-muted)',
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
-          >
-            {t('auth.forgotPasswordLink')}
-          </Link>
+            pattern: { value: /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/, message: t('auth.emailInvalid') },
+          }} render={({ field }) => <AntInput {...field} id="login-email" type="email" required autoComplete="username" autoFocus
+            placeholder={t('auth.emailPlaceholder')} prefix={<Mail size={18} aria-hidden="true" />}
+            status={errors.username ? 'error' : undefined} aria-invalid={!!errors.username} aria-describedby={errors.username ? 'login-email-error' : undefined} />} />
+          <div className="login-field-feedback">{errors.username && <div id="login-email-error" className="login-field-error" role="alert"><AlertCircle size={14} aria-hidden="true" />{errors.username.message}</div>}</div>
         </div>
-
-        <Button
-          type="submit"
-          variant="primary"
-          loading={isSubmitting}
-          icon={<LogIn size={18} />}
-          style={{ width: '100%', marginTop: '0.25rem' }}
-        >
+        <div className="login-field">
+          <label htmlFor="login-password">{t('common.password')}<span className="login-field-required" aria-hidden="true">*</span></label>
+          <Controller name="password" control={control} rules={{
+            required: t('auth.passwordRequired'),
+            minLength: { value: 4, message: t('auth.passwordMinLength') },
+          }} render={({ field }) => <AntInput {...field} id="login-password" type={showPassword ? 'text' : 'password'} required autoComplete="current-password"
+            placeholder={t('auth.passwordPlaceholder')} prefix={<LockKeyhole size={18} aria-hidden="true" />}
+            suffix={<button type="button" className="login-password-toggle" onClick={() => setShowPassword(previous => !previous)}
+              aria-label={t(showPassword ? 'common.hidePassword' : 'common.showPassword')} aria-pressed={showPassword}>
+              {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+            </button>} status={errors.password ? 'error' : undefined} aria-invalid={!!errors.password} aria-describedby={errors.password ? 'login-password-error' : undefined} />} />
+          <div className="login-field-feedback">{errors.password && <div id="login-password-error" className="login-field-error" role="alert"><AlertCircle size={14} aria-hidden="true" />{errors.password.message}</div>}</div>
+        </div>
+        <div className="login-form-options"><Link to="/forgot-password">{t('auth.forgotPasswordLink')}</Link></div>
+        <Button type="submit" variant="primary" loading={isSubmitting} icon={<LogIn size={18} aria-hidden="true" />} className="login-submit">
           {t('auth.loginButton')}
         </Button>
       </form>
-
-      {/* Notice regarding no public registration */}
-      <div
-        style={{
-          marginTop: '1.5rem',
-          paddingTop: '1.25rem',
-          borderTop: '1px solid var(--color-border)',
-          display: 'flex',
-          gap: '0.625rem',
-          alignItems: 'flex-start',
-          fontSize: '0.8125rem',
-          color: 'var(--color-text-muted)',
-          backgroundColor: 'var(--color-surface-muted)',
-          padding: '0.875rem',
-          borderRadius: 'var(--radius-md)',
-        }}
-      >
-        <Info size={16} style={{ color: 'var(--color-primary)', flexShrink: 0, marginTop: '2px' }} />
-        <div>
-          <strong style={{ color: 'var(--color-text-main)' }}>{t('auth.noAccountTitle')}</strong>
-          <br />
-          {t('auth.noAccountDesc')}
-        </div>
-      </div>
+      <button type="button" className="login-activation-link" onClick={() => { setActivationSentSuccess(false); setIsActivationModalOpen(true); }}>
+        <UserRound size={16} aria-hidden="true" />{t('auth.notActivatedPrompt')}
+      </button>
+      <div className="login-account-notice"><Info size={18} aria-hidden="true" /><div>
+        <strong>{t('auth.noAccountTitle')}</strong><p>{t('auth.noAccountDesc')}</p>
+      </div></div>
 
       {/* Modal: Gửi lại email kích hoạt */}
       <Modal
@@ -298,7 +218,7 @@ export const LoginForm: React.FC = () => {
             <Input
               label={t('common.email', 'Địa chỉ Email')}
               type="email"
-              placeholder="student@fpt.edu.vn"
+              placeholder={t('auth.activationEmailPlaceholder')}
               required
               autoFocus
               value={activationEmail}
@@ -322,7 +242,7 @@ export const LoginForm: React.FC = () => {
                 icon={<Send size={16} />}
               >
                 {cooldownSeconds > 0
-                  ? `${t('auth.cooldownWait', 'Đợi')} (${cooldownSeconds}s)`
+                  ? t('auth.cooldownSeconds', { seconds: cooldownSeconds })
                   : t('auth.sendActivationLink', 'Gửi email kích hoạt')}
               </Button>
             </div>

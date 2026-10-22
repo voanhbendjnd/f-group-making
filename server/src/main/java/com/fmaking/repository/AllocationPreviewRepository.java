@@ -7,9 +7,13 @@ import org.springframework.data.repository.query.Param;
 import java.util.Optional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 
 public interface AllocationPreviewRepository extends JpaRepository<AllocationPreview, String> {
     Page<AllocationPreview> findBySchoolClassIdAndDeadlineIdOrderByCreatedAtDescIdDesc(Integer classId, Integer deadlineId, Pageable pageable);
+
+    Slice<AllocationPreview> findBySchoolClassIdAndDeadlineIdAndOwnerIdAndAppliedAtIsNullAndSnapshotFingerprintOrderByIdAsc(
+        Integer classId, Integer deadlineId, Long ownerId, String snapshotFingerprint, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select p from AllocationPreview p where p.id = :id")
