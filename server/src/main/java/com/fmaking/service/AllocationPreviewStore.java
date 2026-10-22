@@ -24,6 +24,7 @@ public class AllocationPreviewStore {
     @Transactional
     public AllocationPreviewDTO store(AllocationPreviewDTO result) {
         var row = new AllocationPreview(); row.setId(UUID.randomUUID().toString()); row.setOwnerId(access.currentLecturerId());
+        row.setFormatVersion(2);
         row.setSchoolClassId(result.scope().classId()); row.setDeadlineId(result.scope().deadlineId());
         row.setTargetCount(result.result().targetGroupCount()); row.setSeed(result.result().seed());
         row.setSnapshotFingerprint(result.snapshotFingerprint()); row.setPlanFingerprint(result.planFingerprint());

@@ -138,6 +138,111 @@ class AllocationApplyServiceTest {
         return invitations.saveAndFlush(i);
     }
 
+    void clearDrafts() {
+        new TransactionTemplate(manager).executeWithoutResult(tx -> {
+            for (Long id : groupIds) { members.deleteByGroupId(id); }
+            members.flush(); groups.deleteAllById(groupIds); groups.flush();
+        });
+    }
+
+    @Test void ungroupedClassStoresVirtualHistoryAndCreatesRealGroupsOnlyOnAtomicApply() {
+        clearDrafts();
+        long statusCount = statusHistory.count();
+        var p = preview();
+        assertThat(p.groups()).hasSize(2).allSatisfy(group -> {
+            assertThat(group.groupId()).isNull(); assertThat(group.newGroup()).isTrue(); assertThat(group.planGroupKey()).isNotBlank();
+        });
+        assertThat(groups.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).isEmpty();
+        assertThat(statusHistory.count()).isEqualTo(statusCount);
+        assertThat(planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId()).preview().groups()).isEqualTo(p.groups());
+        var result = apply(p, "create-virtual-groups");
+        assertThat(result.report().createdGroupIds()).hasSize(2).doesNotHaveDuplicates();
+        assertThat(result.report().createdGroupKeys()).hasSize(2);
+        assertThat(result.report().movements()).allSatisfy(move -> assertThat(move.toGroupId()).isPositive());
+        assertThat(result.report().groupChanges()).allSatisfy(change -> assertThat(change.groupId()).isPositive());
+        var stored = groups.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId());
+        assertThat(stored).extracting(Group::getSequenceNo).containsExactly(1, 2);
+        for (var group : stored) {
+            assertThat(group.getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+            var rows = members.findByGroupId(group.getId()); assertThat(rows).hasSize(4);
+            assertThat(group.getLeaderId()).isEqualTo(rows.stream().map(GroupMember::getStudentId).min(Long::compareTo).orElseThrow());
+        }
+        assertThat(apply(p, "create-virtual-groups")).isEqualTo(result);
+        assertThat(runCount()).isEqualTo(1);
+        assertThat(history.detail(deadline.getId(), schoolClass.getId(), result.runId())).isEqualTo(result);
+        assertThat(planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId()).preview().groups()).isEqualTo(p.groups());
+    }
+
+    @Test void newGroupApplyFailureRollsBackGroupsSequenceMembershipHistoryAndRealtime() {
+        clearDrafts(); long statuses = statusHistory.count(), memberAudits = memberHistory.count();
+        var p = preview();
+        doThrow(new IllegalStateException("Simulated new-group approval failure")).when(groupService).acceptGroup(anyInt(), anyInt(), anyLong());
+        assertThatThrownBy(() -> apply(p, "new-group-rollback")).isInstanceOf(IllegalStateException.class);
+        assertThat(groups.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).isEmpty();
+        assertThat(members.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).isEmpty();
+        assertThat(statusHistory.count()).isEqualTo(statuses); assertThat(memberHistory.count()).isEqualTo(memberAudits);
+        assertThat(runCount()).isZero(); assertThat(storedPreviews.findById(p.previewId()).orElseThrow().getAppliedAt()).isNull();
+        verifyNoInteractions(realtime);
+    }
+
+    @Test void staleVirtualPlanCannotCreateAnyGroup() {
+        clearDrafts(); var p = preview();
+        new TransactionTemplate(manager).executeWithoutResult(tx -> {
+            var current = classes.findById(schoolClass.getId()).orElseThrow(); current.setRulesVersion(current.getRulesVersion() + 1); classes.saveAndFlush(current);
+        });
+        conflict(() -> apply(p, "stale-virtual"), "allocationPreviewStale");
+        assertThat(groups.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).isEmpty(); assertThat(runCount()).isZero();
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = GroupStatus.class, names = {"PENDING", "ACCEPTED"})
+    void addingNewGroupNeverChangesProtectedMembershipLeaderStatusOrVersion(GroupStatus status) {
+        clearDrafts();
+        Long fixedId = new TransactionTemplate(manager).execute(tx -> {
+            Group group = new Group(); group.setSchoolClassId(schoolClass.getId()); group.setDeadlineId(deadline.getId());
+            group.setName("Group 01"); group.setLeaderId(ids.getFirst()); group.setStatus(status); group.setSequenceNo(1);
+            group = groups.saveAndFlush(group);
+            for (int i = 0; i < 4; i++) {
+                var row = new GroupMember(); row.setGroupId(group.getId()); row.setSchoolClassId(schoolClass.getId()); row.setDeadlineId(deadline.getId());
+                row.setStudentId(ids.get(i)); row.setRole(i == 0 ? GroupMemberRole.LEADER : GroupMemberRole.MEMBER); row.setJoinedAt(now); members.saveAndFlush(row);
+            }
+            return group.getId();
+        });
+        long version = groups.findById(fixedId).orElseThrow().getVersion();
+        var p = preview(); assertThat(p.groups()).filteredOn(AllocationPreviewDTO.GroupView::newGroup).hasSize(1);
+        assertThat(p.groups()).extracting(AllocationPreviewDTO.GroupView::name).doesNotHaveDuplicates();
+        var result = apply(p, "protected-new-group"); assertThat(result.approvedGroupIds()).hasSize(1).doesNotContain(fixedId);
+        var fixed = groups.findById(fixedId).orElseThrow(); assertThat(fixed.getStatus()).isEqualTo(status);
+        assertThat(fixed.getLeaderId()).isEqualTo(ids.getFirst()); assertThat(fixed.getVersion()).isEqualTo(version);
+        assertThat(members.findByGroupId(fixedId)).extracting(GroupMember::getStudentId).containsExactlyInAnyOrderElementsOf(ids.subList(0, 4));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(booleans = {true, false})
+    void concurrentVirtualAppliesCreateOnlyOneSetOfGroups(boolean sameKey) throws Exception {
+        clearDrafts(); concurrent(sameKey);
+        assertThat(groups.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).hasSize(2);
+        assertThat(members.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId()))
+            .hasSize(8).extracting(GroupMember::getStudentId).doesNotHaveDuplicates();
+    }
+
+    @Test void formatOneSavedPlanRemainsReadableAndApplicableWithoutRewritingHistory() throws Exception {
+        var p = preview();
+        var legacyGroups = p.groups().stream().map(group -> new AllocationPreviewDTO.GroupView(group.groupId(), group.name(), group.status(),
+            group.leaderId(), group.leaderName(), group.protectedGroup(), group.members(), group.score(), group.rules(), group.allRulesPassed())).toList();
+        String fingerprint = previews.planFingerprint(p.snapshotFingerprint(), legacyGroups);
+        var legacy = new AllocationPreviewDTO(p.scope(), p.snapshotFingerprint(), fingerprint, false, p.result(), legacyGroups, p.report(), null, null, null);
+        var tree = mapper.valueToTree(legacy);
+        tree.get("groups").forEach(group -> ((com.fasterxml.jackson.databind.node.ObjectNode) group).remove(List.of("planGroupKey", "newGroup")));
+        String payload = mapper.writeValueAsString(tree);
+        new TransactionTemplate(manager).executeWithoutResult(tx -> {
+            var row = storedPreviews.findById(p.previewId()).orElseThrow(); row.setFormatVersion(1); row.setPlanFingerprint(fingerprint); row.setPayload(payload); storedPreviews.saveAndFlush(row);
+        });
+        assertThat(planHistory.detail(deadline.getId(), schoolClass.getId(), p.previewId()).summary().canApply()).isTrue();
+        var result = apply(p, "legacy-format-one"); assertThat(result.approvedGroupIds()).hasSize(2);
+        assertThat(result.report().createdGroupIds()).isEmpty();
+        assertThat(storedPreviews.findById(p.previewId()).orElseThrow().getPayload()).isEqualTo(payload);
+    }
+
     @Test void applyCommitsMembershipApprovalHistoryAndIdempotentResult() {
         var p = preview(); assertThat(p.previewId()).isNotNull(); assertThat(p.expiresAt()).isNull();
         assertThat(members.findByGroupId(groupIds.getFirst())).hasSize(2); verifyNoInteractions(realtime);

@@ -1,15 +1,16 @@
 .deadline-list { box-shadow: none; }
-.deadline-list .table { table-layout: fixed; }
+.deadline-list .table { min-width: 52rem; }
 .deadline-list .table th, .deadline-list .table td { white-space: normal; overflow-wrap: anywhere; }
 .deadline-list .deadline-name-column { width: 24%; }
 .deadline-list .deadline-status-column { width: 15%; }
 .deadline-list .deadline-classes-column { width: 18%; }
 .deadline-list .deadline-end-column { width: 23%; }
-.deadline-list .deadline-actions-column { width: 20%; text-align: right; }
+.deadline-list .deadline-actions-column { width: 1%; text-align: right; white-space: nowrap; }
 .deadline-list-name { color: var(--color-text-main); font-weight: 600; }
 .deadline-list-summary { color: var(--color-text-muted); font-size: 0.875rem; }
-.deadline-list-actions, .deadline-detail-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
-.deadline-list-actions .btn { white-space: normal; }
+.deadline-list-actions { display: flex; align-items: center; flex-wrap: nowrap; gap: 0.5rem; justify-content: flex-end; width: max-content; margin-left: auto; }
+.deadline-detail-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end; }
+.deadline-list-actions .btn { flex: 0 0 auto; white-space: nowrap; }
 .deadline-detail .modal-card { max-height: min(90dvh, 900px); }
 .deadline-detail .modal-header, .deadline-detail .modal-footer { flex-shrink: 0; }
 .deadline-detail .modal-body { min-height: 0; overscroll-behavior: contain; }
@@ -34,14 +35,15 @@
 .deadline-class-card dd { font-size: 0.875rem; overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   .deadline-list { overflow: visible; border: 0; border-radius: 0; }
-  .deadline-list .table, .deadline-list tbody { display: block; }
+  .deadline-list .table, .deadline-list tbody { display: block; min-width: 0; }
   .deadline-list thead { display: none; }
   .deadline-list .table tr { display: block; padding: 1rem; border: 1px solid var(--color-border); border-radius: var(--radius-lg); margin-bottom: 0.75rem; }
   .deadline-list .table td { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.5rem 0; border: 0; width: auto; }
   .deadline-list .table td[data-label]::before { content: attr(data-label); color: var(--color-text-muted); font-size: 0.8125rem; flex-shrink: 0; }
   .deadline-list .table .deadline-list-name { display: block; padding-top: 0; padding-bottom: 0.875rem; }
   .deadline-list .table .deadline-list-action-cell { display: block; padding: 0.875rem 0 0; }
-  .deadline-list-actions .btn { flex: 1; }
+  .deadline-list-actions { width: 100%; }
+  .deadline-list-actions .btn { flex: 1 0 auto; }
   .deadline-class-grid { grid-template-columns: minmax(0, 1fr); }
   .deadline-detail .modal-overlay { padding: 0.75rem; }
   .deadline-detail .modal-header, .deadline-detail .modal-body, .deadline-detail .modal-footer { padding: 1rem; }

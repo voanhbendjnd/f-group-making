@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { allocationApi } from '@/features/allocation/api/allocationApi';
 import { useAllocationFlow } from '@/features/allocation/hooks/useAllocationFlow';
+import { AllocationGroups } from '@/features/allocation/components/AllocationGroups';
 import { LecturerAllocationPage } from '@/pages/lecturer/LecturerAllocationPage';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { classApi } from '@/features/classes/api/classApi';
@@ -57,6 +58,71 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('automatic allocation workflow', () => {
+  it.each(['OPEN', 'REVOKED', 'PENDING', 'ACCEPTED'] as const)('shows the leader first for %s without changing saved member order', async status => {
+    const group = structuredClone(overviewFixture.groups[0]);
+    group.status = status;
+    group.members = [...group.members.slice(1), group.members[0]];
+    const originalIds = group.members.map(member => member.studentId);
+    render(<AllocationGroups groups={[group]} proposed />);
+    fireEvent.click(screen.getByText(i18n.t('allocation.members', { count: group.members.length })));
+    const list = document.querySelector('.allocation-members')!;
+    const rows = within(list as HTMLElement).getAllByRole('listitem');
+    expect(within(rows[0]).getByText(group.leaderName!)).toBeInTheDocument();
+    expect(within(rows[0]).getByText(i18n.t('allocation.leader'))).toBeInTheDocument();
+    expect(group.members.map(member => member.studentId)).toEqual(originalIds);
+    expect(rows.slice(1).map(row => row.querySelector('strong')!.textContent)).toEqual(group.members.filter(member => member.studentId !== group.leaderId).map(member => member.fullName));
+  });
+  it('marks only the committed plan applied in list and detail caches even when history refresh fails', async () => {
+    const value = await ready();
+    const detail = planFixture();
+    const other = { ...detail.summary, planId: 'another-plan' };
+    const plansKey = ['allocation', 1, 8, 2, 3, 'plans'];
+    client.setQueryData([...plansKey, 1], { meta: { page: 1, pageSize: 10, total: 2, pages: 1 }, result: [detail.summary, other] });
+    client.setQueryData([...plansKey, 'detail', detail.summary.planId], detail);
+    vi.mocked(allocationApi.plans).mockRejectedValue({ status: 500 });
+    await act(async () => value.result.current.confirmApply());
+    const cached = client.getQueryData<{ result: typeof detail.summary[] }>([...plansKey, 1])!;
+    expect(cached.result[0]).toMatchObject({ status: 'APPLIED', canApply: false, appliedAt: value.result.current.applied!.appliedAt });
+    expect(cached.result[1]).toEqual(other);
+    expect(client.getQueryData<typeof detail>([...plansKey, 'detail', detail.summary.planId])!.summary.status).toBe('APPLIED');
+    expect(context.success).toHaveBeenCalledOnce();
+  });
+  it('keeps saved history unapplied if the backend refuses Apply', async () => {
+    const value = await ready();
+    const detail = planFixture();
+    const plansKey = ['allocation', 1, 8, 2, 3, 'plans', 1];
+    client.setQueryData(plansKey, { result: [detail.summary] });
+    vi.mocked(allocationApi.apply).mockRejectedValue({ status: 409, errorKey: 'allocationPreviewStale' });
+    await act(async () => value.result.current.confirmApply());
+    expect(client.getQueryData<{ result: typeof detail.summary[] }>(plansKey)!.result[0]).toEqual(detail.summary);
+    expect(value.result.current.applied).toBeNull();
+    expect(context.success).not.toHaveBeenCalled();
+  });
+  it('opens Random History after confirmation and shows the exact applied plan and time in VI/EN', async () => {
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    const detail = planFixture();
+    client.setQueryData(['allocation', 1, 8, 2, 3, 'plans', 1], { meta: { page: 1, pageSize: 10, total: 1, pages: 1 }, result: [detail.summary] });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('allocation.autoAllocate'), exact: true }));
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('allocation.confirmTarget') }));
+    await screen.findByText(i18n.t('allocation.status.FEASIBLE'));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('allocation.apply'), exact: true }));
+    const confirm = await screen.findByRole('button', { name: i18n.t('allocation.confirmApply') });
+    await waitFor(() => expect(confirm).not.toBeDisabled());
+    expect(allocationApi.apply).not.toHaveBeenCalled();
+    // The commit succeeds, but a subsequent read fails: retain the confirmed cached result.
+    vi.mocked(allocationApi.plans).mockRejectedValue({ status: 500 });
+    fireEvent.click(confirm);
+    await screen.findByText(i18n.t('allocation.runSuccess', { id: 9, count: 1 }));
+    const tab = screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') });
+    await waitFor(() => expect(tab).toHaveAttribute('aria-selected', 'true'));
+    const panel = screen.getByRole('tabpanel', { name: i18n.t('allocation.randomHistory') });
+    expect(await within(panel).findByRole('button', { name: i18n.t('allocation.planStatuses.APPLIED') })).toBeDisabled();
+    expect(within(panel).getAllByText(i18n.t('allocation.planStatuses.APPLIED')).find(element => element.closest('.allocation-history-status'))).toBeInTheDocument();
+    expect(within(panel).getByText(new RegExp(i18n.t('allocation.appliedAt')))).toBeInTheDocument();
+    await act(async () => i18n.changeLanguage('vi'));
+    expect(within(panel).getByRole('button', { name: i18n.t('allocation.planStatuses.APPLIED') })).toBeDisabled();
+    expect(allocationApi.apply).toHaveBeenCalledTimes(1);
+  }, 15000);
   it('only treats nonempty accepted groups with no unassigned students as complete', () => {
     const complete = { ...overviewFixture, groups: overviewFixture.groups.map(group => ({ ...group, status: 'ACCEPTED' as const })) };
     expect(isAllocationComplete(complete)).toBe(true);
@@ -276,6 +342,29 @@ describe('automatic allocation workflow', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'View run #9' }));
     await screen.findByText('Allocation run #9'); expect(allocationApi.historyDetail).toHaveBeenCalledWith(3, 2, 9, expect.anything());
     await act(async () => i18n.changeLanguage('vi')); expect(await screen.findByText('Lần phân bổ #9')).toBeInTheDocument();
+  }, 15000);
+  it('renders separate virtual groups and restores their saved keys without randomizing again', async () => {
+    const preview = previewFixture();
+    preview.groups = preview.groups.map((group, index) => ({ ...group, groupId: null, planGroupKey: `new:Group 0${index + 1}`,
+      newGroup: true, name: `Group 0${index + 1}`, protectedGroup: false, status: 'OPEN' }));
+    preview.report = { ...preview.report!, keptGroupIds: [], protectedGroupIds: [], disbandedGroupIds: [], createdGroupKeys: preview.groups.map(group => group.planGroupKey!),
+      groupChanges: preview.groups.map(group => ({ groupId: null, planGroupKey: group.planGroupKey, newGroup: true, name: group.name,
+        protectedGroup: false, disbanded: false, leaderBefore: null, leaderNameBefore: null, leaderAfter: group.leaderId, leaderNameAfter: group.leaderName,
+        scoreBefore: null, scoreAfter: group.score, rulesBefore: [], rulesAfter: group.rules })) };
+    const detail = { ...planFixture(), preview };
+    vi.mocked(allocationApi.plan).mockResolvedValue(detail);
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.randomHistory') }));
+    fireEvent.click(await screen.findByRole('button', { name: i18n.t('allocation.viewPlan') }));
+    const drawer = await screen.findByRole('dialog');
+    expect(await within(drawer).findByText('Group 01')).toBeInTheDocument(); expect(within(drawer).getByText('Group 02')).toBeInTheDocument();
+    expect(within(drawer).getAllByText(i18n.t('allocation.newGroup'))).toHaveLength(2);
+    expect(within(drawer).getByText(i18n.t('allocation.createdCount', { count: 2 }))).toBeInTheDocument();
+    fireEvent.click(within(drawer).getByText(i18n.t('allocation.beforeAfter')));
+    const rows = await within(drawer).findAllByRole('row'); expect(rows.length).toBeGreaterThan(2);
+    expect(allocationApi.preview).not.toHaveBeenCalled(); expect(allocationApi.apply).not.toHaveBeenCalled();
+    await act(async () => i18n.changeLanguage('vi'));
+    expect(within(drawer).getAllByText(i18n.t('allocation.newGroup')).length).toBeGreaterThanOrEqual(2);
   }, 15000);
   it.each([400, 401, 403, 404, 409])('localizes HTTP %s without raw server text', status => {
     expect(allocationErrorKey({ status, message: 'server message' })).toBe(`http${status}`);

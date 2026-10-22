@@ -14,6 +14,10 @@ Luồng sản phẩm đã chốt (không đồng nghĩa toàn bộ đã triển 
 TTL Preview 15 phút và retention payload ở các mục Phase 1–5 bên dưới. Các kết quả test cũ được giữ
 như bằng chứng lịch sử, không phải mô tả chính sách hiện hành.
 
+**Cập nhật nhóm mới:** mục 8.11 thay thế giới hạn “chỉ giữ/gộp nhóm hiện có” của các lần triển khai trước.
+Engine được dùng slot nhóm dự kiến; chỉ Atomic Apply mới tạo Group thật. Các mô tả Phase 3–6 và kết quả
+kiểm thử cũ bên dưới phản ánh từng mốc lịch sử; contract hiện hành phải đọc cùng mục 8.11.
+
 ```text
 Danh sách lớp theo Selected Term (mặc định Current Term) → chọn lớp/phiên → xem nhóm, rules và Group Score
 → Auto Allocate → xem range/suggestion, nhập target → Xác nhận
@@ -32,7 +36,8 @@ Không tự chạy phân bổ khi mở trang hoặc nhập target; Random/Random
 
 ## 2. Quyết định nghiệp vụ và giới hạn phiên bản đầu
 
-- Chỉ giữ/gộp nhóm hiện có trong phiên bản đầu; không tự tạo nhóm mới.
+- Ưu tiên giữ nhóm hiện có; cho phép thêm nhóm khi target cần nhiều slot hơn tổng nhóm đang hoạt động.
+  Random chỉ tạo slot trong bộ nhớ và lưu phương án; Apply mới tạo nhóm thực tế (mục 8.11).
 - Target là tổng nhóm không DISBANDED, gồm cả PENDING/ACCEPTED được bảo vệ.
 - OPEN/REVOKED được tái cơ cấu theo quyền hiện có; PENDING/ACCEPTED giữ nguyên.
 - Nhóm tái phân bổ phải đạt toàn bộ rules đang bật trước khi auto-approve.
@@ -120,17 +125,18 @@ F là số PENDING/ACCEPTED; R là số Student không thuộc nhóm protected; 
 Nhóm DISBANDED không là slot, không được giữ membership.
 
 - Lower = max(1, MIN_GROUPS nếu bật, F + ceil(R / MAX_MEMBERS nếu bật)).
-- Upper = min(tổng nhóm hiện tại, MAX_GROUPS nếu bật, F + floor(R / minimumRequired)).
+- Upper = min(MAX_GROUPS nếu bật, F + floor(R / minimumRequired)). Giới hạn theo số nhóm hiện tại
+  đã được bỏ trong cập nhật mục 8.11 để hỗ trợ lớp chưa có nhóm hoặc cần thêm nhóm.
 - minimumRequired = max(1, MIN_MEMBERS, MIN_MAJORS, MIN_SE đang bật).
 - Tiếp tục thu hẹp upper bằng nguồn SE và khả năng phủ ngành: với K nhóm draft,
   tổng min(số Student ngành i, K) phải >= K × MIN_MAJORS.
 - Không có trần cấu hình dùng Integer.MAX_VALUE nội bộ, không khôi phục default của rule đã tắt.
 - Range rỗng khi lower > upper. Giá trị trong range chỉ đạt các điều kiện cần, chưa được coi là feasible.
 
-Target phải là số nguyên dương (kiểu Java int; API sau này phải từ chối số thập phân), không ít hơn F,
-không vượt số nhóm hiện có. Kiểm tra bounds lớp, capacity, số người tối thiểu, nguồn SE và phủ ngành.
+Target phải là số nguyên dương (kiểu Java int; API từ chối số thập phân), không ít hơn F.
+Kiểm tra bounds lớp, capacity, số người tối thiểu, nguồn SE và phủ ngành.
 Không sử dụng Student trong protected groups để tính nguồn lực cho draft.
-Không tự tạo nhóm, đổi phiên hoặc chuyển Student khác lớp.
+Không tạo Group thật trong engine, đổi phiên hoặc chuyển Student khác lớp.
 
 
 ### 4.3. Thuật toán, optimization và phân loại kết quả
@@ -138,7 +144,8 @@ Không tự tạo nhóm, đổi phiên hoặc chuyển Student khác lớp.
 1. Kiểm tra snapshot: ID duy nhất, scope class/deadline, membership không trùng, Student có trong tập lớp,
    dữ liệu Major thống nhất, đúng một Leader khớp group.leaderId. Sai snapshot là IllegalArgumentException,
    không gắn nhãn “bài toán vô nghiệm”.
-2. Chọn K = target - F nhóm từ D draft hiện có; các draft không được giữ được đề xuất giải tán.
+2. Chọn K = target - F slot: tái sử dụng draft hiện có, bổ sung đúng max(0, target - tổng nhóm hiện tại)
+   slot mới trong bộ nhớ. Draft không được giữ được đề xuất giải tán. Xem bảo toàn nhóm hợp lệ ở mục 8.11.
 3. Backtracking gán từng Student trong pool vào K slot. Thứ tự heuristic ưu tiên SE/ngành khan hiếm,
    Leader và vị trí nhóm cũ, sau đó mức đóng góp vào rule còn thiếu. Mọi vị trí hợp lệ vẫn được xét nếu còn ngân sách.
 4. Prune bằng trần người/ngành, tổng capacity, số người/SE/ngành còn thiếu và nguồn lực còn lại.
@@ -162,7 +169,7 @@ Không sửa service recommendation, không coi utility là validation hoặc Gr
 | SEARCH_LIMIT_REACHED | Chưa có witness khi hết ngân sách, vượt giới hạn độ sâu, hoặc bị interrupt |
 
 Nếu có witness nhưng hết ngân sách tối ưu hóa: vẫn FEASIBLE, `searchComplete=false`, có cảnh báo;
-không tuyên bố tối ưu toàn cục. Defaults: 100000 node, độ sâu bảo vệ 256 cho pool + draft; đây là giới hạn
+không tuyên bố tối ưu toàn cục. Defaults: 100000 node, độ sâu bảo vệ 256 cho pool + max(draft, target - F); đây là giới hạn
 xử lý, không phải Business Rule. Có overload SearchLimits để kiểm thử/tinh chỉnh. Node limit bao gồm cả
 chọn tập nhóm và gán thành viên. Giới hạn xử lý hiện chưa đo tải production, có thể cần tinh chỉnh sau.
 
@@ -931,3 +938,153 @@ Live membership mâu thuẫn vẫn cho đọc lịch sử hợp lệ trong đún
   Chỉ sửa component/CSS/test và tài liệu, không sửa Backend hoặc database.
 - Kiểm tra lượt đồng bộ này: 35 Allocation Flow/API tests pass, TypeScript/Vite build và lint pass;
   còn 13 lint warnings cũ ngoài Allocation và cảnh báo bundle lớn. Chưa chụp lại browser cho thay đổi nhỏ này.
+
+### 8.11. Virtual groups và tương thích tối thiểu Preview / History / Apply
+
+#### Quyết định và phạm vi
+
+- Người dùng đã duyệt mở rộng tối thiểu Preview/History/Apply để nhóm mới hoạt động end-to-end.
+  Không migration, không chỉnh dữ liệu MySQL ứng dụng, không đổi Deadline/Review/Reopen hoặc quyền hiện có.
+- Lớp chưa có nhóm có thể Random; target được lớn hơn số nhóm hiện tại khi có witness hợp lệ.
+  PENDING/ACCEPTED giữ nguyên ID, status, Leader, membership. OPEN/REVOKED vẫn là draft được tái cơ cấu.
+- Group Sequence đã tồn tại; dùng lại cơ chế compact và next sequence của `GroupService`, không thêm thuộc tính.
+  Chưa có Rename Group dành cho Leader trong source hiện tại; lượt này không bổ sung chức năng đó.
+
+#### Range, tìm kiếm và công thức giữ nguyên
+
+- Chỉ bỏ trần “tổng nhóm hiện tại” khỏi Upper ở mục 4.2; giữ nguyên Lower, minimumRequired,
+  enabled rules, pruning Major/SE, capacity và phân loại FEASIBLE / PROVEN_INFEASIBLE / SEARCH_LIMIT_REACHED.
+- Tiếp tục cân bằng toàn lớp bằng floor(N/target)..ceil(N/target), gồm cả protected; chênh lệch tối đa 1.
+  Group Score 40/35/25 chuẩn hóa theo tiêu chí bật, validator và Compatibility Score không đổi.
+- Chỉ tạo số slot mới tối thiểu `max(0, target - currentActiveGroups)`. Nếu target không vượt số nhóm cũ,
+  không được thay nhóm cũ bằng nhóm mới chỉ để đổi phương án Random.
+- Ưu tiên xếp draft hợp lệ trước. Với mỗi tập slot, thử trước witness giữ nguyên thành viên những nhóm hợp lệ
+  vừa khoảng cân bằng; sau đó tiếp tục search thông thường nếu còn ngân sách. Objective lexicographic cũ
+  vẫn quyết định: giữ nhóm hợp lệ → Leader → ít di chuyển → utility → seed phá hòa.
+  Không hứa tối ưu toàn cục khi hết ngân sách; witness tìm được vẫn phải qua validator thật.
+- Nhóm mới dùng tên `Group 01`, `Group 02`, ... bỏ qua tên đang dùng trong lớp/phiên theo so sánh không phân biệt
+  hoa/thường; Apply kiểm tra lại tên qua repository trước khi tạo. Tên không phải Group Sequence hay ID kỹ thuật.
+  Leader nhóm mới là Student có ID nhỏ nhất; Leader nhóm cũ được giữ khi còn trong nhóm.
+- Cùng snapshot/seed/ngân sách node cho kết quả tái hiện được trong phiên bản engine này; không cam kết kết quả
+  giống engine cũ trước thay đổi thuật toán. Random Again vẫn ưu tiên giữ nhóm hợp lệ thay vì phá để tạo khác biệt.
+
+#### Contract và lịch sử cũ
+
+- Giữ nguyên routes, request body, Idempotency-Key và các bảng allocation. Setup trả `limits.createsNewGroups=true`.
+- Preview `GroupView` thêm `planGroupKey` và `newGroup`: nhóm thật dùng `group:<id>`, slot mới dùng `new:<name>`;
+  `groupId=null` cho slot mới, không dùng số âm hoặc giả Group ID thật. Members vẫn dùng Student ID thật.
+- Report thêm `createdGroupKeys`; movement thêm `toGroupKey`; leader/group change thêm `planGroupKey`;
+  group change thêm `newGroup`. Những ID tương ứng có thể null trước Apply. `createdGroupIds` chỉ có ID thật sau Apply.
+  Frontend dùng key ổn định khi render card/table, hiển thị badge Nhóm mới/New group và số nhóm sẽ tạo trong xác nhận.
+- Payload mới lưu `formatVersion=2` trong cột INT có sẵn, plan fingerprint gồm key/name/newGroup và assignments.
+  Reader/Apply tiếp tục nhận format 1, dùng đúng thuật toán hash cũ khi payload thiếu key, không ghi lại lịch sử cũ.
+  Snapshot fingerprint không đổi cấu trúc. Saved Random plan giữ nguyên slot dự kiến kể cả sau Apply.
+- Apply/Successful Audit ánh xạ key sang Group ID thật trong movements, leader changes và group changes;
+  Random History vẫn mở lại đúng phương án đã lưu, không chạy Random lại khi xem.
+
+#### Atomic Apply và dữ liệu
+
+- Giữ locking, scope/owner, stale fingerprint, balance check, idempotency và cancellation invitations hiện có.
+- Trong cùng transaction Apply, `GroupService.materializeAllocationGroups` xác minh số slot mới tối thiểu,
+  key duy nhất, status OPEN, tên và Leader nhỏ nhất; dùng sequence hiện có, tạo draft và trả mapping key → ID thật.
+  Dùng entity trả về từ `saveAndFlush` để lấy ID do database cấp, tương thích JPA merge.
+- `applyAllocationPlan` sau đó kiểm tra lại toàn bộ Student set/membership/Leader/protected/rules bằng dữ liệu thật,
+  chuyển membership, giải tán draft không giữ và dùng domain submit/accept cũ để auto-approve.
+  Creation history, membership history, approval, run/idempotency và nhóm mới đều rollback nếu bất kỳ bước nào lỗi.
+  Group events tiếp tục qua after-commit, không phát thành công khi rollback.
+- Không cần sửa schema hay migration: payload LONGTEXT và format_version đã có. Triển khai Backend/Frontend tương thích
+  cùng đợt; server cũ chỉ đọc format 1 sẽ không xử lý được phương án format 2 mới tạo.
+
+#### Kiểm thử lượt cập nhật này
+
+- Backend: **155 tests passed**, 0 failures/errors/skipped: SmartAllocationServiceTest (34), GroupScoreServiceTest (17),
+  AllocationApplyServiceTest (33), AllocationResourceTest (39), GroupSessionPolicyTest (32); `bootJar` thành công.
+  Có oracle độc lập cho bài toán nhỏ, lớp chưa có nhóm, target mở rộng, rules bật/tắt, thiếu Major/SE/capacity,
+  seed, giữ draft hợp lệ và protected, tên/key mới không trùng, Leader nhỏ nhất, Preview không mutation nhóm.
+- H2 riêng kiểm tra Preview → Saved History → Apply tạo nhóm thật, ánh xạ audit IDs, format 1 cũ đọc/Apply được,
+  stale preview, rollback nhóm/sequence/membership/history/events và hai Apply đồng thời cùng/khác key.
+  H2 không chứng minh được mọi đặc tính locking/collation MySQL; chưa chạy MySQL E2E.
+- Frontend: **40 tests passed / 3 files** (Allocation Flow, Allocation API, i18n), gồm mở lại hai nhóm ảo từ History
+  với key riêng và chuyển VI/EN mà không gọi Random/Apply. TypeScript/Vite build và lint thành công;
+  còn 16 lint warnings ngoài phần thay đổi và cảnh báo bundle lớn. jsdom còn cảnh báo pseudo-element Ant Design.
+- Chưa kiểm tra trực quan bằng browser cho lượt cập nhật này; không chạy full Backend/Frontend suite.
+  Không dùng MySQL local/production, không gửi email, không migration, không commit/push.
+
+### 8.12. Tối ưu mềm phân bố chuyên ngành và rút gọn Suggestion Reason
+
+#### Nguyên nhân và chính sách ưu tiên
+
+- `admissionUtility` cũ chỉ thưởng ngành mới khi nhóm chưa đủ MIN_MAJORS; sau ngưỡng đó, phương án
+  tập trung 3–4 Student cùng ngành có thể hòa điểm với phương án đa dạng hơn. Group Score chỉ đo mức
+  hoàn thiện rules, không phải chất lượng phân bố ngành toàn lớp. Không lấy hai score này thay cho validation.
+- Giữ ưu tiên bảo toàn hiện có: hard rules + sĩ số chênh lệch tối đa 1 → giữ draft vốn hợp lệ
+  → giữ Leader → ít Student di chuyển → cân bằng ngành → utility cũ → seed phá hòa.
+  Người dùng đã được thông báo trước khi sửa: không phá OPEN/REVOKED vốn hợp lệ hoặc protected chỉ để cân ngành.
+- Không đổi Group Score (40/35/25 và chuẩn hóa enabled criteria), Compatibility Score/recommendation,
+  công thức target/range/suggestion, lifecycle, phân quyền, tên nhóm hoặc Group Sequence.
+
+#### Công thức và bước tối ưu
+
+- Gọi `c[g,m]` là số Student ngành m trong nhóm g. Tối thiểu hóa số cặp cùng ngành:
+  `P = sum_g sum_m c[g,m] * (c[g,m] - 1) / 2`.
+  Với tổng Student từng ngành và số nhóm cố định, đây tương đương giảm tổng phương sai phân bố từng ngành.
+  Số cặp tương ứng 1/2/3/4 Student cùng ngành là 0/1/3/6; không đặt trần cứng 2 Student/ngành.
+  Protected groups đóng góp hằng số nên không tham gia sửa phương án.
+- Trong backtracking, giữ ưu tiên vị trí cũ và utility, thêm tie-break ưu tiên slot ít Student cùng ngành hơn,
+  sau đó ít người hơn. Không thêm pruning theo ngành ngoài các Business Rules đang bật.
+- Khi so witness tương đương về giữ draft/Leader/movements, xét P trước utility. Không đổi DTO optimization
+  hoặc công thức tính compatibilityUtility; P là tiêu chí nội bộ, không phải Group Score mới.
+- Sau khi tìm được witness, thử hoán đổi 1–1 giữa các nhóm được phép tái cơ cấu. Chỉ nhận swap giảm P,
+  không tăng số Student bị di chuyển, không chuyển Leader cũ đang được giữ, không đụng protected hoặc draft
+  đang giữ nguyên thành viên so với nhóm vốn hợp lệ. Validator thật phải xác nhận cả hai nhóm sau swap.
+  Sĩ số hai nhóm không đổi nên vẫn giữ global size balance; Leader nhóm mới tiếp tục là ID nhỏ nhất.
+- Repair tối đa `min(20000, maximumNodes)` cặp ứng viên, tách khỏi số node backtracking `visitedNodes`.
+  Đây là giới hạn xử lý, không phải hard rule. Thứ tự duyệt và phá hòa dùng RNG của seed; không dùng thời gian
+  làm điều kiện dừng. Không khẳng định tối ưu toàn cục hoặc chứng minh “không còn cách cân hơn” khi hết ngân sách.
+- Có thể còn nhóm 3–4 Student cùng ngành do protected, bảo toàn draft/Leader/movements, nguồn lực, rules hoặc
+  giới hạn tìm kiếm. Muốn đặt cân bằng ngành trước các ưu tiên bảo toàn này cần quyết định nghiệp vụ riêng.
+
+#### Số liệu trước/sau
+
+Đo bằng unit test thuần, cùng snapshot 36 Student (12 SE, 11 IB, 13 GD), không nhóm cũ,
+target 8, seed 42 và SearchLimits mặc định. Mỗi ô là `(SE, IB, GD)`; đây không phải kết quả Random trên MySQL thật.
+
+| Nhóm dự kiến | Engine trước cập nhật | Engine sau cập nhật |
+| --- | --- | --- |
+| Group 01 | (1, 1, 3) | (1, 1, 2) |
+| Group 02 | (3, 1, 0) | (2, 1, 2) |
+| Group 03 | (1, 1, 3) | (1, 2, 2) |
+| Group 04 | (1, 2, 2) | (1, 2, 2) |
+| Group 05 | (1, 2, 1) | (1, 2, 2) |
+| Group 06 | (1, 2, 2) | (2, 1, 1) |
+| Group 07 | (2, 1, 1) | (2, 1, 1) |
+| Group 08 | (2, 1, 1) | (2, 1, 1) |
+
+- P giảm 16 → 12; 12 là lower bound của bộ dữ liệu này (4 cặp SE + 3 cặp IB + 5 cặp GD).
+  Nhóm có từ 3 Student cùng ngành giảm 3 → 0; mỗi ngành đều có 1–2 Student/nhóm.
+  Sĩ số vẫn 4 nhóm × 4 và 4 nhóm × 5; đủ toàn bộ rules, Group Score vẫn 100%.
+
+#### Suggestion và tương thích
+
+- Chỉ bỏ reason không có nội dung: SUGGESTED_PRESERVES_VALID_GROUPS khi không có draft vốn hợp lệ,
+  PROTECTED_COUNTS_INCLUDED khi protected=0; SUGGESTED_BALANCED_SIZE cũng không trả 0/0 cho phương án chỉ có protected.
+  Giữ thông tin khi số lượng thực sự >0 và luôn giữ VALIDATED_SUGGESTION cho target đã có witness.
+- Không đổi target, reason codes/parameters hoặc bản dịch; cùng danh sách reason được i18next render VI/EN.
+  Không thay API, schema hoặc payload version. Preview mới nhận witness đã tối ưu; History cũ vẫn được đọc
+  nguyên trạng, không chạy Random lại và không bị vô hiệu chỉ vì phân bố ngành chưa cân bằng theo tiêu chí mềm mới.
+
+#### Files và kiểm thử
+
+- Chỉ sửa `SmartAllocationService.java`, `SmartAllocationServiceTest.java` và tài liệu này.
+- Engine tests gồm 12/11/13 với seed 1/17/42/93, deterministic, detached input, không gọi repository;
+  protected tập trung ngành, bảo toàn OPEN/REVOKED hợp lệ/Leader/movements; nguồn SE chiếm đa số,
+  MAX_MAJORS=1 buộc nhóm đồng ngành; rules tắt không bị tự áp trần ngành mới; metadata recommendation giữ nguyên.
+  Giữ các tests oracle độc lập, feasibility, Group Score, target và balance cũ.
+- Kết quả cuối: **169 Backend tests passed**, 0 failures/errors/skipped: engine 42, Group Score 17,
+  class-rule status 6, Group Session Policy 32, Atomic Apply/History 33, Allocation HTTP/API 39.
+  `bootJar` thành công. Regression gồm Preview không mutation nhóm, saved history/format 1,
+  stale preview, rollback, protected groups, idempotency và concurrent Apply trên H2 riêng/mock.
+- Frontend regression Allocation Flow/API/i18n: **40 tests / 3 files passed**; không sửa Frontend ở lượt này.
+  Các reason codes/keys VI/EN giữ nguyên; không tạo Markdown khác, không commit/push.
+  Không chạy Random/Apply hoặc truy cập MySQL ứng dụng. Chưa kiểm tra E2E trên database thật;
+  H2 không chứng minh các đặc tính locking MySQL và local search không bảo đảm tối ưu toàn cục cho mọi lớp.

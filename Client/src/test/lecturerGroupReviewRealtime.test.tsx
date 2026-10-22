@@ -77,7 +77,7 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
 describe('group review realtime updates', () => {
-  it('preserves the row, statistics, detail dialog and draft search while refreshing from a socket event', async () => {
+  it('preserves the row, detail dialog and draft search while refreshing from a socket event', async () => {
     await mount();
     const originalRow = document.querySelector('.review-table tbody tr[data-row-key="1"]')!;
     fireEvent.change(screen.getByLabelText(i18n.t('groupReview.search')), { target: { value: 'Draft search' } });
@@ -89,13 +89,14 @@ describe('group review realtime updates', () => {
     await waitFor(() => expect(client.isFetching()).toBe(1));
     expect(document.querySelector('.review-table tbody tr[data-row-key="1"]')).toBe(originalRow);
     expect(document.querySelector('.review-table .ant-spin-spinning')).toBeNull();
-    expect(document.querySelector('.review-stat-pending strong')).toHaveTextContent('1');
+    expect(document.querySelector('.review-summary')).not.toBeInTheDocument();
+    expect(within(originalRow as HTMLElement).getByText(i18n.t('groupReview.statuses.PENDING'))).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBe(dialog);
     expect(screen.getByLabelText(i18n.t('groupReview.search'))).toHaveValue('Draft search');
     await act(async () => { finish(page('ACCEPTED')); });
     await waitFor(() => expect(within(originalRow as HTMLElement).getByText(i18n.t('groupReview.statuses.ACCEPTED'))).toBeInTheDocument());
-    expect(document.querySelector('.review-stat-pending strong')).toHaveTextContent('0');
-    expect(document.querySelector('.review-stat-accepted strong')).toHaveTextContent('1');
+    expect(within(originalRow as HTMLElement).queryByRole('button', { name: i18n.t('groupReview.approve'), exact: true })).not.toBeInTheDocument();
+    expect(within(originalRow as HTMLElement).getByRole('button', { name: i18n.t('groupReview.reopen'), exact: true })).toBeInTheDocument();
     expect(screen.getByRole('dialog')).toBe(dialog);
   });
 
@@ -130,12 +131,13 @@ describe('group review realtime updates', () => {
     expect(groupApi.getReviews).toHaveBeenCalledTimes(reconnectedCalls);
   });
 
-  it('retains the last successful rows and statistics when a background request fails', async () => {
+  it('retains the last successful rows and status when a background request fails', async () => {
     await mount();
     vi.mocked(groupApi.getReviews).mockRejectedValue({ status: 403, message: 'Review refresh failed' });
     await act(async () => { emit('GROUP_UPDATED'); });
     await waitFor(() => expect(client.getQueryCache().find({ queryKey: ['group-reviews'], exact: false })?.state.status).toBe('error'));
     expect(screen.getByText('Realtime review group')).toBeInTheDocument();
-    expect(document.querySelector('.review-stat-pending strong')).toHaveTextContent('1');
+    const row = document.querySelector('.review-table tbody tr[data-row-key="1"]')!;
+    expect(within(row as HTMLElement).getByText(i18n.t('groupReview.statuses.PENDING'))).toBeInTheDocument();
   });
 });

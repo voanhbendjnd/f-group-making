@@ -1,11 +1,16 @@
 .allocation-page { display: flex; flex-direction: column; gap: 1.5rem; min-width: 0; }
 .allocation-back { align-self: flex-start; }
-.allocation-welcome { padding: .375rem; border: 1px solid var(--color-primary-border); border-radius: var(--radius-lg); background: var(--color-primary-light); box-shadow: var(--shadow-sm); }
+.allocation-welcome { padding: .375rem; border: 1px solid rgba(255, 255, 255, .15); border-radius: var(--radius-lg); background: linear-gradient(135deg, var(--color-text-main) 0%, #1e3a8a 45%, #2563eb 100%); box-shadow: var(--shadow-sm); }
 .allocation-hero { position: relative; isolation: isolate; display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; min-width: 0; overflow: hidden; border-radius: var(--radius-md); background: linear-gradient(115deg, var(--color-primary-light), color-mix(in srgb, var(--color-primary-border) 65%, var(--color-surface))); }
 .allocation-hero::before, .allocation-hero::after { content: ''; position: absolute; z-index: -1; width: 80%; height: 8rem; border-radius: 50%; pointer-events: none; }
 .allocation-hero::before { background: color-mix(in srgb, var(--color-surface) 55%, transparent); right: -15%; bottom: -4rem; transform: rotate(-15deg); }
 .allocation-hero::after { background: color-mix(in srgb, var(--color-primary-border) 30%, transparent); left: -15%; bottom: -5rem; transform: rotate(9deg); }
-.allocation-list-hero { padding: 1rem 1.75rem; min-height: 10rem; }
+.allocation-list-hero { padding: 1rem 1.75rem; min-height: 10rem; background: transparent; color: var(--color-text-inverse); }
+.allocation-list-hero::before { background: rgba(255, 255, 255, .05); }
+.allocation-list-hero::after { background: rgba(96, 165, 250, .08); }
+.allocation-list-hero .allocation-eyebrow { color: #bfdbfe; }
+.allocation-list-hero .allocation-hero-copy h1 { color: var(--color-text-inverse); }
+.allocation-list-hero .allocation-hero-copy p { color: rgba(255, 255, 255, .8); }
 .allocation-list-hero .allocation-illustration { width: clamp(8rem, 19vw, 13rem); }
 .allocation-hero-copy { flex: 1; min-width: 0; max-width: 34rem; }
 .allocation-hero-copy h1 { color: var(--color-primary-dark); font-size: clamp(1.5rem, 2.4vw, 2rem); margin: .5rem 0 .625rem; }
@@ -169,7 +174,10 @@
 .allocation-table-time { display: grid; gap: .125rem; white-space: nowrap; font-size: .75rem; }
 .allocation-table-time strong { font-weight: 500; }
 .allocation-table-time span { color: var(--color-text-muted); }
-.allocation-table-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap; }
+.allocation-table-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: nowrap; width: max-content; }
+.allocation-history-panel .allocation-history-action-cell { white-space: nowrap; overflow-wrap: normal; }
+.allocation-history-panel .allocation-history-action-cell .ant-btn { white-space: nowrap; flex: 0 0 auto; }
+.allocation-table-actions > .allocation-action-hint { flex: 0 0 auto; }
 .allocation-history-status.ant-tag { border-radius: var(--radius-full); margin: 0; padding-inline: .625rem; font-size: .75rem; white-space: nowrap; }
 .allocation-history-panel .ant-table-pagination { margin-bottom: 0; }
 .allocation-page .ant-tabs-content-holder, .allocation-page .ant-table-wrapper { min-width: 0; }

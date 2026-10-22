@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { allocationApi } from '../api/allocationApi';
 import { allocationErrorKey, isAllocationComplete, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
-import type { ApplyResult, PlanDetail, Preview } from '../types';
+import type { ApplyResult, PlanDetail, PlanPage, Preview } from '../types';
 import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
 export function useAllocationFlow(classId: number, deadlineId: number) {
@@ -88,8 +88,17 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     try {
       const result = await allocationApi.apply(deadlineId, classId, request.previewId, request.key);
       saveAttempt(null); setApplied(result); setPreview(null); setConfiguring(false); toast.success(t('allocation.saved'));
+      await Promise.allSettled([client.cancelQueries({ queryKey: [...key, 'plans'] })]);
+      // Reflect the committed result immediately, even if the following history refresh fails.
+      const markApplied = (summary: PlanDetail['summary']): PlanDetail['summary'] => summary.planId === result.previewId
+        ? { ...summary, status: 'APPLIED', appliedAt: result.appliedAt, canApply: false, invalidReason: null } : summary;
+      client.setQueriesData<PlanPage>({ queryKey: [...key, 'plans'], predicate: query => typeof query.queryKey[6] === 'number' },
+        page => page && { ...page, result: page.result.map(markApplied) });
+      client.setQueriesData<PlanDetail>({ queryKey: [...key, 'plans', 'detail', result.previewId] },
+        detail => detail && { ...detail, summary: markApplied(detail.summary) });
       // A refresh failure cannot turn a committed Apply into a reported failure.
-      void Promise.allSettled([client.invalidateQueries({ queryKey: ['allocation'] }), syncDeadlineQueries(client)]);
+      void Promise.allSettled([syncDeadlineQueries(client)]);
+      return result;
     } catch (error) {
       setApplyError(error);
       const code = allocationErrorKey(error);

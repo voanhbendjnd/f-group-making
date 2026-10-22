@@ -1,11 +1,43 @@
+.group-export-modal {
+  top: 0;
+  padding-bottom: 0;
+}
+
+.group-export-modal .ant-modal-container,
 .group-export-modal .ant-modal-content {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 2rem);
   border-radius: 16px;
-  padding: 24px;
+  padding: 0;
   overflow: hidden;
 }
 
+.group-export-modal .ant-modal-header {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 1.125rem 3rem 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.group-export-modal .ant-modal-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 1rem 1.25rem;
+  overflow: auto;
+}
+
+.group-export-modal .ant-modal-footer {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0.875rem 1.25rem;
+  border-top: 1px solid var(--color-border);
+  text-align: left;
+}
+
 .export-modal-header {
-  margin-bottom: 20px;
+  min-width: 0;
 }
 
 .export-modal-title {
@@ -20,6 +52,7 @@
 
 .export-modal-title svg {
   color: #3b82f6;
+  flex-shrink: 0;
 }
 
 .export-modal-subtitle {
@@ -31,15 +64,17 @@
 .export-stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-shrink: 0;
 }
 
 .export-stat-card {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 16px;
+  padding: 10px 12px;
+  min-width: 0;
   border-radius: 10px;
   border: 1px solid var(--border-color, #e2e8f0);
   background: var(--bg-surface, #ffffff);
@@ -109,12 +144,14 @@
 .export-filter-bar {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .export-search-input {
   flex: 1;
+  min-width: 0;
 }
 
 .export-status-select {
@@ -122,11 +159,16 @@
 }
 
 .export-table-container {
-  margin-bottom: 20px;
-  max-height: 420px;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
+}
+
+.export-table-container .ant-table-cell {
+  overflow-wrap: anywhere;
 }
 
 .export-table-container .ant-table-thead > tr > th {
@@ -137,14 +179,30 @@
 }
 
 .export-modal-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.5rem 1rem;
   align-items: center;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
+}
+
+.export-modal-footer .form-label {
+  grid-column: 1;
+  grid-row: 1;
+  margin: 0;
+  max-width: 20rem;
+  min-width: 0;
+  font-size: 0.8125rem;
+}
+
+.export-modal-footer .form-control {
+  margin-top: 0.25rem;
+  min-height: 2.25rem;
+  padding-block: 0.375rem;
 }
 
 .export-footer-hint {
+  grid-column: 1 / -1;
+  grid-row: 2;
   font-size: 0.8125rem;
   color: #64748b;
   margin: 0;
@@ -153,7 +211,13 @@
   gap: 6px;
 }
 
+.export-footer-hint svg {
+  flex-shrink: 0;
+}
+
 .export-footer-actions {
+  grid-column: 2;
+  grid-row: 1;
   display: flex;
   gap: 10px;
 }
@@ -180,21 +244,39 @@
 }
 
 @media (max-width: 768px) {
+  .group-export-modal .ant-modal-header { padding: 1rem 2.75rem 0.75rem 1rem; }
+  .group-export-modal .ant-modal-body { padding: 0.75rem 1rem; }
+  .group-export-modal .ant-modal-footer { padding: 0.75rem 1rem; }
+  .export-modal-title { font-size: 1.0625rem; }
+  .export-modal-subtitle { font-size: 0.8125rem; line-height: 1.5; }
   .export-stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
   .export-filter-bar {
     flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
   }
   .export-status-select {
     width: 100%;
   }
   .export-modal-footer {
-    flex-direction: column;
-    gap: 12px;
-    align-items: stretch;
+    gap: 0.5rem 0.75rem;
   }
   .export-footer-actions {
     justify-content: flex-end;
   }
+}
+
+@media (max-width: 540px) {
+  .export-stat-card { gap: 8px; padding: 8px; }
+  .export-stat-icon { width: 30px; height: 30px; flex-shrink: 0; }
+  .export-stat-icon svg { width: 17px; height: 17px; }
+  .export-stat-label { font-size: 0.625rem; }
+  .export-stat-value { font-size: 1.0625rem; }
+  .export-modal-footer { grid-template-columns: minmax(0, 1fr); }
+  .export-modal-footer .form-label { max-width: none; }
+  .export-footer-actions { grid-column: 1; grid-row: 2; }
+  .export-footer-actions .btn { flex: 1; min-width: 0; font-size: 0.8125rem; padding-inline: 0.5rem; }
+  .export-footer-hint { grid-row: 3; font-size: 0.6875rem; }
 }

@@ -31,7 +31,8 @@ public record AllocationResultDTO(Status status, int targetGroupCount, long seed
     }
 
     public record PlannedGroup(Long groupId, String name, GroupStatus status, Long leaderId,
-                                boolean protectedGroup, List<GroupMemberDTO> members, GroupScoreDTO score) {}
+                                boolean protectedGroup, List<GroupMemberDTO> members, GroupScoreDTO score,
+                                String planGroupKey, boolean newGroup) {}
 
     /** Lexicographic objective; a feasible result is not necessarily a proven global optimum. */
     public record Optimization(int validGroupsPreserved, int leadersPreserved, int movedStudents,

@@ -153,13 +153,13 @@ class AllocationResourceTest {
             .with(user(teacher.getEmail()).roles("ADMIN"))).andExpect(status().isBadRequest());
     }
 
-    @Test void setupReturnsCheckedSuggestionRangeAndNoNewGroupPolicy() throws Exception {
+    @Test void setupReturnsCheckedSuggestionRangeAndVirtualGroupSupport() throws Exception {
         mvc.perform(get(path("setup")).param("seed", "42").with(user(teacher.getEmail()).roles("LECTURE")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.seed").value(42))
             .andExpect(jsonPath("$.data.range.minimum").value(2)).andExpect(jsonPath("$.data.range.maximum").value(2))
             .andExpect(jsonPath("$.data.suggestion.status").value("FEASIBLE"))
             .andExpect(jsonPath("$.data.suggestion.suggestedCount").value(2))
-            .andExpect(jsonPath("$.data.limits.createsNewGroups").value(false));
+            .andExpect(jsonPath("$.data.limits.createsNewGroups").value(true));
     }
 
     @ParameterizedTest @org.junit.jupiter.params.provider.CsvSource({"ACCEPTED,true,409", "ACCEPTED,false,200", "PENDING,true,200"})

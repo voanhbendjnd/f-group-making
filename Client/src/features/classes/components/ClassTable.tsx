@@ -29,7 +29,7 @@ export const ClassTable: React.FC<ClassTableProps> = ({
             <th>{t('lecturer.term')}</th>
             <th>{t('classAssignment.title')}</th>
             <th>{t('classes.studentCount')}</th>
-            <th style={{ textAlign: 'right' }}>{t('lecturer.actions')}</th>
+            <th className="table-action-cell" style={{ textAlign: 'right' }}>{t('lecturer.actions')}</th>
           </tr>
         </thead>
         <tbody>
@@ -150,27 +150,29 @@ export const ClassTable: React.FC<ClassTableProps> = ({
                   </td>
 
                   {/* Nút hành động */}
-                  <td style={{ textAlign: 'right' }}>
-                    {cls.lecturerId === null && onAssignLecturer && <button type="button" className="btn btn-primary btn-sm"
-                      onClick={event => { event.stopPropagation(); onAssignLecturer(cls); }}>{t('classAssignment.choose')}</button>}
-                    <button
-                      type="button"
-                      aria-label={t('classes.openClass', { name: cls.name })}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onSelectClass(cls);
-                      }}
-                      className="btn btn-sm btn-secondary"
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        fontWeight: 600,
-                      }}
-                    >
-                      <span>{t('adminUx.classDetail')}</span>
-                      <ArrowRight size={14} />
-                    </button>
+                  <td className="table-action-cell" style={{ textAlign: 'right' }}>
+                    <div className="table-row-actions">
+                      {cls.lecturerId === null && onAssignLecturer && <button type="button" className="btn btn-primary btn-sm"
+                        onClick={event => { event.stopPropagation(); onAssignLecturer(cls); }}>{t('classAssignment.choose')}</button>}
+                      <button
+                        type="button"
+                        aria-label={t('classes.openClass', { name: cls.name })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectClass(cls);
+                        }}
+                        className="btn btn-sm btn-secondary"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          fontWeight: 600,
+                        }}
+                      >
+                        <span>{t('adminUx.classDetail')}</span>
+                        <ArrowRight size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

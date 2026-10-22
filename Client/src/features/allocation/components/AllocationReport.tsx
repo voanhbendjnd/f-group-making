@@ -14,6 +14,7 @@ export const AllocationReport = memo(function AllocationReport({ report }: { rep
       [t('allocation.allocated'), report.movements.filter(value => value.previouslyUnassigned).length],
     ].map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
     <div className="allocation-tags"><Tag>{t('allocation.keptCount', { count: report.keptGroupIds.length })}</Tag>
+      <Tag color="blue">{t('allocation.createdCount', { count: report.createdGroupKeys?.length ?? report.createdGroupIds.length })}</Tag>
       <Tag color="warning">{t('allocation.disbandCount', { count: report.disbandedGroupIds.length })}</Tag>
       <Tag>{t('allocation.protectedCount', { count: report.protectedGroupIds.length })}</Tag></div>
     <Collapse items={[
@@ -24,16 +25,16 @@ export const AllocationReport = memo(function AllocationReport({ report }: { rep
           { title: t('allocation.after'), dataIndex: 'toGroupName' },
         ]} /> },
       { key: 'leaders', label: t('allocation.leaderChanges', { count: report.leaderChanges.length }), children:
-        <ul className="allocation-reasons">{report.leaderChanges.map(change => <li key={change.groupId}>
-          <strong>{report.groupChanges.find(group => group.groupId === change.groupId)?.name || t('allocation.missing')}</strong>: {change.previousLeaderName || t('allocation.missing')} → {change.leaderName || t('allocation.missing')}
+        <ul className="allocation-reasons">{report.leaderChanges.map(change => <li key={change.planGroupKey ?? change.groupId}>
+          <strong>{report.groupChanges.find(group => change.planGroupKey ? group.planGroupKey === change.planGroupKey || `group:${group.groupId}` === change.planGroupKey : group.groupId === change.groupId)?.name || t('allocation.missing')}</strong>: {change.previousLeaderName || t('allocation.missing')} → {change.leaderName || t('allocation.missing')}
         </li>)}</ul> },
       { key: 'groups', label: t('allocation.beforeAfter'), children:
-        <Table size="small" rowKey="groupId" pagination={false} scroll={{ x: 520 }} dataSource={report.groupChanges} expandable={{ expandedRowRender: row => <div className="allocation-comparison">
+        <Table size="small" rowKey={row => row.planGroupKey ?? String(row.groupId)} pagination={false} scroll={{ x: 520 }} dataSource={report.groupChanges} expandable={{ expandedRowRender: row => <div className="allocation-comparison">
           <div><h4>{t('allocation.before')}</h4><AllocationRules rules={row.rulesBefore} /></div>
           <div><h4>{t('allocation.after')}</h4>{row.disbanded ? <p>{t('allocation.disbanded')}</p> : <AllocationRules rules={row.rulesAfter} />}</div>
         </div> }} columns={[
           { title: t('allocation.group'), dataIndex: 'name' },
-          { title: t('allocation.change'), render: (_, row) => <Tag color={row.disbanded ? 'warning' : 'blue'}>{t(row.protectedGroup ? 'allocation.protected' : row.disbanded ? 'allocation.disbanded' : 'allocation.kept')}</Tag> },
+          { title: t('allocation.change'), render: (_, row) => <Tag color={row.disbanded ? 'warning' : 'blue'}>{t(row.protectedGroup ? 'allocation.protected' : row.newGroup ? 'allocation.newGroup' : row.disbanded ? 'allocation.disbanded' : 'allocation.kept')}</Tag> },
           { title: t('allocation.scoreBefore'), render: (_, row) => <ScoreValue score={row.scoreBefore} /> },
           { title: t('allocation.scoreAfter'), render: (_, row) => <ScoreValue score={row.scoreAfter} /> },
         ]} /> },

@@ -26,7 +26,7 @@ export function AllocationApplyHistory({ classId, deadlineId }: { classId: numbe
           { title: t('allocation.appliedAt'), render: (_, row) => <time className="allocation-table-time" dateTime={row.appliedAt}><strong>{new Date(row.appliedAt).toLocaleDateString(i18n.language)}</strong><span>{new Date(row.appliedAt).toLocaleTimeString(i18n.language)}</span></time> },
           { title: t('allocation.actor'), render: (_, row) => actor(row.actorId) },
           { title: t('allocation.target'), dataIndex: 'targetGroupCount' },
-          { title: t('allocation.details'), render: (_, row) => <Button size="small" icon={<Eye size={15} aria-hidden="true" />} onClick={() => setRunId(row.runId)}>{t('allocation.viewRun', { id: row.runId })}</Button> },
+          { title: t('allocation.details'), className: 'allocation-history-action-cell', render: (_, row) => <Button size="small" icon={<Eye size={15} aria-hidden="true" />} onClick={() => setRunId(row.runId)}>{t('allocation.viewRun', { id: row.runId })}</Button> },
         ]} />}
     <Drawer open={runId !== null} onClose={() => setRunId(null)} title={t('allocation.runTitle', { id: runId })} size="large" rootClassName="allocation-history-overlay" className="allocation-history-drawer">
       {detail.isPending ? <Skeleton active /> : detail.isError ? <Alert type="error" showIcon title={t(`allocation.errors.${allocationErrorKey(detail.error)}`, { defaultValue: t('allocation.errors.other') })} action={<Button onClick={() => void detail.refetch()}>{t('allocation.retry')}</Button>} /> : detail.data && <>

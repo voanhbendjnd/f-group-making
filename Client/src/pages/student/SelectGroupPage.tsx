@@ -591,7 +591,7 @@ export const SelectGroupPage: React.FC = () => {
             <div className="student-group-header-meta">
               <Users size={16} />
               <span>
-                {t('studentGroup.classLabel')} <strong style={{ color: 'var(--color-text-main)' }}>{workspace?.schoolClassName || validateResult?.className}</strong>
+                {t('studentGroup.classLabel')} <strong>{workspace?.schoolClassName || validateResult?.className}</strong>
               </span>
               {deadlineState !== 'CANCELLED' && <><span>•</span><span>{t('studentGroup.deadlineLabel')} {formatDateTime(workspace?.deadlineEndTime || validateResult?.endTime)}</span></>}
             </div>
@@ -599,12 +599,12 @@ export const SelectGroupPage: React.FC = () => {
 
           {/* Countdown block */}
           {deadlineState === 'ACTIVE' && <div className="student-group-countdown-box">
-            <Clock size={18} color="var(--color-primary, #2563eb)" />
-            <div style={{ display: 'flex', gap: '6px', fontSize: '1rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
+            <Clock size={18} />
+            <div className="student-group-countdown-value">
               <span>{timeLeft.days}d</span>:
               <span>{timeLeft.hours}h</span>:
               <span>{timeLeft.minutes}m</span>:
-              <span style={{ color: 'var(--color-primary, #2563eb)' }}>{timeLeft.seconds}s</span>
+              <span className="student-group-countdown-seconds">{timeLeft.seconds}s</span>
             </div>
           </div>}
         </div>

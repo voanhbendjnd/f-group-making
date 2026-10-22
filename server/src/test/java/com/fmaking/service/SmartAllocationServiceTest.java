@@ -128,11 +128,15 @@ class SmartAllocationServiceTest {
         assertReason(allocate(snapshot(students, List.of(group(1, GroupStatus.OPEN, students)), List.of()), target), TARGET_MUST_BE_POSITIVE);
     }
 
-    @Test void noNewGroupsAndNoGroupsToAllocateInto() {
+    @Test void createsOnlyMissingSlotsAndAllowsAnInitiallyUngroupedClass() {
         var students = students(8);
         var input = snapshot(students, List.of(group(1, GroupStatus.OPEN, students.subList(0, 4))), List.of());
-        assertReason(allocate(input, 2), NEW_GROUPS_NOT_ALLOWED);
-        assertReason(allocate(snapshot(students, List.of(), List.of()), 1), NEW_GROUPS_NOT_ALLOWED);
+        var expanded = allocate(input, 2);
+        assertValid(input, expanded);
+        assertThat(expanded.groups()).filteredOn(PlannedGroup::newGroup).hasSize(1);
+        var empty = snapshot(students, List.of(), List.of());
+        assertValid(empty, allocate(empty, 2));
+        assertReason(allocate(empty, 1), MEMBER_CAPACITY);
     }
 
     @Test void provesInsufficientSeatsMembersAndSeWithConcreteReasons() {
@@ -262,13 +266,13 @@ class SmartAllocationServiceTest {
         var suggestion = engine.suggest(input, 42);
         assertThat(suggestion.status()).isEqualTo(SEARCH_LIMIT_REACHED);
         assertThat(suggestion.suggestedCount()).isNull();
-        assertThat(suggestion.checkedTargets()).containsExactly(new CheckedTarget(1, SEARCH_LIMIT_REACHED));
+        assertThat(suggestion.checkedTargets()).hasSize(12).allSatisfy(target -> assertThat(target.status()).isEqualTo(SEARCH_LIMIT_REACHED));
     }
 
     @Test void emptyClassHasNoPositiveTargetAndMissingMajorDoesNotCountAsAMajor() {
         var empty = snapshot(List.of(), List.of(), List.of());
         assertThat(engine.preliminaryRange(empty).hasCandidates()).isFalse();
-        assertReason(allocate(empty, 1), NEW_GROUPS_NOT_ALLOWED);
+        assertReason(allocate(empty, 1), INSUFFICIENT_MEMBERS);
         var students = students(4);
         students.forEach(s -> s.setMajorId(null));
         var input = snapshot(students, List.of(group(1, GroupStatus.OPEN, students)), List.of());
@@ -290,7 +294,7 @@ class SmartAllocationServiceTest {
         var removed = GroupDTO.builder().id(2L).schoolClassId(17).deadlineId(3).status(GroupStatus.DISBANDED).build();
         var input = snapshot(students, List.of(group(1, GroupStatus.OPEN, students), removed), List.of());
         assertValid(input, allocate(input, 1));
-        assertReason(allocate(input, 2), NEW_GROUPS_NOT_ALLOWED);
+        assertReason(allocate(input, 2), INSUFFICIENT_MEMBERS);
         removed.setMembers(List.of(students.getFirst()));
         assertThatThrownBy(() -> allocate(input, 1)).isInstanceOf(IllegalArgumentException.class);
     }
@@ -348,6 +352,159 @@ class SmartAllocationServiceTest {
         long majors = members.stream().map(GroupMemberDTO::getMajorId).distinct().count();
         long se = members.stream().filter(s -> "SE".equals(s.getMajorCode())).count();
         return members.size() >= 2 && members.size() <= 4 && majors >= minMajors && majors <= maxMajors && se >= minSe;
+    }
+
+    @Test void virtualGroupsHaveUniqueNamesKeysSmallestIdLeadersAndStableSeedWithoutMutation() throws Exception {
+        var existing = group(1, GroupStatus.OPEN, students(12).subList(0, 4)); existing.setName("gRoUp 01");
+        var input = snapshot(students(12), List.of(existing), List.of());
+        var mapper = new ObjectMapper(); String before = mapper.writeValueAsString(input);
+        var result = allocate(input, 3); assertValid(input, result);
+        assertThat(result.groups()).extracting(PlannedGroup::planGroupKey).doesNotHaveDuplicates();
+        assertThat(result.groups()).extracting(group -> group.name().toLowerCase(Locale.ROOT)).doesNotHaveDuplicates();
+        assertThat(result.groups()).filteredOn(PlannedGroup::newGroup).hasSize(2).allSatisfy(group -> {
+            assertThat(group.groupId()).isNull();
+            assertThat(group.leaderId()).isEqualTo(group.members().stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow());
+            assertThat(group.members()).allSatisfy(member -> assertThat(member.getGroupId()).isNull());
+        });
+        assertThat(mapper.writeValueAsString(allocate(input, 3))).isEqualTo(mapper.writeValueAsString(result));
+        assertThat(mapper.writeValueAsString(input)).isEqualTo(before); verifyNoInteractions(repository);
+    }
+
+    @Test void newSlotsPreserveProtectedGroupsAndExistingValidDraftsAcrossSeeds() {
+        var all = students(16);
+        var pending = group(1, GroupStatus.PENDING, all.subList(0, 4));
+        var open = group(2, GroupStatus.OPEN, all.subList(4, 8));
+        var revoked = group(3, GroupStatus.REVOKED, all.subList(8, 12));
+        var input = snapshot(all, List.of(pending, open, revoked), List.of());
+        for (long seed : List.of(1L, 2L, 3L)) {
+            var result = engine.allocate(input, 4, seed, LIMITS); assertValid(input, result);
+            assertThat(result.groups()).filteredOn(PlannedGroup::newGroup).hasSize(1);
+            assertThat(result.optimization().validGroupsPreserved()).isEqualTo(2);
+            for (var old : List.of(pending, open, revoked)) {
+                var kept = result.groups().stream().filter(group -> Objects.equals(group.groupId(), old.getId())).findFirst().orElseThrow();
+                assertThat(kept.status()).isEqualTo(old.getStatus()); assertThat(kept.leaderId()).isEqualTo(old.getLeaderId());
+                assertThat(kept.members()).extracting(GroupMemberDTO::getStudentId)
+                    .containsExactlyInAnyOrderElementsOf(old.getMembers().stream().map(GroupMemberDTO::getStudentId).toList());
+            }
+        }
+    }
+
+    @Test void disabledRulesDoNotLimitNewSlotsAndImpossibleAcademicCompositionIsExplained() {
+        var all = students(8);
+        var disabled = Arrays.stream(GroupingRuleCode.values()).map(code -> rule(code, code.getSuggestedValue(), false)).toList();
+        var input = snapshot(all, List.of(), disabled);
+        assertThat(engine.preliminaryRange(input).maximum()).isEqualTo(8);
+        assertValid(input, allocate(input, 8));
+        var noSe = IntStream.rangeClosed(1, 8).mapToObj(id -> student(id, 2)).toList();
+        var impossible = allocate(snapshot(noSe, List.of(), List.of()), 2);
+        assertReason(impossible, INSUFFICIENT_SE); assertReason(impossible, INSUFFICIENT_MAJORS);
+        assertThat(impossible.groups()).isEmpty();
+    }
+
+    @ParameterizedTest @ValueSource(longs = {1, 17, 42, 93})
+    void balancedMajorDistributionForThirtySixUngroupedStudents(long seed) throws Exception {
+        var all = mixedMajors(12, 11, 13);
+        all.forEach(student -> { student.setMatchScore(73); student.setMatchReasons(List.of("Existing recommendation")); });
+        var input = snapshot(all, List.of(), List.of());
+        var mapper = new ObjectMapper(); String before = mapper.writeValueAsString(input);
+        var result = engine.allocate(input, 8, seed);
+        assertValid(input, result);
+        assertThat(result.groups().stream().map(group -> group.members().size()).sorted().toList()).containsExactly(4,4,4,4,5,5,5,5);
+        assertThat(result.groups()).allSatisfy(group -> {
+            assertThat(majorCounts(group)).allSatisfy(count -> assertThat(count).isBetween(1L, 2L));
+            assertThat(group.score().scorePercent()).isEqualTo(100.0);
+            assertThat(group.score().breakdown()).extracting(GroupScoreDTO.CriterionScore::baseWeight).containsExactly(40,35,25);
+            assertThat(group.leaderId()).isEqualTo(group.members().stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow());
+            assertThat(group.members()).allSatisfy(member -> {
+                assertThat(member.getMatchScore()).isEqualTo(73); assertThat(member.getMatchReasons()).containsExactly("Existing recommendation");
+            });
+        });
+        assertThat(concentration(result)).isEqualTo(12); // Global lower bound: 4 SE pairs + 3 IB pairs + 5 GD pairs.
+        assertThat(result.optimization().movedStudents()).isEqualTo(36);
+        assertThat(engine.allocate(input, 8, seed)).isEqualTo(result);
+        assertThat(mapper.writeValueAsString(input)).isEqualTo(before); verifyNoInteractions(repository);
+        System.out.println("MAJOR_DISTRIBUTION_SE_IB_GD seed=" + seed + " " + result.groups().stream().map(group ->
+            IntStream.rangeClosed(1, 3).mapToLong(major -> group.members().stream().filter(member -> member.getMajorId() == major).count())
+                .boxed().toList()).toList());
+    }
+
+    @Test void improvesEditablePoolWithoutTouchingConcentratedProtectedGroups() {
+        var all = mixedMajors(12,11,13);
+        var accepted = group(1, GroupStatus.ACCEPTED, List.of(all.get(0), all.get(12), all.get(13), all.get(14), all.get(15)));
+        var pending = group(2, GroupStatus.PENDING, List.of(all.get(1), all.get(23), all.get(24), all.get(25), all.get(26)));
+        var input = snapshot(all, List.of(accepted,pending), List.of());
+        var result = engine.allocate(input,8,42); assertValid(input,result);
+        for (var original : List.of(accepted,pending)) {
+            var fixed = result.groups().stream().filter(group -> Objects.equals(group.groupId(),original.getId())).findFirst().orElseThrow();
+            assertThat(fixed.members()).isEqualTo(original.getMembers()); assertThat(fixed.leaderId()).isEqualTo(original.getLeaderId());
+            assertThat(fixed.status()).isEqualTo(original.getStatus()); assertThat(fixed.protectedGroup()).isTrue();
+            assertThat(majorCounts(fixed)).contains(4L);
+        }
+        assertThat(result.groups()).filteredOn(group -> !group.protectedGroup()).allSatisfy(group -> assertThat(majorCounts(group)).allSatisfy(count -> assertThat(count).isBetween(1L,2L)));
+    }
+
+    @Test void retainingValidOpenAndRevokedGroupsOutranksImprovingTheirMajorBalance() {
+        var all = mixedMajors(12,11,13);
+        var open = group(1, GroupStatus.OPEN, List.of(all.get(0),all.get(12),all.get(13),all.get(14),all.get(15)));
+        var revoked = group(2, GroupStatus.REVOKED, List.of(all.get(1),all.get(23),all.get(24),all.get(25),all.get(26)));
+        var input = snapshot(all,List.of(open,revoked),List.of());
+        var result = engine.allocate(input,8,42); assertValid(input,result);
+        assertThat(result.optimization().validGroupsPreserved()).isEqualTo(2);
+        assertThat(result.optimization().leadersPreserved()).isEqualTo(2);
+        assertThat(result.optimization().movedStudents()).isEqualTo(26);
+        for (var original : List.of(open,revoked)) {
+            var kept = result.groups().stream().filter(group -> Objects.equals(group.groupId(),original.getId())).findFirst().orElseThrow();
+            assertThat(kept.members()).extracting(GroupMemberDTO::getStudentId)
+                .containsExactlyInAnyOrderElementsOf(original.getMembers().stream().map(GroupMemberDTO::getStudentId).toList());
+            assertThat(kept.leaderId()).isEqualTo(original.getLeaderId()); assertThat(kept.status()).isEqualTo(original.getStatus());
+            assertThat(majorCounts(kept)).contains(4L);
+        }
+    }
+
+    @Test void majorBalanceDoesNotRejectConcentrationRequiredByActiveRulesOrAvailableStudents() {
+        var all = mixedMajors(4,4,0);
+        var restricted = snapshot(all,List.of(),List.of(rule(MIN_MAJORS_PER_GROUP,1,true),rule(MAX_MAJORS_PER_GROUP,1,true),rule(MIN_SE_MEMBERS_PER_GROUP,0,false)));
+        var result = engine.allocate(restricted,2,42); assertValid(restricted,result);
+        assertThat(result.groups()).allSatisfy(group -> assertThat(majorCounts(group)).contains(4L));
+        var dominant = snapshot(mixedMajors(16,4,4),List.of(),List.of());
+        var balanced = engine.allocate(dominant,6,42); assertValid(dominant,balanced);
+        assertThat(balanced.groups()).allSatisfy(group -> assertThat(majorCounts(group)).allSatisfy(count -> assertThat(count).isLessThanOrEqualTo(3L)));
+        assertThat(balanced.groups()).anySatisfy(group -> assertThat(majorCounts(group)).contains(3L));
+        var disabled = Arrays.stream(GroupingRuleCode.values()).map(code -> rule(code,code.getSuggestedValue(),false)).toList();
+        var singleMajor = snapshot(mixedMajors(8,0,0),List.of(),disabled);
+        var permitted = engine.allocate(singleMajor,2,42); assertValid(singleMajor,permitted);
+        assertThat(permitted.groups()).allSatisfy(group -> {assertThat(group.members()).hasSize(4);assertThat(group.score().applicable()).isFalse();});
+    }
+
+    @Test void suggestionOmitsZeroDraftAndProtectedReasonsButKeepsUsefulExplanations() {
+        var all = students(8);
+        var empty = engine.suggest(snapshot(all,List.of(),List.of()),42);
+        assertThat(empty.status()).isEqualTo(FEASIBLE);
+        assertThat(empty.reasons()).extracting(Reason::code).contains(VALIDATED_SUGGESTION,SUGGESTED_BALANCED_SIZE)
+            .doesNotContain(SUGGESTED_PRESERVES_VALID_GROUPS,PROTECTED_COUNTS_INCLUDED);
+        var invalidDrafts = engine.suggest(snapshot(all,List.of(group(1,GroupStatus.OPEN,all.subList(0,2))),List.of()),42);
+        assertThat(invalidDrafts.reasons()).extracting(Reason::code).doesNotContain(SUGGESTED_PRESERVES_VALID_GROUPS,PROTECTED_COUNTS_INCLUDED);
+        var valid = engine.suggest(snapshot(all,List.of(group(1,GroupStatus.OPEN,all.subList(0,4))),List.of()),42);
+        assertThat(valid.reasons()).extracting(Reason::code).contains(SUGGESTED_PRESERVES_VALID_GROUPS).doesNotContain(PROTECTED_COUNTS_INCLUDED);
+        var fixed = engine.suggest(snapshot(all,List.of(group(1,GroupStatus.ACCEPTED,all.subList(0,4))),List.of()),42);
+        assertThat(fixed.reasons()).extracting(Reason::code).contains(PROTECTED_COUNTS_INCLUDED).doesNotContain(SUGGESTED_PRESERVES_VALID_GROUPS);
+        var onlyFixed = engine.suggest(snapshot(all,List.of(group(1,GroupStatus.ACCEPTED,all)),List.of(rule(MAX_MEMBERS_PER_GROUP,8,true))),42);
+        assertThat(onlyFixed.reasons()).extracting(Reason::code).containsExactly(VALIDATED_SUGGESTION,PROTECTED_COUNTS_INCLUDED);
+    }
+
+    private static List<GroupMemberDTO> mixedMajors(int se, int ib, int gd) {
+        var all = new ArrayList<GroupMemberDTO>();
+        for (int id=1; id<=se+ib+gd; id++) {
+            int major=id<=se?1:id<=se+ib?2:3;
+            var member=student(id,major);member.setMajorCode(major==1?"SE":major==2?"IB":"GD");all.add(member);
+        }
+        return all;
+    }
+    private static List<Long> majorCounts(PlannedGroup group) {
+        return IntStream.rangeClosed(1,3).mapToLong(major -> group.members().stream().filter(member -> member.getMajorId()==major).count()).boxed().toList();
+    }
+    private static long concentration(AllocationResultDTO result) {
+        return result.groups().stream().flatMap(group -> majorCounts(group).stream()).mapToLong(count -> count*(count-1)/2).sum();
     }
 
     private AllocationResultDTO allocate(AllocationSnapshotDTO input, int target) { return engine.allocate(input, target, 42, LIMITS); }

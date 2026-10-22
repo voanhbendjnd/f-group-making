@@ -102,6 +102,7 @@ export function AllocationError({ error, retry }: { error: unknown; retry?: () =
 function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { classId: number; deadlineId: number; termName: string | null; backAction: ReactNode }) {
   const { t } = useTranslation(); const flow = useAllocationFlow(classId, deadlineId);
   const [confirming, setConfirming] = useState(false);
+  const [contentTab, setContentTab] = useState('current');
   const data = flow.overview.data; const setup = flow.setup.data;
   const report = flow.preview?.report;
   if (flow.overview.isPending) return <>{backAction}<Skeleton active /></>;
@@ -115,7 +116,11 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     : flow.savedPlan?.status === 'APPLIED' ? t('allocation.planStatuses.APPLIED') : flow.savedPlan?.invalidReason
       ? t(`allocation.errors.${flow.savedPlan.invalidReason}`, { defaultValue: t('allocation.errors.other') })
       : flow.preview?.result.status && flow.preview.result.status !== 'FEASIBLE' ? t(`allocation.status.${flow.preview.result.status}`) : t('allocation.readyToApplyHint'));
-  const confirm = async () => { await flow.confirmApply(); setConfirming(false); };
+  const confirm = async () => {
+    const result = await flow.confirmApply();
+    setConfirming(false);
+    if (result) setContentTab('history');
+  };
   return <>
     <div className="allocation-detail-toolbar">{backAction}
         <div className="allocation-actions"><Button icon={<RefreshCw size={16} />} loading={flow.overview.isFetching} onClick={() => void flow.refresh()}>{t('allocation.refresh')}</Button>
@@ -143,7 +148,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     {flow.acceptedWithUnassigned && <Alert type="warning" showIcon title={t('allocation.acceptedWithUnassigned')} />}
     {flow.applied && <Alert type="success" showIcon title={t('allocation.runSuccess', { id: flow.applied.runId, count: flow.applied.approvedGroupIds.length })} />}
     {flow.attempt && <Alert type={flow.applying ? 'info' : 'warning'} showIcon title={t(flow.applying ? 'allocation.applying' : 'allocation.unknownTitle')} description={t(flow.applying ? 'allocation.waitForApply' : 'allocation.unknownHint')}
-      action={<Button loading={flow.applying} onClick={() => void flow.confirmApply()}>{t('allocation.retrySameRequest')}</Button>} />}
+      action={<Button loading={flow.applying} onClick={() => void confirm()}>{t('allocation.retrySameRequest')}</Button>} />}
     {flow.applyError !== null && <AllocationError error={flow.applyError} />}
     {flow.configuring && <section className="allocation-workflow" aria-label={t('allocation.setup')}>
       <div className="allocation-heading"><div><h2>{t('allocation.setup')}</h2><p>{t('allocation.confirmTargetHint')}</p></div><Tag>{t('allocation.previewOnly')}</Tag></div>
@@ -189,7 +194,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
         </div>}
       </>}
     </section>}
-    <Tabs className="allocation-content-nav" items={[
+    <Tabs className="allocation-content-nav" activeKey={contentTab} onChange={setContentTab} items={[
       { key: 'current', label: <span className="allocation-tab-label"><UsersRound size={16} aria-hidden="true" />{t('allocation.currentData')}</span>, children: <section className="allocation-panel allocation-current-panel"><div className="allocation-heading"><div><h2>{t('allocation.currentData')}</h2><p>{t('allocation.scoreHint')}</p></div></div><AllocationGroups groups={data.groups} /></section> },
       { key: 'history', label: <span className="allocation-tab-label"><History size={16} aria-hidden="true" />{t('allocation.randomHistory')}</span>, children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} disabled={flow.applying || !!flow.attempt}
         onSelect={flow.restorePlan} onApply={detail => { flow.restorePlan(detail); setConfirming(true); }} /> },
@@ -201,8 +206,9 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
       <Alert type="warning" showIcon title={t('allocation.noUndo')} />
       {report && <dl className="allocation-confirm-list">{[
         [t('allocation.target'), flow.preview?.result.targetGroupCount], [t('allocation.kept'), report.keptGroupIds.length],
+        [t('allocation.newGroup'), report.createdGroupKeys?.length ?? report.createdGroupIds.length],
         [t('allocation.disbanded'), report.disbandedGroupIds.length], [t('allocation.movementsLabel'), report.movements.length],
-        [t('allocation.leaderChangesLabel'), report.leaderChanges.length], [t('allocation.autoApproved'), report.keptGroupIds.length - report.protectedGroupIds.length],
+        [t('allocation.leaderChangesLabel'), report.leaderChanges.length], [t('allocation.autoApproved'), report.keptGroupIds.length - report.protectedGroupIds.length + (report.createdGroupKeys?.length ?? report.createdGroupIds.length)],
       ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
     </Modal>
   </>;

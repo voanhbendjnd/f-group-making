@@ -24,9 +24,10 @@ export function AllocationRules({ rules }: { rules: RuleView[] }) {
 }
 export const AllocationGroups = memo(function AllocationGroups({ groups, proposed = false }: { groups: AllocationGroup[]; proposed?: boolean }) {
   const { t } = useTranslation();
-  return <div className="allocation-groups">{groups.length ? groups.map(group => <article className={`allocation-group allocation-group--enhanced ${group.protectedGroup ? 'is-protected' : ''}`} key={group.groupId}>
+  return <div className="allocation-groups">{groups.length ? groups.map(group => <article className={`allocation-group allocation-group--enhanced ${group.protectedGroup ? 'is-protected' : ''}`} key={group.planGroupKey ?? group.groupId}>
     <div className="allocation-group-heading"><h3>{group.name}</h3><Tag color={group.status === 'ACCEPTED' ? 'success' : 'blue'}>{t(`groupReview.statuses.${group.status}`)}</Tag></div>
     <div className="allocation-tags">
+      {group.newGroup && <Tag color="blue">{t('allocation.newGroup')}</Tag>}
       {group.protectedGroup ? <Tag icon={<LockKeyhole size={12} />}>{t('allocation.protected')}</Tag> : proposed && <Tag color="blue">{t('allocation.willApprove')}</Tag>}
       <Tag color={group.allRulesPassed ? 'success' : 'warning'}>{t(group.allRulesPassed ? 'allocation.passed' : 'allocation.warning')}</Tag>
     </div>
@@ -35,7 +36,7 @@ export const AllocationGroups = memo(function AllocationGroups({ groups, propose
     {group.score.applicable && <Progress percent={group.score.scorePercent ?? 0} showInfo={false} size="small" strokeColor="var(--color-primary)" />}
     <Collapse ghost size="small" items={[
       { key: 'members', label: <span><Users size={14} aria-hidden="true" /> {t('allocation.members', { count: group.members.length })}</span>, children:
-        <ul className="allocation-members">{group.members.map(member => <li key={member.studentId}>
+        <ul className="allocation-members">{[...group.members].sort((a, b) => Number(b.studentId === group.leaderId) - Number(a.studentId === group.leaderId)).map(member => <li key={member.studentId}>
           <Avatar size={30}>{member.fullName?.trim().slice(0, 1) || '?'}</Avatar>
           <div><strong>{member.fullName || t('allocation.missing')}</strong><small>{member.rollNumber || t('allocation.missing')} · {member.majorCode || member.majorName || t('allocation.missing')}</small></div>
           {member.role === 'LEADER' && <Tag>{t('allocation.leader')}</Tag>}
