@@ -27,12 +27,11 @@ public class Deadline extends AbstractAuditingEntity<Integer> {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @NotNull
-    @Column(name = "start_time", nullable = false)
+    // A grouping session may exist before its student selection window is scheduled.
+    @Column(name = "start_time")
     private Instant startTime;
 
-    @NotNull
-    @Column(name = "end_time", nullable = false)
+    @Column(name = "end_time")
     private Instant endTime;
 
     @Column(name = "status", length = 20, nullable = false)

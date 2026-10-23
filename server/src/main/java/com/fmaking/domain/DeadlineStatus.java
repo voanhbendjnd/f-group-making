@@ -3,6 +3,7 @@ package com.fmaking.domain;
 import java.time.Instant;
 
 public enum DeadlineStatus {
+    UNSCHEDULED,
     UPCOMING,
     ACTIVE,
     EXPIRED,
@@ -19,6 +20,7 @@ public enum DeadlineStatus {
     }
 
     public static DeadlineStatus calculateStatus(Instant startTime, Instant endTime, Instant now) {
+        if (startTime == null || endTime == null) return UNSCHEDULED;
         if (now.isBefore(startTime)) {
             return UPCOMING;
         }

@@ -73,6 +73,30 @@ class LecturerClassRulesTest {
     }
 
     @Test
+    void assignedLecturerCanInitializeUnscheduledWorkspaceIdempotently() throws Exception {
+        var first = mvc.perform(put("/api/school-classes/{id}/grouping-session", ownClass.getId())
+                        .param("termId", term.getId().toString()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("UNSCHEDULED"))
+                .andExpect(jsonPath("$.data.startTime").isEmpty()).andExpect(jsonPath("$.data.endTime").isEmpty())
+                .andReturn();
+        int sessionId = mapper.readTree(first.getResponse().getContentAsString()).path("data").path("id").asInt();
+        mvc.perform(put("/api/school-classes/{id}/grouping-session", ownClass.getId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(sessionId));
+        mvc.perform(get("/api/deadlines/{deadline}/classes/{classId}/groups/workspace", sessionId, ownClass.getId()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.canManageGroups").value(true))
+                .andExpect(jsonPath("$.data.deadlineStatus").value("UNSCHEDULED"));
+        mvc.perform(put("/api/school-classes/{id}/grouping-session", otherClass.getId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "assigned@example.com", authorities = "ROLE_STUDENT")
+    void studentCannotInitializeManagementWorkspace() throws Exception {
+        mvc.perform(put("/api/school-classes/{id}/grouping-session", ownClass.getId()))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void readsOwnClassAndSuggestionsWithoutInsertingRules() throws Exception {
         mvc.perform(get("/api/school-classes/{id}", ownClass.getId()))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.name").value(ownClass.getName()));

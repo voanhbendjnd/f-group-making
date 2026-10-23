@@ -69,6 +69,26 @@ public class DeadlineService {
         this.termService = termService;
     }
 
+    public DeadlineDTO ensureGroupingSession(Integer classId, Integer termId) {
+        SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(classId)
+            .orElseThrow(() -> new DataResourceNotFoundException("Class not found", "schoolClass", "classNotFound"));
+        schoolClassAccessService.requireWriteAccess(schoolClass);
+        termService.validateTerm(termId);
+        if (termId != null && !Objects.equals(schoolClass.getTermId(), termId)) {
+            throw new BadRequestResourceException("Class does not belong to selected term", "schoolClass", "classNotInTerm");
+        }
+        List<Deadline> sessions = deadlineRepository.findAllBySchoolClassId(classId);
+        if (sessions.size() > 1) {
+            throw new com.fmaking.web.rest.errors.ConflictAlertException("Select a specific grouping session", "group", "allocationMultipleSessions");
+        }
+        if (!sessions.isEmpty()) return toDTO(sessions.getFirst());
+        Deadline session = new Deadline();
+        session.setName(schoolClass.getName());
+        session.setStatus("UNSCHEDULED");
+        session.setSchoolClasses(new HashSet<>(List.of(schoolClass)));
+        return toDTO(deadlineRepository.saveAndFlush(session));
+    }
+
     public DeadlineDTO createDeadline(CreateDeadlineDTO dto) {
         Instant now = clock.instant();
 
@@ -83,7 +103,13 @@ public class DeadlineService {
         List<SchoolClass> classes = classIds.stream().sorted().map(id -> schoolClassRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new BadRequestResourceException("Class not found", "deadline", "classNotFound"))).toList();
         for (Integer classId : classIds) {
-            if (!deadlineRepository.findAllBySchoolClassId(classId).isEmpty()) {
+            List<Deadline> sessions = deadlineRepository.findAllBySchoolClassId(classId);
+            if (classIds.size() == 1 && sessions.size() == 1 && policy.status(sessions.getFirst()) == DeadlineStatus.UNSCHEDULED) {
+                schoolClassAccessService.requireWriteAccess(classes.getFirst());
+                Deadline existing = deadlineRepository.findForUpdate(sessions.getFirst().getId()).orElseThrow();
+                return schedule(existing, dto.getName(), dto.getDescription(), dto.getStartTime(), dto.getEndTime());
+            }
+            if (!sessions.isEmpty()) {
                 throw new BadRequestResourceException("This class already has a group formation session. Extend or reopen that session.", "deadline", "sessionAlreadyExists");
             }
         }
@@ -139,6 +165,13 @@ public class DeadlineService {
         List<SchoolClass> selected = existing.getSchoolClasses().stream().filter(c -> targets.contains(c.getId())).toList();
         selected.forEach(schoolClassAccessService::requireWriteAccess);
         confirmScope(targets, dto.getConfirmedClassIds());
+        if (policy.status(existing) == DeadlineStatus.UNSCHEDULED) {
+            if (!targets.equals(all) || !canManage(existing)) {
+                throw new ForbiddenAlertException("Schedule all classes in this session", "deadline", "accessDenied");
+            }
+            return schedule(existing, dto.getName(), dto.getDescription(),
+                dto.getStartTime() == null ? now : dto.getStartTime(), dto.getEndTime());
+        }
         boolean changesMetadata = !Objects.equals(existing.getName(), dto.getName().trim())
             || !Objects.equals(description(existing.getDescription()), description(dto.getDescription()));
         if (changesMetadata && !canManage(existing)) {
@@ -194,6 +227,23 @@ public class DeadlineService {
         existing.touchSchedule();
         Deadline saved = deadlineRepository.saveAndFlush(existing);
         deadlineEvents.publishForClasses(reopening ? "DEADLINE_REOPENED" : upcoming ? "DEADLINE_UPDATED" : "DEADLINE_EXTENDED", saved, targets);
+        return toDTO(saved);
+    }
+
+    private DeadlineDTO schedule(Deadline deadline, String name, String description, Instant start, Instant end) {
+        if (start == null || end == null || !end.isAfter(start) || !end.isAfter(clock.instant())) {
+            throw new BadRequestResourceException("Deadline must end in the future and after its start", "deadline", "invalidEndTime");
+        }
+        deadline.setName(name.trim());
+        deadline.setDescription(description(description));
+        deadline.setStartTime(start);
+        deadline.setEndTime(end);
+        deadline.setStatus("ACTIVE");
+        deadline.touchSchedule();
+        Deadline saved = deadlineRepository.saveAndFlush(deadline);
+        deadlineEvents.publish("DEADLINE_CREATED", saved, List.of());
+        applicationEventPublisher.publishEvent(new DeadlineCreatedEvent(saved.getId(),
+            saved.getSchoolClasses().stream().map(SchoolClass::getId).toList()));
         return toDTO(saved);
     }
 
@@ -317,6 +367,8 @@ public class DeadlineService {
         String message;
         if ("CANCELLED".equalsIgnoreCase(deadline.getStatus())) {
             message = "Deadline đã kết thúc; có thể được mở lại bởi giáo viên.";
+        } else if (status == DeadlineStatus.UNSCHEDULED) {
+            message = "Lớp chưa mở thời gian chọn nhóm.";
         } else if (status == DeadlineStatus.UPCOMING) {
             message = "Thời gian chọn nhóm chưa bắt đầu.";
         } else if (status == DeadlineStatus.EXPIRED) {

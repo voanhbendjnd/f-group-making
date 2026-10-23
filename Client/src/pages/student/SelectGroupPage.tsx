@@ -257,7 +257,7 @@ export const SelectGroupPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [validateResult?.endTime]);
 
-  const formatDateTime = (dateStr?: string) => {
+  const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return '-';
     try {
       return new Intl.DateTimeFormat(currentLocale, {

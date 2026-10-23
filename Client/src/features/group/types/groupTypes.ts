@@ -84,8 +84,8 @@ export interface WorkspaceDTO {
   deadlineName: string;
   deadlineDescription?: string;
   deadlineStatus: string;
-  deadlineStartTime: string;
-  deadlineEndTime: string;
+  deadlineStartTime: string | null;
+  deadlineEndTime: string | null;
   deadlineExpired: boolean;
   readOnlyReason?: string | null;
   canManageGroups: boolean;

@@ -12,7 +12,7 @@ export interface RuleView { code: GroupingRuleCode; scope: 'GROUP' | 'CLASS'; ac
 export interface AllocationGroup { groupId: number | null; planGroupKey?: string | null; newGroup?: boolean; name: string; status: GroupStatus; leaderId: number; leaderName: string | null;
   protectedGroup: boolean; members: GroupMemberDTO[]; score: Score; rules: RuleView[]; allRulesPassed: boolean }
 export interface Scope { classId: number; className: string; termId: number | null; lecturerId: number | null; rulesVersion: number;
-  deadlineId: number; deadlineName: string; deadlineStatus: string; startTime: string; endTime: string; deadlineVersion: number }
+  deadlineId: number; deadlineName: string; deadlineStatus: string; startTime: string | null; endTime: string | null; deadlineVersion: number }
 export interface Summary { totalStudents: number; totalGroups: number; unassignedStudents: number; validGroups: number; invalidGroups: number; protectedGroups: number }
 export interface Overview { scope: Scope; snapshotFingerprint: string; summary: Summary; rules: GroupingRuleDTO[];
   groups: AllocationGroup[]; unassignedStudents: GroupMemberDTO[]; warnings: Reason[] }

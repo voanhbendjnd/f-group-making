@@ -8,8 +8,8 @@ export interface RealtimeEvent {
   schoolClassId?: number;
   affectedClassIds?: number[];
   version?: number;
-  startTime?: string;
-  endTime?: string;
+  startTime?: string | null;
+  endTime?: string | null;
   classWindows?: DeadlineClassWindow[];
 }
 const recommendationKeys = new Set([

@@ -145,6 +145,24 @@ class AllocationApplyServiceTest {
         });
     }
 
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(value = DeadlineStatus.class, names = {"UNSCHEDULED", "UPCOMING", "ACTIVE", "EXPIRED"})
+    void lecturerCanPreviewAndApplyRegardlessOfStudentSelectionWindow(DeadlineStatus status) {
+        clearDrafts();
+        new TransactionTemplate(manager).executeWithoutResult(tx -> {
+            var session = deadlines.findById(deadline.getId()).orElseThrow();
+            session.setStatus(status == DeadlineStatus.UNSCHEDULED ? "UNSCHEDULED" : "ACTIVE");
+            session.setStartTime(status == DeadlineStatus.UNSCHEDULED ? null : status == DeadlineStatus.UPCOMING ? now.plusSeconds(60) : now.minusSeconds(60));
+            session.setEndTime(status == DeadlineStatus.UNSCHEDULED ? null : status == DeadlineStatus.EXPIRED ? now.minusSeconds(1) : now.plusSeconds(3600));
+            deadlines.saveAndFlush(session);
+        });
+        var plan = preview();
+        assertThat(plan.scope().deadlineStatus()).isEqualTo(status.name());
+        var result = apply(plan, "selection-window-" + status);
+        assertThat(result.approvedGroupIds()).hasSize(2);
+        assertThat(members.findBySchoolClassIdAndDeadlineId(schoolClass.getId(), deadline.getId())).hasSize(8);
+    }
+
     @Test void ungroupedClassStoresVirtualHistoryAndCreatesRealGroupsOnlyOnAtomicApply() {
         clearDrafts();
         long statusCount = statusHistory.count();

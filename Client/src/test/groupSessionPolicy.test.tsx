@@ -26,6 +26,19 @@ beforeEach(async () => { vi.clearAllMocks(); await i18n.changeLanguage('en'); })
 afterEach(cleanup);
 
 describe('group session policy UI', () => {
+  it('offers scheduling for an unscheduled session and submits the new window on its existing ID', async () => {
+    const unscheduled: Deadline = { ...deadline, status: 'UNSCHEDULED', startTime: null, endTime: null,
+      schoolClassIds: [1], schoolClassNames: ['CLASS_A'] };
+    vi.mocked(deadlineApi.updateDeadline).mockResolvedValue({ ...unscheduled, status: 'UPCOMING' });
+    render(<ExtendDeadlineModal open deadline={unscheduled} onClose={vi.fn()} onSuccess={vi.fn()} />);
+    const start = screen.getByLabelText(i18n.t('deadline.modal.startTime'), { exact: false });
+    expect(start).toBeEnabled(); expect(start).toHaveValue('');
+    fireEvent.change(start, { target: { value: '2099-01-01T10:00' } });
+    fireEvent.change(screen.getByLabelText(i18n.t('deadline.modal.endTimeExtend'), { exact: false }), { target: { value: '2099-01-02T10:00' } });
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('deadlineLifecycle.schedule') }));
+    await waitFor(() => expect(deadlineApi.updateDeadline).toHaveBeenCalledWith(8, expect.objectContaining({ startTime: expect.any(String), targetClassIds: [1] })));
+  });
+
   it('shows reopen for expired sessions and requires confirmation of every affected class', async () => {
     const closed = vi.fn(); vi.mocked(deadlineApi.updateDeadline).mockResolvedValue({ ...deadline, status: 'ACTIVE' });
     render(<ExtendDeadlineModal open deadline={deadline} onClose={closed} onSuccess={vi.fn()} />);

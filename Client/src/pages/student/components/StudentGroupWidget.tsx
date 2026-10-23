@@ -86,7 +86,7 @@ export const StudentGroupWidget: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeActivity?.endTime]);
 
-  const formatDateTime = (dateStr?: string) => {
+  const formatDateTime = (dateStr?: string | null) => {
     if (!dateStr) return '-';
     try {
       return new Intl.DateTimeFormat(currentLocale, {
@@ -220,7 +220,7 @@ export const StudentGroupWidget: React.FC = () => {
     );
   }
 
-  if (activeActivity.status === 'CANCELLED' || activeActivity.status === 'EXPIRED') {
+  if (activeActivity.status === 'UNSCHEDULED' || activeActivity.status === 'CANCELLED' || activeActivity.status === 'EXPIRED') {
     return <div style={{ marginBottom: '2rem' }}>
       <DeadlineStateNotice status={activeActivity.status} />
       {activities.map(activity => <div className="card" key={activity.deadlineId} style={{ padding: '1rem', marginTop: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>

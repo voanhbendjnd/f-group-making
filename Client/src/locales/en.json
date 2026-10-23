@@ -198,6 +198,7 @@
     "applying": "Applying allocation…",
     "waitForApply": "Please wait while the server verifies and saves this request.",
     "deadlineStatus": {
+      "UNSCHEDULED": "No deadline set",
       "ACTIVE": "Active",
       "EXPIRED": "Expired",
       "UPCOMING": "Upcoming",
@@ -410,6 +411,7 @@
     "notActive": "Only an active deadline can be ended immediately."
   },
   "deadlineLifecycle": {
+    "schedule": "Set deadline",
     "reopen": "Reopen deadline",
     "reopened": "Deadline reopened. Groups and approval history are preserved.",
     "confirmScope": "I confirm the change applies to the selected classes listed above.",
@@ -1230,6 +1232,7 @@
     "emptyLecturerDesc": "Click 'Create Deadline for Class' to schedule a group selection period and notify students.",
     "status": {
       "active": "Active",
+      "unscheduled": "No deadline set",
       "upcoming": "Upcoming",
       "expired": "Expired",
       "cancelled": "Cancelled"
@@ -1339,6 +1342,7 @@
       "verifying": "Verifying deadline and class information..."
     },
     "closed": {
+      "UNSCHEDULED": { "title": "Group selection has not opened", "description": "Your lecturer can arrange groups. Student changes will be available during the scheduled selection window." },
       "CANCELLED": {
         "title": "This group selection round was cancelled",
         "description": "Registration has stopped. Existing groups and history are preserved for viewing; changes in this round are locked."
@@ -1611,6 +1615,7 @@
     "otherActivitiesTitle": "Other class group deadlines"
   },
   "groupBoard": {
+    "noDeadlineNeeded": "You can arrange groups manually or automatically before setting a student selection deadline.",
     "title": "Advanced grouping",
     "open": "Advanced grouping",
     "subtitle": "Drag students to arrange groups",

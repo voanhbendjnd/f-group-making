@@ -8,6 +8,19 @@ import org.junit.jupiter.api.Test;
 import static org.mockito.Mockito.*;
 
 class DeadlineBoundaryTest {
+    @Test void restoringUnscheduledSessionsDoesNotCreateTimersOrFailOnMissingDates() {
+        var repository = mock(DeadlineRepository.class);
+        var events = mock(DeadlineBoundaryService.class);
+        var scheduler = mock(org.springframework.scheduling.TaskScheduler.class);
+        Deadline session = new Deadline(); session.setId(1); session.setStatus("UNSCHEDULED");
+        SchoolClass schoolClass = new SchoolClass(); schoolClass.setId(2); session.getSchoolClasses().add(schoolClass);
+        when(repository.findAll()).thenReturn(List.of(session));
+        var service = new DeadlineScheduleService(scheduler, events, repository, Clock.systemUTC());
+        service.restore();
+        verifyNoInteractions(scheduler, events);
+        service.close();
+    }
+
     @Test void classBoundariesUseTheClassOverrideAndPublishOnlyThatClass() {
         var repository = mock(DeadlineRepository.class);
         var events = mock(DeadlineEventPublisher.class);

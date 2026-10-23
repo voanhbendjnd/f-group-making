@@ -18,7 +18,8 @@ interface ExtendDeadlineModalProps {
   onSuccess: () => void;
   lockSelection?: () => () => void;
 }
-const localTime = (value: string) => {
+const localTime = (value: string | null) => {
+  if (!value) return '';
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return '';
   const pad = (n: number) => String(n).padStart(2, '0');
@@ -63,10 +64,11 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
   const targetIds = targets.map(w => w.schoolClassId);
   const shared = windows.length > 1;
   const allSelected = targetIds.length === windows.length;
-  const upcoming = windows.every(w => w.status === 'UPCOMING') && allSelected;
+  const unscheduled = windows.every(w => w.status === 'UNSCHEDULED');
+  const upcoming = windows.every(w => w.status === 'UPCOMING' || w.status === 'UNSCHEDULED') && allSelected;
   const reopening = targets.length > 0 && targets.every(w => w.status === 'EXPIRED');
   const changed = version !== undefined && deadline.version !== version;
-  const label = reopening ? t('deadlineLifecycle.reopen') : upcoming ? t('deadline.modal.submitSave') : t('deadline.modal.submitExtend');
+  const label = unscheduled ? t('deadlineLifecycle.schedule') : reopening ? t('deadlineLifecycle.reopen') : upcoming ? t('deadline.modal.submitSave') : t('deadline.modal.submitExtend');
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (busy.current || unknown || changed || !targetIds.length || (shared && !confirmed)) return;
@@ -74,9 +76,9 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
     if (!name.trim()) return toast.error(t('deadline.modal.nameRequired'));
     if (!Number.isFinite(end.getTime()) || end.getTime() <= Date.now()) return toast.error(t('deadline.modal.timeFutureError'));
     const start = new Date(startTime);
-    if (upcoming && (start.getTime() < Date.now() || end <= start)) return toast.error(t('deadline.modal.timeOrderError'));
-    if (!upcoming && targets.some(w => end.getTime() <= Date.parse(w.startTime))) return toast.error(t('deadline.modal.timeOrderError'));
-    if (targets.some(w => w.status === 'ACTIVE' && end.getTime() <= Date.parse(w.endTime))) {
+    if (upcoming && (!Number.isFinite(start.getTime()) || start.getTime() < Date.now() || end <= start)) return toast.error(t('deadline.modal.timeOrderError'));
+    if (!upcoming && targets.some(w => end.getTime() <= Date.parse(w.startTime ?? ''))) return toast.error(t('deadline.modal.timeOrderError'));
+    if (targets.some(w => w.status === 'ACTIVE' && end.getTime() <= Date.parse(w.endTime ?? ''))) {
       return toast.error(t('deadline.modal.extendTimeMustBeGreater'));
     }
     busy.current = true; setIsSubmitting(true);
@@ -131,7 +133,7 @@ export const ExtendDeadlineModal: React.FC<ExtendDeadlineModalProps> = ({ open, 
               {w.schoolClassName}
             </label>
             <small style={{ color: 'var(--color-text-muted)' }}>
-              {t('deadlineScope.current')}: {new Date(w.endTime).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US')} · {t(`deadline.status.${w.status.toLowerCase()}`)}
+              {t('deadlineScope.current')}: {w.endTime ? new Date(w.endTime).toLocaleString(i18n.language === 'vi' ? 'vi-VN' : 'en-US') : '—'} · {t(`deadline.status.${w.status.toLowerCase()}`)}
             </small>
           </div>)}
         </div>

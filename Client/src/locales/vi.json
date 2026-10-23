@@ -198,6 +198,7 @@
     "applying": "Đang áp dụng phân bổ…",
     "waitForApply": "Vui lòng chờ máy chủ kiểm tra và lưu yêu cầu này.",
     "deadlineStatus": {
+      "UNSCHEDULED": "Chưa đặt hạn",
       "ACTIVE": "Đang mở",
       "EXPIRED": "Hết hạn",
       "UPCOMING": "Sắp diễn ra",
@@ -410,6 +411,7 @@
     "notActive": "Chỉ có thể kết thúc ngay deadline đang mở."
   },
   "deadlineLifecycle": {
+    "schedule": "Đặt thời gian chọn nhóm",
     "reopen": "Mở lại deadline",
     "reopened": "Đã mở lại deadline, giữ nguyên nhóm và lịch sử duyệt.",
     "confirmScope": "Tôi xác nhận thay đổi áp dụng cho các lớp được chọn phía trên.",
@@ -1230,6 +1232,7 @@
     "emptyLecturerDesc": "Bấm 'Tạo deadline cho lớp' để bắt đầu thiết lập deadline chọn nhóm và thông báo tới sinh viên.",
     "status": {
       "active": "Đang diễn ra",
+      "unscheduled": "Chưa đặt hạn",
       "upcoming": "Sắp tới",
       "expired": "Đã kết thúc",
       "cancelled": "Đã hủy"
@@ -1339,6 +1342,7 @@
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
     },
     "closed": {
+      "UNSCHEDULED": { "title": "Chưa mở thời gian chọn nhóm", "description": "Giảng viên vẫn có thể sắp nhóm cho lớp. Sinh viên được thay đổi nhóm trong thời gian chọn nhóm được mở." },
       "CANCELLED": {
         "title": "Đợt chọn nhóm đã bị hủy",
         "description": "Đợt này đã ngừng nhận đăng ký. Nhóm và lịch sử hiện có được giữ lại để xem; mọi thao tác thay đổi trong đợt đã bị khóa."
@@ -1611,6 +1615,7 @@
     "otherActivitiesTitle": "Các đợt chọn nhóm khác của lớp"
   },
   "groupBoard": {
+    "noDeadlineNeeded": "Có thể sắp nhóm thủ công hoặc tự động trước khi đặt thời gian sinh viên chọn nhóm.",
     "title": "Sắp nhóm nâng cao",
     "open": "Sắp nhóm nâng cao",
     "subtitle": "Kéo thả để sắp nhóm",
