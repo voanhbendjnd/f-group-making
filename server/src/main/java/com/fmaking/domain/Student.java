@@ -28,6 +28,10 @@ public class Student{
     @NotNull
     @Column(name = "member_code", nullable = false)
     String memberCode;
+    @Column(name = "cohort", length = 255)
+    String cohort;
+    @Column(name = "slot_type", length = 255)
+    String slotType;
     @Column(name = "school_class_id")
     Integer schoolClassId;
     @Column(name = "group_id")

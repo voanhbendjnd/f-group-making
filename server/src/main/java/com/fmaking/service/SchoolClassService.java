@@ -140,6 +140,8 @@ public class SchoolClassService {
                 .fullName(row.fullName())
                 .email(row.email())
                 .memberCode(row.memberCode())
+                .cohort(row.cohort())
+                .slotType(row.slotType())
                 .majorId(row.majorId())
                 .majorCode(row.majorCode())
                 .majorName(row.majorName())

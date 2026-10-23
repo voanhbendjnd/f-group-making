@@ -27,6 +27,8 @@ public class StudentImportRowDTO {
 
     private String majorCode;
 
+    private String slotType;
+
     @NotBlank(message = "Member code student not found")
     private String memberCode;
 

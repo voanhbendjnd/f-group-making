@@ -67,7 +67,10 @@ public class StudentQueryRepository {
                 user.get("activationKey"),
                 user.get("activationKeyExpiresAt"),
                 user.get("createdDate"),
-                user.get("lastModifiedDate")));
+                user.get("lastModifiedDate"),
+                root.get("selfDescription"),
+                root.get("cohort"),
+                root.get("slotType")));
 
 //        Predicate predicate = spec.toPredicate(root, cq, cb);
 //        if (predicate != null) cq.where(predicate);

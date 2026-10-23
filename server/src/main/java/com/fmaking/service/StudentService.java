@@ -85,6 +85,7 @@ public class StudentService {
     private static final int COL_MAJOR       = 3;   // Column D: Major (BEN_CHN_ET_19C,...)
     private static final int COL_MEMBER_CODE = 4;   // Column E: Member code
     private static final int COL_EMAIL       = 5;   // Column F: Email
+    private static final int COL_SLOT_TYPE   = 6;   // Column G: SlotType
     private static final int COL_GROUP_NAME  = 8;   // Column I: GroupName (SchoolClass)
     private static final int COL_LECTURER_CODE = 9; // Column J: GV (Lecturer code)
 
@@ -332,6 +333,8 @@ public class StudentService {
         student.setRollNumber(dto.getRollNumber());
         student.setFullName(dto.getFullName());
         student.setMemberCode(dto.getMemberCode());
+        student.setCohort(dto.getCohort());
+        student.setSlotType(dto.getSlotType());
         student.setMajorId(dto.getMajorId());
         student.setSchoolClassId(dto.getSchoolClassId());
         return student;
@@ -382,6 +385,8 @@ public class StudentService {
                 .fullName(row.fullName())
                 .email(row.email())
                 .memberCode(row.memberCode())
+                .cohort(row.cohort())
+                .slotType(row.slotType())
                 .majorId(row.majorId())
                 .majorCode(row.majorCode())
                 .majorName(row.majorName())
@@ -486,6 +491,7 @@ public class StudentService {
                 String memberCode    = getCellValueAsString(row, COL_MEMBER_CODE).trim();
                 String email         = getCellValueAsString(row, COL_EMAIL).trim().toLowerCase(Locale.ENGLISH);
                 String majorCode     = parseMajorCode(originalMajor);
+                String slotType      = getCellValueAsString(row, COL_SLOT_TYPE).trim();
                 String groupName     = getCellValueAsString(row, COL_GROUP_NAME).trim();
                 String lecturerCode  = getCellValueAsString(row, COL_LECTURER_CODE).trim();
 
@@ -496,6 +502,7 @@ public class StudentService {
                         .email(email)
                         .memberCode(memberCode)
                         .originalMajor(originalMajor)
+                        .slotType(slotType)
                         .majorCode(majorCode)
                         .groupName(groupName)
                         .lecturerCode(lecturerCode)
@@ -696,6 +703,15 @@ public class StudentService {
             return;
         }
 
+        if (row.getOriginalMajor().length() > 255) {
+            errors.add(ImportRowErrorDTO.builder().row(row.getRowIndex()).rollNumber(row.getRollNumber())
+                    .field("originalMajor").message("Cohort must not exceed 255 characters.").build());
+        }
+        if (row.getSlotType() != null && row.getSlotType().length() > 255) {
+            errors.add(ImportRowErrorDTO.builder().row(row.getRowIndex()).rollNumber(row.getRollNumber())
+                    .field("slotType").message("SlotType must not exceed 255 characters.").build());
+        }
+
         // Rule 7: member code must not be null/blank
         if (row.getMemberCode() == null || row.getMemberCode().isBlank()) {
             errors.add(ImportRowErrorDTO.builder()
@@ -790,6 +806,8 @@ public class StudentService {
             student.setFullName(row.getFullName());
             student.setEmail(row.getEmail());
             student.setMemberCode(row.getMemberCode());
+            student.setCohort(row.getOriginalMajor());
+            student.setSlotType(row.getSlotType());
             student.setMajorId(major.getId());
             student.setGroupName(row.getGroupName());
             student.setLecturerCode(row.getLecturerCode());
