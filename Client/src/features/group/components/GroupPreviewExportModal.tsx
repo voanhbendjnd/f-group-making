@@ -143,6 +143,13 @@ export function GroupPreviewExportModal({
       render: (val: string) => <span className="text-secondary">{val || '—'}</span>,
     },
     {
+      title: 'SlotType',
+      dataIndex: 'slotType',
+      key: 'slotType',
+      width: 120,
+      render: (value: string) => value || '—',
+    },
+    {
       title: t('groupExport.colMemberCode', 'Mã TV'),
       dataIndex: 'memberCode',
       key: 'memberCode',

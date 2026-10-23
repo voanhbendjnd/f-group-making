@@ -9,6 +9,8 @@ export interface GroupMemberDTO {
   fullName: string;
   email?: string;
   memberCode: string;
+  cohort?: string | null;
+  slotType?: string | null;
   majorId?: number;
   majorCode: string;
   majorName: string;

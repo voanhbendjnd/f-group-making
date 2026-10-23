@@ -9,6 +9,7 @@ const studentColumns = [
   ['D', 'Khoá', 'major', 'BEN_SE_ET_26'],
   ['E', 'MemberCode', 'memberCode', 'MEM_TEST0001'],
   ['F', 'Email', 'email', 'student.demo@example.test'],
+  ['G', 'SlotType', 'slotType', 'A24/EXE'],
   ['I', 'GroupName', 'className', 'EXE101_DEMO'],
   ['J', 'GV', 'lecturerCode', 'GV_MAU'],
 ] as const;

@@ -9,10 +9,10 @@
     "columnsLabel": "Cấu trúc Excel nhập dữ liệu",
     "column": "Cột", "header": "Tiêu đề", "meaning": "Thông tin bắt buộc", "example": "Ví dụ minh họa",
     "keepFormat": "Giữ nguyên tên cột, thứ tự cột và dòng bắt đầu nhập trong mẫu. Ví dụ trên trang chỉ để tham khảo; điền thông tin thực tế vào tệp.",
-    "studentRules": "Khoá dùng dạng PREFIX_MANGANH_..., ví dụ BEN_SE_ET_26 lấy mã ngành SE. GroupName là tên lớp. GV phải là mã giảng viên đã có; tạo/import giảng viên trước khi nhập sinh viên. Giữ vị trí các cột A, G, H, K dù không cần điền.",
+    "studentRules": "Khóa được lưu nguyên chuỗi; dạng PREFIX_MANGANH_... đồng thời xác định ngành (BEN_SE_ET_26 lấy mã SE). SlotType ở cột G được lưu theo file, có thể để trống với file cũ. GroupName là tên lớp. GV phải là mã giảng viên đã có; tạo/import giảng viên trước khi nhập sinh viên. Giữ vị trí các cột A, H, K dù không cần điền.",
     "studentUniqueValues": "Mã sinh viên, mã thành viên và email phải duy nhất. Hệ thống kiểm tra trùng và dữ liệu liên quan khi xác nhận nhập.",
     "lecturerUniqueValues": "Mã giảng viên và email phải duy nhất. Hệ thống kiểm tra trùng khi xác nhận nhập.",
-    "fields": { "rollNumber": "Mã sinh viên", "fullName": "Họ tên (tối đa 50 ký tự)", "major": "Chuỗi thông tin ngành", "memberCode": "Mã thành viên", "email": "Địa chỉ email hợp lệ", "className": "Tên lớp (tối đa 50 ký tự)", "lecturerCode": "Mã giảng viên" }
+    "fields": { "rollNumber": "Mã sinh viên", "fullName": "Họ tên (tối đa 50 ký tự)", "major": "Nguyên chuỗi Khóa (tối đa 255 ký tự)", "slotType": "Loại slot (không bắt buộc, tối đa 255 ký tự)", "memberCode": "Mã thành viên", "email": "Địa chỉ email hợp lệ", "className": "Tên lớp (tối đa 50 ký tự)", "lecturerCode": "Mã giảng viên" }
   },
   "adminUx": {
     "lecturerDropHint": "Hỗ trợ .xlsx tối đa 5 MB. Tệp giảng viên có tiêu đề Mentor và Email ở dòng đầu, dữ liệu từ dòng 2.",
@@ -725,6 +725,8 @@
       "email": "Địa chỉ Email"
     },
     "clientErrors": {
+      "cohortTooLong": "Khóa dài hơn 255 ký tự (Cột D)",
+      "slotTypeTooLong": "SlotType dài hơn 255 ký tự (Cột G)",
       "noSheet": "Tệp Excel không chứa trang tính (sheet) nào.",
       "missingRollNumber": "Thiếu Mã sinh viên (Cột B)",
       "duplicateRollNumber": "Mã sinh viên \"{{rollNumber}}\" bị trùng lặp trong tệp",
@@ -1849,7 +1851,8 @@
     "colStt": "STT",
     "colRollNumber": "Mã SV",
     "colFullName": "Họ và tên",
-    "colKhoa": "Khoá / Ngành",
+    "colKhoa": "Khóa",
+    "missingGroupSequence": "Có nhóm chưa có số thứ tự. Cần cập nhật số thứ tự nhóm trước khi xuất Excel.",
     "colMemberCode": "Mã TV",
     "colEmail": "Email",
     "colGroupMentor": "Nhóm (Group Mentor)",

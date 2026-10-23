@@ -136,9 +136,11 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
               <th style={{ width: '70px' }}>#</th>
               <th>{t('students.colRollNumber')}</th>
               <th>{t('students.colFullName')}</th>
+              <th>{t('groupExport.colKhoa')}</th>
               <th>{t('students.colMajor')}</th>
               <th>{t('students.colMemberCode')}</th>
               <th>{t('students.colEmail')}</th>
+              <th>SlotType</th>
               <th>Lớp</th>
               <th>GV</th>
               <th>{t('common.status')}</th>
@@ -154,6 +156,7 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
                   {row.rollNumber || '—'}
                 </td>
                 <td>{row.fullName || '—'}</td>
+                <td>{row.originalMajor || '—'}</td>
                 <td>
                   <span
                     style={{
@@ -171,6 +174,7 @@ export const ImportPreviewTable: React.FC<ImportPreviewTableProps> = ({
                   {row.memberCode || '—'}
                 </td>
                 <td>{row.email || '—'}</td>
+                <td>{row.slotType || '—'}</td>
                 <td>
                   <span
                     style={{

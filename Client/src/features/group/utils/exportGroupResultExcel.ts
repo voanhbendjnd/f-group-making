@@ -1,4 +1,4 @@
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import { classApi } from '@/features/classes/api/classApi';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { groupApi } from '../api/groupApi';
@@ -17,9 +17,26 @@ export interface StudentGroupExportRow {
   subjectCode: string;
   groupName: string; // Tên lớp (SchoolClass name e.g. EXE101_G01)
   gv: string; // Tên/mã giảng viên phụ trách
-  groupMentor: string; // Tên nhóm sinh viên thuộc về (e.g. EXE101_G01.01) hoặc '' nếu chưa có nhóm
+  groupMentor: string; // Tên lớp + số nhóm (e.g. EXE101_G01.01), hoặc '' nếu chưa có nhóm
   groupStatus?: GroupStatus | null;
   groupCode?: string;
+  groupSequenceNo?: number;
+}
+
+function sequenceFromCode(code?: string | null): number | undefined {
+  const match = /^G(\d+)$/i.exec(code ?? '');
+  const value = match ? Number(match[1]) : undefined;
+  return value != null && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
+function rowSequence(row: StudentGroupExportRow): number {
+  return row.groupSequenceNo ?? sequenceFromCode(row.groupCode)
+    ?? (row.groupMentor ? Number(row.groupMentor.match(/\.(\d+)$/)?.[1]) || Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER);
+}
+
+export function sortGroupExportRows(rows: StudentGroupExportRow[]): StudentGroupExportRow[] {
+  return [...rows].sort((a, b) => rowSequence(a) - rowSequence(b)
+    || a.rollNumber.localeCompare(b.rollNumber) || a.studentId - b.studentId);
 }
 
 export interface GroupExportMeta {
@@ -66,11 +83,10 @@ export function buildGroupResultWorkbook(
     'GroupName',
     'GV',
     'Group Mentor',
-    'Group Code',
   ]);
 
   // Dòng 2+: Dữ liệu từng sinh viên trong lớp
-  rows.forEach((row, index) => {
+  sortGroupExportRows(rows).forEach((row, index) => {
     wsData.push([
       index + 1,
       row.rollNumber || '',
@@ -78,12 +94,11 @@ export function buildGroupResultWorkbook(
       row.khoa || '',
       row.memberCode || '',
       row.email || '',
-      row.slotType || 'A24/EXE   ',
+      row.slotType || '',
       row.subjectCode || meta.subjectCode,
       row.groupName || meta.className,
       row.gv || meta.lecturerCode || '',
       row.groupMentor || '', // Nếu không có nhóm thì để trống ''
-      row.groupCode || '',
     ]);
   });
 
@@ -96,17 +111,40 @@ export function buildGroupResultWorkbook(
   worksheet['!cols'] = [
     { wch: 6 },  // STT
     { wch: 14 }, // RollNumber
-    { wch: 25 }, // FullName
-    { wch: 18 }, // Khoá
-    { wch: 18 }, // MemberCode
-    { wch: 30 }, // Email
+    { wch: 28 }, // FullName
+    { wch: 23 }, // Khoá
+    { wch: 24 }, // MemberCode
+    { wch: 42 }, // Email
     { wch: 14 }, // SlotType
     { wch: 14 }, // SubjectCode
     { wch: 16 }, // GroupName
     { wch: 12 }, // GV
-    { wch: 18 }, // Group Mentor
-    { wch: 12 }, // Group Code
+    { wch: 25 }, // Group Mentor
   ];
+
+  worksheet['!rows'] = [{ hpt: 120 }, { hpt: 22 }, ...rows.map(() => ({ hpt: 21 }))];
+  worksheet['!autofilter'] = { ref: `A2:K${rows.length + 2}` };
+  worksheet.B1.s = {
+    font: { name: 'Calibri', sz: 22, bold: true },
+    alignment: { vertical: 'center', wrapText: true },
+  };
+  worksheet.K1.s = {
+    font: { name: 'Calibri', sz: 11 },
+    alignment: { vertical: 'center', wrapText: true },
+  };
+  const edge = { style: 'thin', color: { rgb: 'D9D9D9' } };
+  for (let r = 1; r < wsData.length; r++) {
+    for (let c = 0; c < 11; c++) {
+      const cell = worksheet[XLSX.utils.encode_cell({ r, c })];
+      cell.s = {
+        font: { name: 'Calibri', sz: 11, bold: r === 1 },
+        alignment: { vertical: 'center', horizontal: c === 0 || (r === 1 && c === 10) ? 'center' : 'left' },
+        border: { top: edge, bottom: edge, left: edge, right: edge },
+        ...(r === 1 ? { fill: { patternType: 'solid', fgColor: { rgb: c === 10 ? 'FFFF00' : 'FFC000' } } } : {}),
+      };
+      if (r > 1 && c > 0) cell.z = '@';
+    }
+  }
 
   const workbook = XLSX.utils.book_new();
   const sheetName = (meta.subjectCode || meta.className || 'Result').substring(0, 31);
@@ -204,19 +242,25 @@ export async function fetchClassAllocationData(
 
     // 1. Sinh viên đã ở trong nhóm
     (ws.groups || []).forEach((g) => {
+      if (g.status === 'DISBANDED') return;
+      const sequence = g.sequenceNo ?? sequenceFromCode(g.groupCode);
+      if (g.members?.length && (sequence == null || !Number.isSafeInteger(sequence) || sequence < 1)) {
+        throw new Error(i18n.t('groupExport.missingGroupSequence'));
+      }
       (g.members || []).forEach((m) => {
         rows.push({
           studentId: m.studentId,
           rollNumber: m.rollNumber || '',
           fullName: m.fullName || '',
-          khoa: m.majorName || m.majorCode || '',
+          khoa: m.cohort || '',
           memberCode: m.memberCode || '',
           email: m.email || '',
-          slotType: 'A24/EXE   ',
+          slotType: m.slotType || '',
           subjectCode,
           groupName: className,
           gv: lecturerCode,
-          groupMentor: g.name, // Lưu tên nhóm vào cột Group Mentor
+          groupMentor: `${className}.${String(sequence).padStart(2, '0')}`,
+          groupSequenceNo: sequence,
           groupStatus: g.status,
           groupCode: groupCode(g),
         });
@@ -229,10 +273,10 @@ export async function fetchClassAllocationData(
         studentId: m.studentId,
         rollNumber: m.rollNumber || '',
         fullName: m.fullName || '',
-        khoa: m.majorName || m.majorCode || '',
+        khoa: m.cohort || '',
         memberCode: m.memberCode || '',
         email: m.email || '',
-        slotType: 'A24/EXE   ',
+        slotType: m.slotType || '',
         subjectCode,
         groupName: className,
         gv: lecturerCode,
@@ -241,11 +285,8 @@ export async function fetchClassAllocationData(
       });
     });
 
-    // Sắp xếp theo mã sinh viên
-    rows.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
-
     return {
-      rows,
+      rows: sortGroupExportRows(rows),
       meta: {
         className,
         subjectCode,
@@ -264,10 +305,10 @@ export async function fetchClassAllocationData(
     studentId: s.userId,
     rollNumber: s.rollNumber || '',
     fullName: s.fullName || '',
-    khoa: s.majorName || s.majorCode || '',
+    khoa: s.cohort || '',
     memberCode: s.memberCode || '',
     email: s.email || '',
-    slotType: 'A24/EXE   ',
+    slotType: s.slotType || '',
     subjectCode,
     groupName: className,
     gv: lecturerCode,
@@ -275,10 +316,8 @@ export async function fetchClassAllocationData(
     groupStatus: null,
   }));
 
-  rows.sort((a, b) => a.rollNumber.localeCompare(b.rollNumber));
-
   return {
-    rows,
+    rows: sortGroupExportRows(rows),
     meta: {
       className,
       subjectCode,
