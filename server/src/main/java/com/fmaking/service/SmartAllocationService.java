@@ -516,6 +516,7 @@ public class SmartAllocationService {
     private static GroupMemberDTO copy(GroupMemberDTO row) {
         return GroupMemberDTO.builder().id(row.getId()).groupId(row.getGroupId()).studentId(row.getStudentId())
             .rollNumber(row.getRollNumber()).fullName(row.getFullName()).email(row.getEmail()).memberCode(row.getMemberCode())
+            .cohort(row.getCohort()).slotType(row.getSlotType())
             .majorId(row.getMajorId()).majorCode(row.getMajorCode()).majorName(row.getMajorName()).role(row.getRole())
             .joinedAt(row.getJoinedAt()).selfDescription(row.getSelfDescription()).matchScore(row.getMatchScore())
             .matchReasons(row.getMatchReasons() == null ? null : List.copyOf(row.getMatchReasons())).build();

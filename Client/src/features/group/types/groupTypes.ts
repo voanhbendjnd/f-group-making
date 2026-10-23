@@ -9,6 +9,8 @@ export interface GroupMemberDTO {
   fullName: string;
   email?: string;
   memberCode: string;
+  cohort?: string | null;
+  slotType?: string | null;
   majorId?: number;
   majorCode: string;
   majorName: string;
@@ -82,8 +84,8 @@ export interface WorkspaceDTO {
   deadlineName: string;
   deadlineDescription?: string;
   deadlineStatus: string;
-  deadlineStartTime: string;
-  deadlineEndTime: string;
+  deadlineStartTime: string | null;
+  deadlineEndTime: string | null;
   deadlineExpired: boolean;
   readOnlyReason?: string | null;
   canManageGroups: boolean;

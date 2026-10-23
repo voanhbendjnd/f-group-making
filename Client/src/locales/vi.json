@@ -9,10 +9,10 @@
     "columnsLabel": "Cấu trúc Excel nhập dữ liệu",
     "column": "Cột", "header": "Tiêu đề", "meaning": "Thông tin bắt buộc", "example": "Ví dụ minh họa",
     "keepFormat": "Giữ nguyên tên cột, thứ tự cột và dòng bắt đầu nhập trong mẫu. Ví dụ trên trang chỉ để tham khảo; điền thông tin thực tế vào tệp.",
-    "studentRules": "Khoá dùng dạng PREFIX_MANGANH_..., ví dụ BEN_SE_ET_26 lấy mã ngành SE. GroupName là tên lớp. GV phải là mã giảng viên đã có; tạo/import giảng viên trước khi nhập sinh viên. Giữ vị trí các cột A, G, H, K dù không cần điền.",
+    "studentRules": "Khóa được lưu nguyên chuỗi; dạng PREFIX_MANGANH_... đồng thời xác định ngành (BEN_SE_ET_26 lấy mã SE). SlotType ở cột G được lưu theo file, có thể để trống với file cũ. GroupName là tên lớp. GV phải là mã giảng viên đã có; tạo/import giảng viên trước khi nhập sinh viên. Giữ vị trí các cột A, H, K dù không cần điền.",
     "studentUniqueValues": "Mã sinh viên, mã thành viên và email phải duy nhất. Hệ thống kiểm tra trùng và dữ liệu liên quan khi xác nhận nhập.",
     "lecturerUniqueValues": "Mã giảng viên và email phải duy nhất. Hệ thống kiểm tra trùng khi xác nhận nhập.",
-    "fields": { "rollNumber": "Mã sinh viên", "fullName": "Họ tên (tối đa 50 ký tự)", "major": "Chuỗi thông tin ngành", "memberCode": "Mã thành viên", "email": "Địa chỉ email hợp lệ", "className": "Tên lớp (tối đa 50 ký tự)", "lecturerCode": "Mã giảng viên" }
+    "fields": { "rollNumber": "Mã sinh viên", "fullName": "Họ tên (tối đa 50 ký tự)", "major": "Nguyên chuỗi Khóa (tối đa 255 ký tự)", "slotType": "Loại slot (không bắt buộc, tối đa 255 ký tự)", "memberCode": "Mã thành viên", "email": "Địa chỉ email hợp lệ", "className": "Tên lớp (tối đa 50 ký tự)", "lecturerCode": "Mã giảng viên" }
   },
   "adminUx": {
     "lecturerDropHint": "Hỗ trợ .xlsx tối đa 5 MB. Tệp giảng viên có tiêu đề Mentor và Email ở dòng đầu, dữ liệu từ dòng 2.",
@@ -198,6 +198,7 @@
     "applying": "Đang áp dụng phân bổ…",
     "waitForApply": "Vui lòng chờ máy chủ kiểm tra và lưu yêu cầu này.",
     "deadlineStatus": {
+      "UNSCHEDULED": "Chưa đặt hạn",
       "ACTIVE": "Đang mở",
       "EXPIRED": "Hết hạn",
       "UPCOMING": "Sắp diễn ra",
@@ -410,6 +411,7 @@
     "notActive": "Chỉ có thể kết thúc ngay deadline đang mở."
   },
   "deadlineLifecycle": {
+    "schedule": "Đặt thời gian chọn nhóm",
     "reopen": "Mở lại deadline",
     "reopened": "Đã mở lại deadline, giữ nguyên nhóm và lịch sử duyệt.",
     "confirmScope": "Tôi xác nhận thay đổi áp dụng cho các lớp được chọn phía trên.",
@@ -725,6 +727,8 @@
       "email": "Địa chỉ Email"
     },
     "clientErrors": {
+      "cohortTooLong": "Khóa dài hơn 255 ký tự (Cột D)",
+      "slotTypeTooLong": "SlotType dài hơn 255 ký tự (Cột G)",
       "noSheet": "Tệp Excel không chứa trang tính (sheet) nào.",
       "missingRollNumber": "Thiếu Mã sinh viên (Cột B)",
       "duplicateRollNumber": "Mã sinh viên \"{{rollNumber}}\" bị trùng lặp trong tệp",
@@ -1228,6 +1232,7 @@
     "emptyLecturerDesc": "Bấm 'Tạo deadline cho lớp' để bắt đầu thiết lập deadline chọn nhóm và thông báo tới sinh viên.",
     "status": {
       "active": "Đang diễn ra",
+      "unscheduled": "Chưa đặt hạn",
       "upcoming": "Sắp tới",
       "expired": "Đã kết thúc",
       "cancelled": "Đã hủy"
@@ -1337,6 +1342,7 @@
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
     },
     "closed": {
+      "UNSCHEDULED": { "title": "Chưa mở thời gian chọn nhóm", "description": "Giảng viên vẫn có thể sắp nhóm cho lớp. Sinh viên được thay đổi nhóm trong thời gian chọn nhóm được mở." },
       "CANCELLED": {
         "title": "Đợt chọn nhóm đã bị hủy",
         "description": "Đợt này đã ngừng nhận đăng ký. Nhóm và lịch sử hiện có được giữ lại để xem; mọi thao tác thay đổi trong đợt đã bị khóa."
@@ -1609,6 +1615,7 @@
     "otherActivitiesTitle": "Các đợt chọn nhóm khác của lớp"
   },
   "groupBoard": {
+    "noDeadlineNeeded": "Có thể sắp nhóm thủ công hoặc tự động trước khi đặt thời gian sinh viên chọn nhóm.",
     "title": "Sắp nhóm nâng cao",
     "open": "Sắp nhóm nâng cao",
     "subtitle": "Kéo thả để sắp nhóm",
@@ -1849,7 +1856,8 @@
     "colStt": "STT",
     "colRollNumber": "Mã SV",
     "colFullName": "Họ và tên",
-    "colKhoa": "Khoá / Ngành",
+    "colKhoa": "Khóa",
+    "missingGroupSequence": "Có nhóm chưa có số thứ tự. Cần cập nhật số thứ tự nhóm trước khi xuất Excel.",
     "colMemberCode": "Mã TV",
     "colEmail": "Email",
     "colGroupMentor": "Nhóm (Group Mentor)",

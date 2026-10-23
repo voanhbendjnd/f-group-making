@@ -19,7 +19,7 @@ vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: context.success }) }));
 vi.mock('@/app/providers/realtimeContext', () => ({ useRealtime: () => ({ subscribe: context.subscribe }) }));
 vi.mock('@/features/allocation/api/allocationApi', () => ({ allocationApi: { overview: vi.fn(), setup: vi.fn(), preview: vi.fn(), apply: vi.fn(), history: vi.fn(), historyDetail: vi.fn(), plans: vi.fn(), plan: vi.fn(), recommendation: vi.fn() } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), ensureGroupingSession: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 let client: QueryClient;
 function wrapper({ children }: { children: React.ReactNode }) { return <QueryClientProvider client={client}>{children}</QueryClientProvider>; }
@@ -60,6 +60,18 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('automatic allocation workflow', () => {
+  it('opens automatic allocation without a deadline and uses the same class grouping session', async () => {
+    vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({ result: [], meta: { page: 1, pageSize: 50, total: 0, pages: 0 } });
+    vi.mocked(classApi.ensureGroupingSession).mockResolvedValue({ id: 3, status: 'UNSCHEDULED' } as never);
+    vi.mocked(allocationApi.overview).mockResolvedValue({ ...overviewFixture,
+      scope: { ...overviewFixture.scope, deadlineStatus: 'UNSCHEDULED', startTime: null, endTime: null } });
+    render(pageTree());
+    await screen.findByText(i18n.t('allocation.deadlineStatus.UNSCHEDULED'));
+    expect(classApi.ensureGroupingSession).toHaveBeenCalledWith(2, 8, expect.anything());
+    expect(allocationApi.overview).toHaveBeenCalledWith(3, 2, expect.anything());
+    expect(screen.queryByText(i18n.t('allocation.noSession'))).not.toBeInTheDocument();
+  });
+
   it('marks only the globally recommended history row and explains real counts in VI/EN without auto Apply', async () => {
     vi.mocked(allocationApi.recommendation).mockResolvedValue(recommendationFixture());
     vi.mocked(allocationApi.plans).mockResolvedValue({ meta: { page: 1, pageSize: 10, total: 2, pages: 1 }, result: [planFixture().summary,

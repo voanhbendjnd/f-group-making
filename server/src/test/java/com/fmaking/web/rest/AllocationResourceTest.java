@@ -163,7 +163,8 @@ class AllocationResourceTest {
         assertThat(data.path("summary").path("totalGroups").asInt()).isEqualTo(3);
         assertThat(data.path("summary").path("unassignedStudents").asInt()).isEqualTo(2);
         assertThat(data.path("summary").path("invalidGroups").asInt()).isEqualTo(3);
-        assertThat(data.path("groups").get(0).path("score").path("scorePercent").asDouble()).isEqualTo(80);
+        assertThat(data.path("groups").get(0).path("score").path("scorePercent").asDouble()).isEqualTo(73.3);
+        assertThat(data.path("rules").get(6).path("status").asBoolean()).isFalse();
         assertThat(data.path("groups").get(0).path("leaderName").asText()).isEqualTo("Student 0");
         assertThat(data.path("groups").get(0).path("rules").get(0).has("message")).isFalse();
         assertThat(data.toString()).doesNotContain("activationKey", "secret-for-test-only", "password", "refreshToken");

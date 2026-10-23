@@ -16,8 +16,17 @@ public record StudentRow(
         Instant activationKeyExpiresAt,
         Instant createdDate,
         Instant lastModifiedDate,
-        String selfDescription
+        String selfDescription,
+        String cohort,
+        String slotType
 ) {
+    public StudentRow(Long userId, String rollNumber, String fullName, String email, String memberCode,
+                      Integer majorId, String majorCode, String majorName, Boolean activated, String activationKey,
+                      Instant activationKeyExpiresAt, Instant createdDate, Instant lastModifiedDate, String selfDescription) {
+        this(userId, rollNumber, fullName, email, memberCode, majorId, majorCode, majorName, activated,
+                activationKey, activationKeyExpiresAt, createdDate, lastModifiedDate, selfDescription, null, null);
+    }
+
     public StudentRow(
             Long userId,
             String rollNumber,

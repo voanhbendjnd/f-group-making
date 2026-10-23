@@ -90,6 +90,82 @@ class GroupSessionPolicyTest {
 
     @AfterEach void clear() { SecurityContextHolder.clearContext(); }
 
+    @Test void concurrentManualAndAutomaticOpeningCreateOnlyOneUnscheduledSession() throws Exception {
+        SchoolClass target = schoolClass(); User owner = teacher;
+        ExecutorService workers = Executors.newFixedThreadPool(2);
+        CountDownLatch start = new CountDownLatch(1);
+        Callable<Integer> open = () -> {
+            start.await(); login(owner, "ROLE_LECTURE");
+            try { return deadlineService.ensureGroupingSession(target.getId(), target.getTermId()).getId(); }
+            finally { SecurityContextHolder.clearContext(); }
+        };
+        try {
+            Future<Integer> manual = workers.submit(open), automatic = workers.submit(open);
+            start.countDown();
+            assertThat(manual.get(20, TimeUnit.SECONDS)).isEqualTo(automatic.get(20, TimeUnit.SECONDS));
+            assertThat(deadlines.findAllBySchoolClassId(target.getId())).hasSize(1);
+        } finally { workers.shutdownNow(); }
+    }
+
+    @Test void unscheduledWorkspaceIsReusedAndSupportsManualAssignmentBeforeAndAfterScheduling() {
+        schoolClass = schoolClass();
+        login(teacher, "ROLE_LECTURE");
+        DeadlineDTO session = deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId());
+        assertThat(session.getStatus()).isEqualTo(DeadlineStatus.UNSCHEDULED);
+        assertThat(session.getStartTime()).isNull(); assertThat(session.getEndTime()).isNull();
+        assertThat(deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId()).getId()).isEqualTo(session.getId());
+        assertThat(deadlines.findAllBySchoolClassId(schoolClass.getId())).hasSize(1);
+        deadline = deadlines.findById(session.getId()).orElseThrow();
+        GroupDTO group = draft(1);
+        User extra = student(schoolClass, otherMajor);
+        service.lecturerAddMember(deadline.getId(), schoolClass.getId(), group.getId(), extra.getId());
+        var workspace = service.getWorkspace(deadline.getId(), schoolClass.getId());
+        assertThat(workspace.isCanManageGroups()).isTrue();
+        assertThat(workspace.isCanCreateGroup()).isFalse(); assertThat(workspace.isCanJoinGroup()).isFalse();
+        assertThat(workspace.getGroups().getFirst().getMemberCount()).isEqualTo(2);
+
+        CreateDeadlineDTO schedule = new CreateDeadlineDTO(); schedule.setName("Student selection window");
+        schedule.setStartTime(Instant.now().minusSeconds(1)); schedule.setEndTime(Instant.now().plusSeconds(3600));
+        schedule.setSchoolClassIds(List.of(schoolClass.getId()));
+        assertThat(deadlineService.createDeadline(schedule).getId()).isEqualTo(session.getId());
+        assertThat(deadlines.findAllBySchoolClassId(schoolClass.getId())).hasSize(1);
+        assertThat(service.getGroupDetail(group.getId(), schoolClass.getId(), session.getId()).getMemberCount()).isEqualTo(2);
+        assertThat(service.getWorkspace(session.getId(), schoolClass.getId()).getDeadlineStatus()).isEqualTo("ACTIVE");
+    }
+
+    @Test void studentsCannotModifyUnscheduledGroupsAndOtherTeachersCannotInitializeWorkspaces() {
+        schoolClass = schoolClass(); login(teacher, "ROLE_LECTURE");
+        var session = deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId());
+        deadline = deadlines.findById(session.getId()).orElseThrow();
+        GroupDTO group = draft(1); User pupil = student(schoolClass, se);
+        login(pupil, "ROLE_STUDENT");
+        CreateGroupRequest create = new CreateGroupRequest(); create.setName("Student draft");
+        assertThatThrownBy(() -> service.createGroup(session.getId(), schoolClass.getId(), create)).isInstanceOf(RuntimeException.class);
+        assertThatThrownBy(() -> service.joinGroup(session.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        for (String role : List.of("ROLE_LECTURE", "ROLE_LECTURE_MASTER")) {
+            login(user(), role);
+            assertThatThrownBy(() -> deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId()))
+                .isInstanceOf(com.fmaking.web.rest.errors.ForbiddenAlertException.class);
+        }
+        login(teacher, "ROLE_LECTURE");
+        assertThatThrownBy(() -> deadlineService.ensureGroupingSession(schoolClass.getId(), terms.saveAndFlush(newTerm()).getId()))
+            .isInstanceOf(RuntimeException.class);
+    }
+
+    private Term newTerm() { Term term = new Term(); term.setName("Other" + UUID.randomUUID().toString().substring(0, 7)); return term; }
+
+    @Test void placingADeadlineThroughEditPreservesUnscheduledGroupIdentity() {
+        schoolClass = schoolClass(); login(teacher, "ROLE_LECTURE");
+        var session = deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId());
+        deadline = deadlines.findById(session.getId()).orElseThrow(); GroupDTO group = draft(1);
+        UpdateDeadlineDTO request = extension(); request.setStartTime(Instant.now().plusSeconds(300));
+        request.setScope("ALL"); request.setExpectedVersion(session.getVersion());
+        var scheduled = deadlineService.updateDeadline(request);
+        assertThat(scheduled.getStatus()).isEqualTo(DeadlineStatus.UPCOMING);
+        assertThat(service.getGroupDetail(group.getId(), schoolClass.getId(), session.getId()).getGroupCode()).isEqualTo("G01");
+        assertThat(deadlineService.ensureGroupingSession(schoolClass.getId(), schoolClass.getTermId()).getId()).isEqualTo(session.getId());
+    }
+
     User student(SchoolClass target, Major major) {
         User user = user(); Student value = new Student(); value.setUserId(user.getId()); value.setFullName("Policy Student");
         value.setRollNumber("R" + user.getId()); value.setMemberCode("M" + user.getId()); value.setMajorId(major.getId());
@@ -505,13 +581,15 @@ class GroupSessionPolicyTest {
     }
 
     @Test void seMinimumIsACompletionCountAndCanBeDisabledExplicitly() {
+        Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP");
+        seRule.setValue(1); seRule.setStatus(true); rules.saveAndFlush(seRule);
         Major third = new Major(); third.setCode("X" + UUID.randomUUID().toString().substring(0, 5)); third.setName("Third"); third = majors.saveAndFlush(third);
         LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("No SE draft");
         request.setStudentIds(List.of(student(schoolClass, otherMajor).getId(), student(schoolClass, otherMajor).getId(),
             student(schoolClass, third).getId(), student(schoolClass, third).getId()));
         GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
         assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP"); seRule.setValue(1); seRule.setStatus(false); rules.saveAndFlush(seRule);
+        seRule.setStatus(false); rules.saveAndFlush(seRule);
         service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
         assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
     }

@@ -18,7 +18,7 @@ Package gốc BE là `com.fmaking`, dùng nhất quán cho package/import, JPQL,
 
 ## Chạy cục bộ
 
-Từ thư mục gốc repository, khởi động MySQL/Redis nếu cần:
+Từ thư mục gốc repository, khởi động MySQL/Redis và Mailpit:
 
 ```powershell
 docker compose -f server/docker-compose.yml up -d
@@ -34,6 +34,21 @@ cd server
 ```
 
 Giữ cấu hình BE cục bộ trong `server/src/main/resources/application.properties`; file này không đưa vào Git. Cấu hình FE cục bộ nằm ở `Client/.env`, tham khảo `Client/.env.example`. Các file cấu hình hiện có được giữ khi đổi tên thư mục.
+
+Để kiểm thử email cục bộ, dùng Mailpit với cấu hình sau trong `application.properties`, rồi khởi động lại BE:
+
+```properties
+spring.mail.host=localhost
+spring.mail.port=1025
+spring.mail.username=
+spring.mail.password=
+spring.mail.properties.mail.smtp.auth=false
+spring.mail.properties.mail.smtp.starttls.enable=false
+spring.mail.properties.mail.smtp.ssl.enable=false
+spring.mail.properties.mail.smtp.from=no-reply@fgroup.local
+```
+
+Xem email và link kích hoạt tại `http://localhost:8025`. Compose không cấu hình chuyển tiếp hoặc relay ra SMTP bên ngoài. Có thể chỉ khởi động hộp thư thử bằng `docker compose -f server/docker-compose.yml up -d mailpit`; hai cổng 1025/8025 chỉ mở trên máy local.
 
 Chạy FE trong terminal khác:
 

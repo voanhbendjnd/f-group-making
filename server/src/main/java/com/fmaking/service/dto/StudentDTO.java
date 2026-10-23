@@ -22,6 +22,8 @@ public class StudentDTO {
     String fullName;
     String email;
     String memberCode;
+    String cohort;
+    String slotType;
     Integer majorId;
     String majorCode;
     String majorName;

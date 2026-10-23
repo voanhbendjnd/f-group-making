@@ -1,6 +1,13 @@
 # Stable infrastructure identity across source-directory renames.
 name: jumpln-app-backend-java-spring
 services:
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: mailpit-fgroup-making-local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
   mysql-db:
     image: mysql:8.0
     container_name: mysql-fgroup-making-local

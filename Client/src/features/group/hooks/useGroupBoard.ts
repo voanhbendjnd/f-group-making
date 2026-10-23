@@ -5,6 +5,7 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { useToast } from '@/app/providers/ToastContext';
 import { useTerm } from '@/app/providers/TermContext';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
+import { classApi } from '@/features/classes/api/classApi';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
 import { groupApi } from '../api/groupApi';
@@ -32,7 +33,7 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
         matches.push(...next.result.filter(d => d.schoolClassIds.includes(classId!)));
       }
       if (matches.length > 1) throw new AmbiguousGroupSessionError();
-      return matches[0]?.id ?? null;
+      return matches[0]?.id ?? (await classApi.ensureGroupingSession(classId!, termId ?? undefined, signal)).id;
     }, retry: false,
   });
   const deadlineId = requestedDeadline ?? session.data ?? null;

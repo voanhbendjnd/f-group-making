@@ -14,6 +14,8 @@ export interface Student {
   fullName: string;
   email: string;
   memberCode: string;
+  cohort?: string | null;
+  slotType?: string | null;
   majorId: number | null;
   majorCode: string | null;
   majorName?: string | null;

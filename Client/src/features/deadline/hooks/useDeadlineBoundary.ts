@@ -3,15 +3,16 @@ import { useQueryClient } from '@tanstack/react-query';
 import { syncDeadlineQueries } from '../realtime';
 import type { DeadlineStatus } from '../types';
 
-export function effectiveDeadlineStatus(status: DeadlineStatus, startTime: string, endTime: string, now = Date.now()): DeadlineStatus {
+export function effectiveDeadlineStatus(status: DeadlineStatus, startTime: string | null, endTime: string | null, now = Date.now()): DeadlineStatus {
+  if (status === 'UNSCHEDULED' || !startTime || !endTime) return 'UNSCHEDULED';
   // A server-confirmed closure must not be reopened by an old future endTime or a slow client clock.
   if (status === 'CANCELLED' || status === 'EXPIRED') return 'EXPIRED';
   if (now < Date.parse(startTime)) return 'UPCOMING';
   return now >= Date.parse(endTime) ? 'EXPIRED' : 'ACTIVE';
 }
 
-export function useDeadlineBoundary(items: { status: DeadlineStatus; startTime: string; endTime: string;
-  classWindows?: { status: DeadlineStatus; startTime: string; endTime: string }[] }[]) {
+export function useDeadlineBoundary(items: { status: DeadlineStatus; startTime: string | null; endTime: string | null;
+  classWindows?: { status: DeadlineStatus; startTime: string | null; endTime: string | null }[] }[]) {
   const client = useQueryClient();
   const [now, setNow] = useState(Date.now);
   const windows = items.flatMap(item => item.classWindows?.length ? item.classWindows : [item]);
@@ -19,7 +20,7 @@ export function useDeadlineBoundary(items: { status: DeadlineStatus; startTime: 
   useEffect(() => {
     const time = Date.now();
     const next = windows.filter(item => item.status !== 'CANCELLED')
-      .flatMap(item => [Date.parse(item.startTime), Date.parse(item.endTime)]).filter(t => t > time);
+      .flatMap(item => [Date.parse(item.startTime ?? ''), Date.parse(item.endTime ?? '')]).filter(t => t > time);
     if (!next.length) return;
     const timer = window.setTimeout(() => {
       setNow(Date.now());

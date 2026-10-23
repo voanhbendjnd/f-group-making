@@ -3,6 +3,17 @@ import * as XLSX from 'xlsx';
 import { parseExcelClientSide } from '../features/import/utils/excelParser';
 
 describe('excelParser client validation', () => {
+  it('rejects cohort and slotType values exceeding the database field limits', async () => {
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([
+      ['Title'], ['Headers'],
+      [1, 'SE01', 'Student', `BEN_SE_${'X'.repeat(250)}`, 'M01', 'student@example.com', 'S'.repeat(256), '', 'EXE101_G01', 'GV01'],
+    ]), 'Students');
+    const result = await parseExcelClientSide(new File([XLSX.write(workbook, { type: 'array', bookType: 'xlsx' })], 'students.xlsx'));
+    expect(result.invalidCount).toBe(1);
+    expect(result.rows[0].validationErrors).toHaveLength(2);
+  });
+
   it('normalizes the code after the first underscore, rejects missing codes and preserves row numbers', async () => {
     const workbook = XLSX.utils.book_new();
     const sheet = XLSX.utils.aoa_to_sheet([
@@ -27,7 +38,7 @@ describe('excelParser client validation', () => {
     const data = [
       ['BẢNG PHÂN CÔNG SINH VIÊN', '', '', '', '', ''],
       ['STT', 'Mã SV', 'Họ và tên', 'Mã ngành', 'Mã thành viên', 'Email'],
-      [1, 'SE180001', 'Nguyễn Văn An', 'BEN_SE_ET_19C', 'AN_SE180001', 'an@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
+      [1, 'SE180001', 'Nguyễn Văn An', 'BEN_SE_ET_19C', 'AN_SE180001', 'an@fpt.edu.vn', ' B12/EXE ', '', 'EXE101_G01', 'GV01'],
       [2, 'SE180002', 'Trần Thị Bình', 'BEN_SE_ET_19C', 'BINH_SE180002', 'binh@fpt.edu.vn', '', '', 'EXE101_G01', 'GV01'],
     ];
 
@@ -48,6 +59,9 @@ describe('excelParser client validation', () => {
     expect(result.rows[0].rollNumber).toBe('SE180001');
     expect(result.rows[0].extractedMajorCode).toBe('SE');
     expect(result.rows[0].isValid).toBe(true);
+    expect(result.rows[0].originalMajor).toBe('BEN_SE_ET_19C');
+    expect(result.rows[0].slotType).toBe('B12/EXE');
+    expect(result.rows[1].slotType).toBe('');
   });
 
   it('detects missing fields and invalid email format', async () => {

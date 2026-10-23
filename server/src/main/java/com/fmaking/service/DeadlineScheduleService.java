@@ -55,7 +55,8 @@ public class DeadlineScheduleService {
         versions.put(key, version);
         tasks.getOrDefault(key, List.of()).forEach(task -> task.cancel(false));
         tasks.remove(key);
-        if (status == DeadlineStatus.CANCELLED || status == DeadlineStatus.EXPIRED) return;
+        if (status == DeadlineStatus.UNSCHEDULED || status == DeadlineStatus.CANCELLED || status == DeadlineStatus.EXPIRED
+                || start == null || end == null) return;
         List<ScheduledFuture<?>> scheduled = new ArrayList<>();
         if (start.isAfter(clock.instant())) {
             scheduled.add(scheduler.schedule(() -> boundaries.announceClass(id, classId, version, DeadlineStatus.ACTIVE), start));

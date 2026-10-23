@@ -7,6 +7,13 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 class DeadlinePolicyTest {
+    @Test void missingSelectionWindowNeverPermitsStudentWrites() {
+        Deadline session = new Deadline(); session.setStatus("UNSCHEDULED");
+        DeadlinePolicy policy = new DeadlinePolicy(Clock.systemUTC());
+        assertThat(policy.status(session)).isEqualTo(DeadlineStatus.UNSCHEDULED);
+        assertThatThrownBy(() -> policy.requireStudentWrite(session)).isInstanceOf(ConflictAlertException.class);
+        assertThatThrownBy(() -> policy.requireStudentWrite(session, 1)).isInstanceOf(ConflictAlertException.class);
+    }
     private final Instant start = Instant.parse("2026-10-16T00:00:00Z");
     private final Instant end = start.plusSeconds(3600);
     private Deadline deadline() {

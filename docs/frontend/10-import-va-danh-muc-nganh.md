@@ -30,7 +30,7 @@ nullable hoặc không tồn tại. `ddl-auto=update` không tự sửa cột đ
 
 Hai trang import có khối tải mẫu trước vùng chọn tệp, dùng chung `ImportTemplateGuide`:
 
-- `/admin/students/import`: tải `/sample-students.xlsx`; sheet `Students` đầu tiên, hai dòng tiêu đề, nhập dữ liệu từ dòng 3. Các cột bắt buộc ở B/C/D/E/F/I/J lần lượt là RollNumber/FullName/Khoá/MemberCode/Email/GroupName/GV. Giữ vị trí các cột A/G/H/K dù để trống.
+- `/admin/students/import`: tải `/sample-students.xlsx`; sheet `Students` đầu tiên, hai dòng tiêu đề, nhập dữ liệu từ dòng 3. Các cột bắt buộc ở B/C/D/E/F/I/J lần lượt là RollNumber/FullName/Khoá/MemberCode/Email/GroupName/GV. Cột G là SlotType, có thể để trống với file cũ. Giữ vị trí các cột A/H/K dù để trống.
 - `/admin/lecturers/import`: tải `/sample-lecturers.xlsx`; sheet `Mentors` có Mentor/Email ở A1/B1, nhập từ dòng 2.
 
 Cả hai tệp dùng bố cục cơ bản theo ảnh tham chiếu, mỗi tệp chỉ có một sheet và vùng nhập trống. Mẫu sinh viên có tiêu đề `DSSV_EXE101_FA26 / *Xếp nhóm`, hàng tên cột màu vàng, hướng dẫn Group Mentor tại K1 và bộ lọc cột. Tiêu đề FA26 chỉ là ví dụ; học kỳ nhập lấy từ lựa chọn trên giao diện. Mẫu giảng viên là bảng trắng hai cột Mentor/Email, không trang trí thêm. Hướng dẫn và ví dụ nằm trên trang import, không có sheet `Huong dan` trong tệp.
@@ -50,6 +50,12 @@ Mã ngành là phần ngay sau dấu `_` đầu tiên, kết thúc ở dấu `_`
 Mã được trim và viết hoa. Mã hợp lệ có 1–20 ký tự, bắt đầu bằng chữ/số,
 chỉ gồm chữ cái ASCII, chữ số và dấu gạch ngang. CRUD Major dùng cùng quy tắc.
 Danh mục được nạp một lần cho mỗi request; các mã có sẵn được đối chiếu không phân biệt hoa/thường.
+
+Nguyên chuỗi Khóa ở D được trim và lưu tại `students.cohort`; SlotType ở G được trim và lưu tại `students.slot_type`, mỗi trường tối đa 255 ký tự. Khóa vẫn được dùng để tách mã ngành như trước. API sinh viên, danh sách lớp và workspace trả về `cohort`/`slotType`.
+
+Xuất Excel một lớp giữ đúng 11 cột A–K theo mẫu, lấy Khóa và SlotType từ dữ liệu đã lưu; dữ liệu thiếu để trống. GroupName là tên lớp; Group Mentor ghép tên lớp với số thứ tự nhóm, ví dụ `EXE101_G01` + `G02` thành `EXE101_G01.02`. Ưu tiên `sequenceNo`, dự phòng mã `Gxx`, không dùng tên nhóm tùy chỉnh. Nhóm thiếu số thứ tự cần cập nhật trước khi xuất. Danh sách sắp theo số nhóm tăng dần, trong nhóm theo MSSV; sinh viên chưa có nhóm đứng cuối và để trống Group Mentor. Xuất toàn bộ lớp hoặc kết quả lọc đều áp dụng thứ tự này.
+
+Database đã có dữ liệu có thể chạy `docs/sql/20261023_student_cohort_slot_type.sql` (chạy lại được); cấu hình Hibernate `ddl-auto=update` cũng thêm hai cột khi khởi động. Dữ liệu cũ chưa có hai trường không được tự suy đoán; cần khôi phục từ file gốc. Import vẫn từ chối MSSV trùng, không dùng import thường để ghi đè dữ liệu cũ.
 
 Ví dụ lần gửi đầu có mã chưa có trong danh mục (payload nằm trong envelope `data`):
 

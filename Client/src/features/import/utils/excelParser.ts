@@ -37,21 +37,24 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
     const rawRow = rawRows[i];
     const excelRowNumber = i + 1; // 1-indexed Excel row
 
-    // Extract columns B to F (indices 1 to 5) and I, J (indices 8, 9)
+    // Preserve the full cohort in D and SlotType in G, alongside the extracted major.
     const rollNumber = String(rawRow[1] ?? '').trim();
     const fullName = String(rawRow[2] ?? '').trim();
     const originalMajor = String(rawRow[3] ?? '').trim();
     const memberCode = String(rawRow[4] ?? '').trim();
     const email = String(rawRow[5] ?? '').trim().toLowerCase();
+    const slotType = String(rawRow[6] ?? '').trim();
     const groupName = String(rawRow[8] ?? '').trim();
     const lecturerCode = String(rawRow[9] ?? '').trim();
 
     // Check if entire row is empty
-    if (!rollNumber && !fullName && !originalMajor && !memberCode && !email && !groupName && !lecturerCode) {
+    if (!rollNumber && !fullName && !originalMajor && !memberCode && !email && !slotType && !groupName && !lecturerCode) {
       continue;
     }
 
     const errors: string[] = [];
+    if (originalMajor.length > 255) errors.push(i18n.t('import.clientErrors.cohortTooLong'));
+    if (slotType.length > 255) errors.push(i18n.t('import.clientErrors.slotTypeTooLong'));
 
     if (!rollNumber) {
       errors.push(i18n.t('import.clientErrors.missingRollNumber'));
@@ -103,6 +106,7 @@ export async function parseExcelClientSide(file: File): Promise<ParseExcelResult
       rollNumber,
       fullName,
       originalMajor,
+      slotType,
       extractedMajorCode,
       memberCode,
       email,

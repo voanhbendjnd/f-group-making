@@ -28,6 +28,7 @@ public class DeadlinePolicy {
     public void requireStudentWrite(Deadline deadline) {
         requireNotCancelled(deadline);
         switch (status(deadline)) {
+            case UNSCHEDULED -> throw new ConflictAlertException("Lớp chưa mở thời gian chọn nhóm.", "deadline", "ERR_DEADLINE_NOT_STARTED");
             case UPCOMING -> throw new ConflictAlertException("Đợt chọn nhóm chưa bắt đầu.", "deadline", "ERR_DEADLINE_NOT_STARTED");
             case EXPIRED -> throw new ConflictAlertException("Deadline chọn nhóm đã kết thúc.", "deadline", "ERR_DEADLINE_EXPIRED");
             default -> { }
@@ -37,7 +38,7 @@ public class DeadlinePolicy {
     public void requireStudentWrite(Deadline deadline, Integer classId) {
         switch (status(deadline, classId)) {
             case ACTIVE -> { }
-            case UPCOMING -> throw new ConflictAlertException("Deadline chưa bắt đầu.", "deadline", "ERR_DEADLINE_NOT_STARTED");
+            case UNSCHEDULED, UPCOMING -> throw new ConflictAlertException("Deadline chưa bắt đầu.", "deadline", "ERR_DEADLINE_NOT_STARTED");
             default -> throw new ConflictAlertException("Deadline đã kết thúc.", "deadline", "ERR_DEADLINE_EXPIRED");
         }
     }

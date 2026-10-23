@@ -191,7 +191,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
     <div className="board-context-bar">
       <label className="board-search"><Search size={16} /><input aria-label={t('groupBoard.searchGroups')} placeholder={t('groupBoard.searchGroups')} value={groupSearch} onChange={event => setGroupSearch(event.target.value)} /></label>
       <span className="board-count">{t('groupBoard.groupCount', { count: data.groups.length })}</span>
-      <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>
+      <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'UNSCHEDULED' ? 'UNSCHEDULED' : data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>
       <button className="board-rules-link" type="button" onClick={() => setShowRules(true)}>{t('groupReview.rules')}</button>
       <span role="status" className="board-save-status">{pending ? t('groupBoard.saving') : t('groupBoard.savedHint')}</span>
     </div>

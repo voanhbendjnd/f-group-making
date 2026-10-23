@@ -19,6 +19,7 @@ export interface ParsedStudentRow {
   rollNumber: string;
   fullName: string;
   originalMajor: string;
+  slotType?: string;
   extractedMajorCode?: string;
   memberCode: string;
   email: string;

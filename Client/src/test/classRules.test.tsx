@@ -17,6 +17,20 @@ afterEach(cleanup);
 describe('Class grouping rules workflow', () => {
   const toggle = (index: number) => screen.getAllByRole('switch')[index]!;
 
+  it('keeps the default SE rule off with its suggested value and allows the lecturer to enable it', async () => {
+    const initial = { ...config, rules: config.rules.map(rule => rule.code === 'MIN_SE_MEMBERS_PER_GROUP' ? { ...rule, status: false } : rule) };
+    const save = vi.fn(async (request: SaveClassRules) => ({ ...saved, rules: request.rules }));
+    const { container } = render(<ClassRulesForm initial={initial} onSave={save} onReload={vi.fn()} />);
+    const switchControl = screen.getByRole('switch', { name: i18n.t('rules.toggleLabel', { rule: i18n.t('rules.sections.seMembers.title') }) });
+    const field = container.querySelector('#rule-MIN_SE_MEMBERS_PER_GROUP')!;
+    expect(switchControl).not.toBeChecked(); expect(field).toHaveValue(1); expect(field).toHaveAttribute('readonly');
+    fireEvent.click(switchControl);
+    expect(switchControl).toBeChecked(); expect(field).not.toHaveAttribute('readonly');
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('rules.save') }));
+    await screen.findByText(i18n.t('rules.saved'));
+    expect(save.mock.calls[0]![0].rules).toContainEqual({ code: 'MIN_SE_MEMBERS_PER_GROUP', value: 1, status: true });
+  });
+
   it.each([
     { name: 'members', codes: RULE_CODES.slice(0, 2), min: 'MIN_MEMBERS_PER_GROUP', invalid: 9 },
     { name: 'groups', codes: RULE_CODES.slice(2, 4), min: 'MIN_GROUPS_PER_CLASS', invalid: 60 },

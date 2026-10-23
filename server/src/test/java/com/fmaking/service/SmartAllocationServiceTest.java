@@ -22,6 +22,15 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class SmartAllocationServiceTest {
+    @Test void classWithoutSeCanAllocateByDefaultAndOnlyRequiresSeWhenEnabled() {
+        var all = students(8);
+        all.forEach(member -> member.setMajorCode("M" + member.getMajorId()));
+        var defaults = snapshot(all, List.of(), List.of());
+        assertValid(defaults, allocate(defaults, 2));
+        var enabled = snapshot(all, List.of(), List.of(rule(MIN_SE_MEMBERS_PER_GROUP, 1, true)));
+        assertReason(allocate(enabled, 2), INSUFFICIENT_SE);
+    }
+
     RuleRepository repository;
     GroupRuleValidationService validator;
     SmartAllocationService engine;
@@ -146,7 +155,7 @@ class SmartAllocationServiceTest {
         assertReason(allocate(snapshot(students, groups, List.of(rule(MIN_MEMBERS_PER_GROUP, 5, true))), 2), INSUFFICIENT_MEMBERS);
         var noSe = IntStream.rangeClosed(1, 8).mapToObj(id -> student(id, 2)).toList();
         assertReason(allocate(snapshot(noSe, List.of(group(1, GroupStatus.OPEN, noSe.subList(0, 4)),
-            group(2, GroupStatus.OPEN, noSe.subList(4, 8))), List.of()), 2), INSUFFICIENT_SE);
+            group(2, GroupStatus.OPEN, noSe.subList(4, 8))), List.of(rule(MIN_SE_MEMBERS_PER_GROUP, 1, true))), 2), INSUFFICIENT_SE);
     }
 
     @Test void majorDistributionNotJustDistinctMajorCountConstrainsFeasibility() {
@@ -396,7 +405,7 @@ class SmartAllocationServiceTest {
         assertThat(engine.preliminaryRange(input).maximum()).isEqualTo(8);
         assertValid(input, allocate(input, 8));
         var noSe = IntStream.rangeClosed(1, 8).mapToObj(id -> student(id, 2)).toList();
-        var impossible = allocate(snapshot(noSe, List.of(), List.of()), 2);
+        var impossible = allocate(snapshot(noSe, List.of(), List.of(rule(MIN_SE_MEMBERS_PER_GROUP, 1, true))), 2);
         assertReason(impossible, INSUFFICIENT_SE); assertReason(impossible, INSUFFICIENT_MAJORS);
         assertThat(impossible.groups()).isEmpty();
     }
@@ -413,7 +422,7 @@ class SmartAllocationServiceTest {
         assertThat(result.groups()).allSatisfy(group -> {
             assertThat(majorCounts(group)).allSatisfy(count -> assertThat(count).isBetween(1L, 2L));
             assertThat(group.score().scorePercent()).isEqualTo(100.0);
-            assertThat(group.score().breakdown()).extracting(GroupScoreDTO.CriterionScore::baseWeight).containsExactly(40,35,25);
+            assertThat(group.score().breakdown()).extracting(GroupScoreDTO.CriterionScore::baseWeight).containsExactly(40,35);
             assertThat(group.leaderId()).isEqualTo(group.members().stream().map(GroupMemberDTO::getStudentId).min(Long::compareTo).orElseThrow());
             assertThat(group.members()).allSatisfy(member -> {
                 assertThat(member.getMatchScore()).isEqualTo(73); assertThat(member.getMatchReasons()).containsExactly("Existing recommendation");

@@ -1,9 +1,13 @@
 import { apiClient } from '@/services/api/client';
 import type { PaginatedSchoolClasses, SchoolClass, SchoolClassFilterParams } from '../types';
 import type { Student } from '@/features/students/types';
+import type { Deadline } from '@/features/deadline/types';
 import { parseClassPage, parseSchoolClass } from './classContract';
 
 export const classApi = {
+  async ensureGroupingSession(classId: number, termId?: number, signal?: AbortSignal): Promise<Deadline> {
+    return apiClient.put<unknown, Deadline>(`/api/school-classes/${classId}/grouping-session`, null, { params: { termId }, signal });
+  },
   async getAllClasses(termId: number, signal?: AbortSignal): Promise<SchoolClass[]> {
     const result = new Map<number, SchoolClass>();
     let page = 1;

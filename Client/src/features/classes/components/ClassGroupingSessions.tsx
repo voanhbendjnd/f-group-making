@@ -22,7 +22,11 @@ export function ClassGroupingSessions({ classId, mode }: { classId: number; mode
   const now = useDeadlineBoundary(sessions);
   if (query.isPending) return <LoadingSpinner message={t('deadline.loadingList')} />;
   if (query.isError) return <ErrorState message={t('deadline.loadErrorDesc')} onRetry={() => void query.refetch()} />;
-  if (!sessions.length) return <EmptyState title={t('adminUx.noSession')} actionText={t('adminUx.viewDeadlines')} onAction={() => navigate('/admin/deadlines')} />;
+  if (!sessions.length && mode === 'deadlines') return <EmptyState title={t('adminUx.noSession')} actionText={t('adminUx.viewDeadlines')} onAction={() => navigate('/admin/deadlines')} />;
+  if (!sessions.length) return <section className="card"><p>{t('groupBoard.noDeadlineNeeded')}</p><div className="admin-inline-actions">
+    <Link to={advancedGroupPath(classId, new URLSearchParams({ termId: String(selectedTermId), source: 'class' }), undefined, 'admin')} className="btn btn-primary">{t('adminUx.openGroups')}</Link>
+    <Link to={`/admin/automatic-allocation/${classId}`} className="btn btn-secondary">{t('adminUx.openAllocation')}</Link>
+  </div></section>;
   return <section className="card">
     <div className="card-header"><h2 className="card-title">{t(mode === 'groups' ? 'adminUx.selectSession' : 'adminUx.deadlines')}</h2>
       <Link className="btn btn-secondary btn-sm" to="/admin/deadlines">{t('adminUx.viewDeadlines')}</Link>

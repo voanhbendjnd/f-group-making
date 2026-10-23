@@ -87,7 +87,8 @@ function AllocationSession({ classId, termName, backAction, requestedDeadline }:
       for (let page = 2; page <= first.meta.pages; page++) values.push(...(await deadlineApi.getDeadlines({ page, termId: selectedTermId!, size: 50 }, signal)).result);
       const matches = values.filter(value => value.schoolClassIds.includes(classId) && (!requestedDeadline || value.id === requestedDeadline));
       if (matches.length > 1) throw { status: 409, message: '', errorKey: 'allocationMultipleSessions' };
-      return matches[0]?.id ?? null;
+      if (requestedDeadline && !matches.length) throw { status: 404, errorKey: 'invalidAllocationScope' };
+      return matches[0]?.id ?? (await classApi.ensureGroupingSession(classId, selectedTermId!, signal)).id;
     } });
   if (session.isPending) return <>{backAction}<Skeleton active /></>;
   if (session.isError) return <>{backAction}<AllocationError error={session.error} retry={() => void session.refetch()} /></>;

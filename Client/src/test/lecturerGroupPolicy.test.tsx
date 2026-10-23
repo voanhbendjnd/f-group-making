@@ -15,7 +15,7 @@ vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.
 vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ lockTermSelection: () => () => {} }) }));
 vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn(), lecturerSubmitGroup: vi.fn() } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn(), ensureGroupingSession: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 vi.mock('@/features/group/hooks/useGroupWebSocket', () => ({ useGroupWebSocket: () => ({ status: 'connected' }) }));
 vi.mock('@/features/group/components/LecturerGroupModal', () => ({ LecturerGroupModal: (props: { open: boolean; initialStudentIds: number[] }) => props.open ? <div role="dialog" aria-label="Create fixture">{props.initialStudentIds.join(',')}</div> : null }));
@@ -41,6 +41,20 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); });
 
 describe('lecturer group policy controls', () => {
+  it('opens a shared unscheduled workspace and permits a manual assignment without a deadline', async () => {
+    vi.mocked(classApi.ensureGroupingSession).mockResolvedValue({ id: 8, status: 'UNSCHEDULED', startTime: null, endTime: null } as never);
+    mount('OPEN', 'UNSCHEDULED', 1, data => {
+      data.deadlineStartTime = null; data.deadlineEndTime = null; data.deadlineExpired = false;
+    }, '/lecturer/group-review/advanced?classId=1&termId=8');
+    await screen.findByText('Policy group');
+    expect(classApi.ensureGroupingSession).toHaveBeenCalledExactlyOnceWith(1, 8, expect.anything());
+    expect(screen.getByText(i18n.t('deadline.status.unscheduled'))).toBeInTheDocument();
+    fireEvent.drop(document.querySelector('[data-group-id="10"]')!, {
+      dataTransfer: { getData: () => JSON.stringify({ studentId: 4, fromGroupId: null, classId: 1, deadlineId: 8 }) },
+    });
+    await waitFor(() => expect(groupApi.lecturerAddMember).toHaveBeenCalledWith(8, 1, 10, 4));
+  });
+
   it('keeps columns in numeric group order after submit and a shuffled server refresh', async () => {
     let initial!: WorkspaceDTO;
     mount('OPEN', 'EXPIRED', 4, data => {

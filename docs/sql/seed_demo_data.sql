@@ -41,5 +41,5 @@ INSERT INTO rules (school_class_id, code, value, status, created_date)
 VALUES 
   (1, 'MIN_MEMBERS_PER_GROUP', 4, 1, NOW()),
   (1, 'MAX_MEMBERS_PER_GROUP', 5, 1, NOW()),
-  (1, 'MIN_SE_MEMBERS_PER_GROUP', 1, 1, NOW())
+  (1, 'MIN_SE_MEMBERS_PER_GROUP', 1, 0, NOW())
 ON DUPLICATE KEY UPDATE value=VALUES(value), status=VALUES(status);

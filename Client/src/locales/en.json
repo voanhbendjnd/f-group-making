@@ -9,10 +9,10 @@
     "columnsLabel": "Excel import structure",
     "column": "Column", "header": "Header", "meaning": "Required information", "example": "Example",
     "keepFormat": "Keep the template headers, column order and first data row. The examples on this page are for reference; fill in your actual data in the file.",
-    "studentRules": "Use PREFIX_MAJORCODE_... for Khoá; BEN_SE_ET_26 gives major SE. GroupName is the class name. GV must reference an existing lecturer code; create/import lecturers first. Keep columns A, G, H and K in position even when blank.",
+    "studentRules": "Khoá is saved in full; PREFIX_MAJORCODE_... also determines the major (BEN_SE_ET_26 gives SE). SlotType in G is saved as entered and may be blank for older files. GroupName is the class name. GV must reference an existing lecturer code; create/import lecturers first. Keep columns A, H and K in position even when blank.",
     "studentUniqueValues": "Student IDs, member codes and emails must be unique. The server checks duplicates and related data when you confirm import.",
     "lecturerUniqueValues": "Lecturer codes and emails must be unique. The server checks duplicates when you confirm import.",
-    "fields": { "rollNumber": "Student ID", "fullName": "Full name (up to 50 characters)", "major": "Major source string", "memberCode": "Member code", "email": "Valid email address", "className": "Class name (up to 50 characters)", "lecturerCode": "Lecturer code" }
+    "fields": { "rollNumber": "Student ID", "fullName": "Full name (up to 50 characters)", "major": "Full cohort string (up to 255 characters)", "slotType": "Slot type (optional, up to 255 characters)", "memberCode": "Member code", "email": "Valid email address", "className": "Class name (up to 50 characters)", "lecturerCode": "Lecturer code" }
   },
   "adminUx": {
     "lecturerDropHint": "Accepts .xlsx up to 5 MB. The lecturer sheet has Mentor and Email headers on row 1, with data from row 2.",
@@ -198,6 +198,7 @@
     "applying": "Applying allocation…",
     "waitForApply": "Please wait while the server verifies and saves this request.",
     "deadlineStatus": {
+      "UNSCHEDULED": "No deadline set",
       "ACTIVE": "Active",
       "EXPIRED": "Expired",
       "UPCOMING": "Upcoming",
@@ -410,6 +411,7 @@
     "notActive": "Only an active deadline can be ended immediately."
   },
   "deadlineLifecycle": {
+    "schedule": "Set deadline",
     "reopen": "Reopen deadline",
     "reopened": "Deadline reopened. Groups and approval history are preserved.",
     "confirmScope": "I confirm the change applies to the selected classes listed above.",
@@ -725,6 +727,8 @@
       "email": "Email Address"
     },
     "clientErrors": {
+      "cohortTooLong": "Cohort exceeds 255 characters (Column D)",
+      "slotTypeTooLong": "SlotType exceeds 255 characters (Column G)",
       "noSheet": "The Excel file does not contain any sheets.",
       "missingRollNumber": "Missing Student ID (Column B)",
       "duplicateRollNumber": "Student ID \"{{rollNumber}}\" is duplicated in the file",
@@ -1228,6 +1232,7 @@
     "emptyLecturerDesc": "Click 'Create Deadline for Class' to schedule a group selection period and notify students.",
     "status": {
       "active": "Active",
+      "unscheduled": "No deadline set",
       "upcoming": "Upcoming",
       "expired": "Expired",
       "cancelled": "Cancelled"
@@ -1337,6 +1342,7 @@
       "verifying": "Verifying deadline and class information..."
     },
     "closed": {
+      "UNSCHEDULED": { "title": "Group selection has not opened", "description": "Your lecturer can arrange groups. Student changes will be available during the scheduled selection window." },
       "CANCELLED": {
         "title": "This group selection round was cancelled",
         "description": "Registration has stopped. Existing groups and history are preserved for viewing; changes in this round are locked."
@@ -1609,6 +1615,7 @@
     "otherActivitiesTitle": "Other class group deadlines"
   },
   "groupBoard": {
+    "noDeadlineNeeded": "You can arrange groups manually or automatically before setting a student selection deadline.",
     "title": "Advanced grouping",
     "open": "Advanced grouping",
     "subtitle": "Drag students to arrange groups",
@@ -1849,7 +1856,8 @@
     "colStt": "No.",
     "colRollNumber": "Roll Number",
     "colFullName": "Full Name",
-    "colKhoa": "Cohort / Major",
+    "colKhoa": "Cohort",
+    "missingGroupSequence": "A group is missing its sequence number. Update the group sequence before exporting.",
     "colMemberCode": "Member Code",
     "colEmail": "Email",
     "colGroupMentor": "Group (Group Mentor)",

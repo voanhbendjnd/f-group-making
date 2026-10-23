@@ -43,6 +43,7 @@ class StudentImportResourceTest {
     @MockitoSpyBean private StudentRepository students;
     @Autowired private UserRepository users;
     @Autowired private StudentService service;
+    @Autowired private com.fmaking.service.GroupService groupService;
     @Autowired private EntityManager em;
     @Autowired private LecturerRepository lecturers;
     private Long importLecturerId;
@@ -90,9 +91,18 @@ class StudentImportResourceTest {
         assertThat(major.getName()).isEqualTo("XYZ");
         var student = students.findByRollNumberIn(List.of("IMP000")).getFirst();
         assertThat(student.getMajorId()).isEqualTo(major.getId());
+        assertThat(student.getCohort()).isEqualTo("BEN_xyz_ET");
+        assertThat(student.getSlotType()).isEqualTo("B12/EXE");
         mvc.perform(get("/api/students/{id}", student.getUserId()))
+                .andExpect(jsonPath("$.data.cohort").value("BEN_xyz_ET"))
+                .andExpect(jsonPath("$.data.slotType").value("B12/EXE"))
                 .andExpect(jsonPath("$.data.majorCode").value("XYZ"))
                 .andExpect(jsonPath("$.data.majorName").value("XYZ"));
+        mvc.perform(get("/api/school-classes/{id}/students", student.getSchoolClassId()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].cohort").value("BEN_xyz_ET"))
+                .andExpect(jsonPath("$.data[0].slotType").value("B12/EXE"));
+        assertThat(students.findByRollNumberIn(List.of("IMP001")).getFirst().getSlotType()).isEmpty();
         assertThat(em.createNativeQuery("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'STUDENTS' AND COLUMN_NAME = 'MAJOR_CODE'")
                 .getSingleResult().toString()).isEqualTo("0");
     }
@@ -129,6 +139,16 @@ class StudentImportResourceTest {
                 .andExpect(jsonPath("$.data.createdMajorCodes").isEmpty());
         assertThat(majors.count()).isEqualTo(count);
         assertThat(students.findByRollNumberIn(List.of("IMP000")).getFirst().getMajorId()).isEqualTo(major.getId());
+    }
+
+    @Test
+    void tooLongCohortIsRejectedBeforeWriting() throws Exception {
+        mvc.perform(multipart("/api/students/import").file(file(false, "BEN_XYZ_" + "X".repeat(250)))
+                        .param("confirmedMajorCodes", "XYZ"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.success").value(false))
+                .andExpect(jsonPath("$.data.errors[0].field").value("originalMajor"));
+        assertThat(students.findByRollNumberIn(List.of("IMP000"))).isEmpty();
+        assertThat(majors.existsByCode("XYZ")).isFalse();
     }
 
     @Test
@@ -247,11 +267,47 @@ class StudentImportResourceTest {
                 row.createCell(3).setCellValue(codes[i]);
                 row.createCell(4).setCellValue("IMPMEMBER" + i);
                 row.createCell(5).setCellValue("import" + i + "@example.com");
+                if (i == 0) row.createCell(6).setCellValue(" B12/EXE ");
                 row.createCell(8).setCellValue("Import Class");
                 row.createCell(9).setCellValue("IMPORT-LECTURER");
             }
             workbook.write(output);
             return new MockMultipartFile("file", "students.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", output.toByteArray());
         }
+    }
+
+    @Test
+    @WithMockUser(username = "import-lecturer@example.com", authorities = "ROLE_ADMIN")
+    void workspaceReturnsImportedCohortAndSlotTypeForAssignedAndUnassignedStudents() throws Exception {
+        service.importFromExcel(file(false, "BEN_XYZ_ET_19C", "BKR_XYZ_20C"), Set.of("XYZ"));
+        var imported = students.findByRollNumberIn(List.of("IMP000", "IMP001"));
+        var assigned = imported.stream().filter(s -> s.getRollNumber().equals("IMP000")).findFirst().orElseThrow();
+        var unassigned = imported.stream().filter(s -> s.getRollNumber().equals("IMP001")).findFirst().orElseThrow();
+        unassigned.setSlotType("C24/EXE");
+        var schoolClass = em.find(com.fmaking.domain.SchoolClass.class, assigned.getSchoolClassId());
+        var deadline = new com.fmaking.domain.Deadline();
+        deadline.setName("Export test");
+        deadline.setStartTime(java.time.Instant.now().minusSeconds(60));
+        deadline.setEndTime(java.time.Instant.now().plusSeconds(3600));
+        deadline.setStatus("ACTIVE");
+        deadline.getSchoolClasses().add(schoolClass);
+        em.persist(deadline);
+        var group = new com.fmaking.domain.Group();
+        group.setName("Custom team name");
+        group.setSchoolClassId(schoolClass.getId()); group.setDeadlineId(deadline.getId());
+        group.setLeaderId(assigned.getUserId()); group.setSequenceNo(1);
+        em.persist(group);
+        var member = new com.fmaking.domain.GroupMember();
+        member.setGroupId(group.getId()); member.setStudentId(assigned.getUserId());
+        member.setSchoolClassId(schoolClass.getId()); member.setDeadlineId(deadline.getId());
+        member.setRole(com.fmaking.domain.GroupMemberRole.LEADER); member.setJoinedAt(java.time.Instant.now());
+        em.persist(member);
+        em.flush(); em.clear();
+
+        var workspace = groupService.getWorkspace(deadline.getId(), schoolClass.getId());
+        assertThat(workspace.getGroups().getFirst().getMembers().getFirst().getCohort()).isEqualTo("BEN_XYZ_ET_19C");
+        assertThat(workspace.getGroups().getFirst().getMembers().getFirst().getSlotType()).isEqualTo("B12/EXE");
+        assertThat(workspace.getUnassignedStudents().getFirst().getCohort()).isEqualTo("BKR_XYZ_20C");
+        assertThat(workspace.getUnassignedStudents().getFirst().getSlotType()).isEqualTo("C24/EXE");
     }
 }

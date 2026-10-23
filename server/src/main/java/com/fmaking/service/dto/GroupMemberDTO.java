@@ -20,6 +20,8 @@ public class GroupMemberDTO {
     private String fullName;
     private String email;
     private String memberCode;
+    private String cohort;
+    private String slotType;
     private Integer majorId;
     private String majorCode;
     private String majorName;

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import * as XLSX from 'xlsx';
+import XLSX from 'xlsx-js-style';
 import {
   buildGroupResultWorkbook,
   extractSubjectCode,
@@ -17,10 +17,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import React from 'react';
 import i18n from '@/locales/i18n';
 
-vi.mock('xlsx', async importOriginal => ({
-  ...await importOriginal<typeof import('xlsx')>(),
-  writeFile: vi.fn(),
-}));
+vi.mock('xlsx-js-style', async importOriginal => {
+  const actual = await importOriginal<typeof import('xlsx-js-style')>();
+  return { default: { ...actual.default, writeFile: vi.fn() } };
+});
 
 vi.mock('../features/group/api/groupApi', () => ({
   groupApi: {
@@ -140,7 +140,6 @@ describe('Group Allocation Excel Export Utility', () => {
       'GroupName',
       'GV',
       'Group Mentor',
-      'Group Code',
     ]);
 
     // Dòng 2: Sinh viên có nhóm
@@ -155,14 +154,17 @@ describe('Group Allocation Excel Export Utility', () => {
     expect(json[2][8]).toBe('EXE101_G01');
     expect(json[2][9]).toBe('DuyVL');
     expect(json[2][10]).toBe('EXE101_G01.01'); // Cột Group Mentor
-    expect(json[2][11]).toBe('G01');
+    expect(json[2]).toHaveLength(11);
+    expect(sheet['!autofilter']?.ref).toBe('A2:K4');
+    expect(sheet.A2.s.fill.fgColor.rgb).toBe('FFC000');
+    expect(sheet.K2.s.fill.fgColor.rgb).toBe('FFFF00');
 
     // Dòng 3: Sinh viên chưa có nhóm
     expect(json[3][0]).toBe(2);
     expect(json[3][1]).toBe('SE190001');
     expect(json[3][2]).toBe('Trần Văn Nam');
     expect(json[3][10]).toBe(''); // Cột Group Mentor để trống
-    expect(json[3][11]).toBe('');
+    expect(json[3]).toHaveLength(11);
   });
 
   it('fetchClassAllocationData retrieves all assigned and unassigned students from workspace', async () => {
@@ -202,6 +204,8 @@ describe('Group Allocation Excel Export Utility', () => {
               email: 'anv@fpt.edu.vn',
               majorCode: 'SE',
               majorName: 'Software Engineering',
+              cohort: 'BEN_SE_ET_19C',
+              slotType: 'B12/EXE',
               role: 'LEADER',
             },
           ],
@@ -232,12 +236,16 @@ describe('Group Allocation Excel Export Utility', () => {
     });
 
     expect(result.rows).toHaveLength(2);
-    // Đã sắp xếp theo rollNumber
+    // Nhóm đứng trước sinh viên chưa có nhóm; mã nhóm không lấy từ tên tùy chỉnh.
     expect(result.rows[0].rollNumber).toBe('SE180001');
-    expect(result.rows[0].groupMentor).toBe('EXE101_G01.01');
+    expect(result.rows[0].groupMentor).toBe('EXE101_G01.02');
+    expect(result.rows[0].khoa).toBe('BEN_SE_ET_19C');
+    expect(result.rows[0].slotType).toBe('B12/EXE');
     expect(result.rows[0].groupCode).toBe('G02');
     expect(result.rows[1].rollNumber).toBe('SE180002');
     expect(result.rows[1].groupMentor).toBe('');
+    expect(result.rows[1].khoa).toBe('');
+    expect(result.rows[1].slotType).toBe('');
     expect(result.meta.className).toBe('EXE101_G01');
     expect(result.meta.subjectCode).toBe('EXE101');
   });
@@ -252,11 +260,60 @@ describe('Group Allocation Excel Export Utility', () => {
     expect(result.meta.termName).toBe('FA26');
   });
 
+  it('sorts groups numerically before unassigned students and preserves text identifiers after serialization', () => {
+    const meta = { className: 'EXE101_G01', subjectCode: 'EXE101', termName: 'FA26', lecturerCode: 'DuyVL' };
+    const base = { fullName: 'Nguyễn Văn An', khoa: 'BEN_ENG_ET_19C', memberCode: '00123',
+      email: 'student@example.com', slotType: '', subjectCode: 'EXE101', groupName: 'EXE101_G01', gv: 'DuyVL' };
+    const rows = [
+      { ...base, studentId: 1, rollNumber: '00001', groupMentor: '' },
+      { ...base, studentId: 2, rollNumber: '00002', groupCode: 'G10', groupMentor: 'EXE101_G01.10' },
+      { ...base, studentId: 3, rollNumber: '00004', groupCode: 'G02', groupMentor: 'EXE101_G01.02' },
+      { ...base, studentId: 4, rollNumber: '00003', groupCode: 'G02', groupMentor: 'EXE101_G01.02' },
+      { ...base, studentId: 5, rollNumber: '00005', groupCode: 'G01', groupMentor: 'EXE101_G01.01' },
+    ];
+    const workbook = buildGroupResultWorkbook(rows, meta);
+    const saved = XLSX.read(XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }), { type: 'array', cellStyles: true });
+    const sheet = saved.Sheets.EXE101;
+    const values = XLSX.utils.sheet_to_json<any[]>(sheet, { header: 1 });
+    expect(values.slice(2).map(row => row[1])).toEqual(['00005', '00003', '00004', '00002', '00001']);
+    expect(values.slice(2).map(row => row[0])).toEqual([1, 2, 3, 4, 5]);
+    expect(values[2][4]).toBe('00123');
+    expect(values[2][6]).toBe('');
+    expect(sheet.K2.s.fgColor.rgb).toBe('FFFF00');
+    expect(sheet['!ref']).toBe('A1:K7');
+    expect(rows[0].rollNumber).toBe('00001');
+  });
+
   it('does not turn a workspace read error into an export with empty groups', async () => {
     vi.mocked(groupApi.getWorkspace).mockRejectedValueOnce(new Error('Workspace unavailable'));
     await expect(fetchClassAllocationData(104, { deadlineId: 10, className: 'EXE101_G01', termName: 'FA26', lecturerCode: 'DuyVL' }))
       .rejects.toThrow('Workspace unavailable');
     expect(classApi.getClassStudents).not.toHaveBeenCalled();
+  });
+
+  it('supports Gxx codes when sequenceNo is absent and refuses groups without a usable number', async () => {
+    const member = { studentId: 1, rollNumber: 'SE01', fullName: 'Student', memberCode: 'M01',
+      majorCode: 'SE', majorName: 'Software Engineering', role: 'MEMBER' as const };
+    const workspace = { groups: [{ id: 1, name: 'Custom name', groupCode: 'G10', members: [member] }],
+      unassignedStudents: [] } as unknown as Awaited<ReturnType<typeof groupApi.getWorkspace>>;
+    const options = { deadlineId: 10, className: 'EXE101_G01', termName: 'FA26', lecturerCode: 'GV01' };
+    vi.mocked(groupApi.getWorkspace).mockResolvedValueOnce(workspace);
+    const result = await fetchClassAllocationData(104, options);
+    expect(result.rows[0].groupMentor).toBe('EXE101_G01.10');
+    workspace.groups[0].groupCode = undefined;
+    vi.mocked(groupApi.getWorkspace).mockResolvedValueOnce(workspace);
+    await expect(fetchClassAllocationData(104, options)).rejects.toThrow(i18n.t('groupExport.missingGroupSequence'));
+  });
+
+  it('exports stored cohort and slotType for a class without a grouping session', async () => {
+    vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({ result: [], meta: { page: 1, pageSize: 50, pages: 0, total: 0 } });
+    vi.mocked(classApi.getClassStudents).mockResolvedValue([
+      { userId: 1, rollNumber: '001', fullName: 'Student', cohort: 'BEN_ENG_ET_19C', slotType: 'B12/EXE',
+        majorCode: 'ENG', majorName: 'English' } as never,
+    ]);
+    const result = await fetchClassAllocationData(104, { className: 'EXE101_G01', termName: 'FA26', lecturerCode: 'GV01' });
+    expect(result.rows[0]).toMatchObject({ khoa: 'BEN_ENG_ET_19C', slotType: 'B12/EXE', groupMentor: '' });
+    expect(groupApi.getWorkspace).not.toHaveBeenCalled();
   });
 
   it('checks later deadline pages and requires a specific session when several apply', async () => {
@@ -325,6 +382,7 @@ describe('GroupPreviewExportModal Component', () => {
       groups: [
         {
           id: 1,
+          sequenceNo: 1,
           deadlineId: 10,
           schoolClassId: 104,
           name: 'EXE101_G01.01',

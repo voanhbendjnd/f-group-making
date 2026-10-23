@@ -1,10 +1,10 @@
-export type DeadlineStatus = 'UPCOMING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
+export type DeadlineStatus = 'UNSCHEDULED' | 'UPCOMING' | 'ACTIVE' | 'EXPIRED' | 'CANCELLED';
 
 export interface DeadlineClassWindow {
   schoolClassId: number;
   schoolClassName: string;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   status: DeadlineStatus;
   canEdit: boolean;
 }
@@ -13,8 +13,8 @@ export interface Deadline {
   id: number;
   name: string;
   description?: string;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   status: DeadlineStatus;
   version?: number;
   cancelledAt?: string;
@@ -59,8 +59,8 @@ export interface DeadlineValidateResult {
   deadlineId: number;
   name: string;
   description?: string;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   classId: number;
   className: string;
   message?: string;
@@ -80,8 +80,8 @@ export interface StudentDeadlineActivity {
   deadlineId: number;
   deadlineName: string;
   deadlineDescription?: string;
-  startTime: string;
-  endTime: string;
+  startTime: string | null;
+  endTime: string | null;
   status: DeadlineStatus;
   schoolClassId: number;
   schoolClassName: string;
