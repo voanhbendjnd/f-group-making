@@ -581,13 +581,15 @@ class GroupSessionPolicyTest {
     }
 
     @Test void seMinimumIsACompletionCountAndCanBeDisabledExplicitly() {
+        Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP");
+        seRule.setValue(1); seRule.setStatus(true); rules.saveAndFlush(seRule);
         Major third = new Major(); third.setCode("X" + UUID.randomUUID().toString().substring(0, 5)); third.setName("Third"); third = majors.saveAndFlush(third);
         LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("No SE draft");
         request.setStudentIds(List.of(student(schoolClass, otherMajor).getId(), student(schoolClass, otherMajor).getId(),
             student(schoolClass, third).getId(), student(schoolClass, third).getId()));
         GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
         assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        Rule seRule = new Rule(); seRule.setSchoolClassId(schoolClass.getId()); seRule.setCode("MIN_SE_MEMBERS_PER_GROUP"); seRule.setValue(1); seRule.setStatus(false); rules.saveAndFlush(seRule);
+        seRule.setStatus(false); rules.saveAndFlush(seRule);
         service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
         assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
     }

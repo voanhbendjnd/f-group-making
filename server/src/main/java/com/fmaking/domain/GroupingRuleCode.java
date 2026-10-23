@@ -23,7 +23,7 @@ public enum GroupingRuleCode {
     }
 
     public boolean isEnabledByDefault() {
-        return this != MIN_GROUPS_PER_CLASS && this != MAX_GROUPS_PER_CLASS;
+        return this != MIN_GROUPS_PER_CLASS && this != MAX_GROUPS_PER_CLASS && this != MIN_SE_MEMBERS_PER_GROUP;
     }
 
     public int getSuggestedValue() {

@@ -36,8 +36,8 @@ class GroupScoreServiceTest {
     @ParameterizedTest
     @CsvSource({"2,2,1,80,false", "4,2,1,100,true", "4,2,0,75,false",
         "4,1,1,82.5,false", "1,1,0,27.5,false", "8,2,1,90,false"})
-    void scoresCompletionWithoutReplacingValidation(int count, int majors, int se, double expected, boolean passed) {
-        when(rules.findBySchoolClassId(17)).thenReturn(List.of());
+    void scoresCompletionWithSeEnabledWithoutReplacingValidation(int count, int majors, int se, double expected, boolean passed) {
+        when(rules.findBySchoolClassId(17)).thenReturn(List.of(rule(MIN_SE_MEMBERS_PER_GROUP, 1, true)));
         var result = scores.evaluate(17, members(count, majors, se));
         assertThat(result.scorePercent()).isEqualTo(expected);
         assertThat(result.compositionRulesPassed()).isEqualTo(passed);
@@ -55,6 +55,15 @@ class GroupScoreServiceTest {
         assertThat(memberScore.rules().getFirst().actualValue()).isEqualTo(3);
         assertThat(memberScore.rules().getFirst().targetValue()).isEqualTo(6);
         assertThat(memberScore.rules().getFirst().passed()).isFalse();
+    }
+
+    @Test void defaultRulesDoNotRequireSeOrPenalizeItsAbsence() {
+        when(rules.findBySchoolClassId(17)).thenReturn(List.of());
+        var result = scores.evaluate(17, members(4, 2, 0));
+        assertThat(result.scorePercent()).isEqualTo(100);
+        assertThat(result.compositionRulesPassed()).isTrue();
+        assertThat(result.breakdown()).extracting(GroupScoreDTO.CriterionScore::code)
+            .containsExactly(GroupScoreDTO.Criterion.MEMBERS, GroupScoreDTO.Criterion.MAJORS);
     }
 
     @Test void disablingSeRenormalizesWeightsAndDoesNotPenalizeMissingSe() {
@@ -75,7 +84,7 @@ class GroupScoreServiceTest {
     }
 
     @Test void exceedingMajorMaximumReducesScoreEvenWhenMinimumPasses() {
-        when(rules.findBySchoolClassId(17)).thenReturn(List.of(rule(MAX_MAJORS_PER_GROUP, 2, true)));
+        when(rules.findBySchoolClassId(17)).thenReturn(List.of(rule(MAX_MAJORS_PER_GROUP, 2, true), rule(MIN_SE_MEMBERS_PER_GROUP, 1, true)));
         var result = scores.evaluate(17, members(4, 4, 1));
         assertThat(result.scorePercent()).isEqualTo(82.5);
         assertThat(result.compositionRulesPassed()).isFalse();
@@ -107,7 +116,7 @@ class GroupScoreServiceTest {
 
     @Test void disabledMajorsDoNotUseStoredThresholdsAndMemberMaximumCanBeDisabled() {
         when(rules.findBySchoolClassId(17)).thenReturn(List.of(rule(MIN_MAJORS_PER_GROUP, 10, false),
-            rule(MAX_MAJORS_PER_GROUP, 1, false), rule(MAX_MEMBERS_PER_GROUP, 6, false)));
+            rule(MAX_MAJORS_PER_GROUP, 1, false), rule(MAX_MEMBERS_PER_GROUP, 6, false), rule(MIN_SE_MEMBERS_PER_GROUP, 1, true)));
         var result = scores.evaluate(17, members(8, 4, 1));
         assertThat(result.scorePercent()).isEqualTo(100);
         assertThat(result.compositionRulesPassed()).isTrue();

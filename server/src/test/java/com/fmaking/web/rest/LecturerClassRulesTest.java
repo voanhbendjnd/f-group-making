@@ -105,6 +105,7 @@ class LecturerClassRulesTest {
                 .andExpect(jsonPath("$.data.version").value(0))
                 .andExpect(jsonPath("$.data.rules.length()").value(GroupingRuleCode.values().length))
                 .andExpect(jsonPath("$.data.rules[?(@.code == 'MAX_GROUPS_PER_CLASS')].status", org.hamcrest.Matchers.contains(false)))
+                .andExpect(jsonPath("$.data.rules[?(@.code == 'MIN_SE_MEMBERS_PER_GROUP')].status", org.hamcrest.Matchers.contains(false)))
                 .andExpect(jsonPath("$.data.rules[?(@.code == 'MIN_MAJORS_PER_GROUP')].value", org.hamcrest.Matchers.contains(2)));
         assertThat(rules.findBySchoolClassId(ownClass.getId())).isEmpty();
     }
@@ -123,6 +124,17 @@ class LecturerClassRulesTest {
                 .extracting(Rule::getId).containsExactlyInAnyOrderElementsOf(ids);
         assertThat(value(ownClass, "MIN_MEMBERS_PER_GROUP")).isEqualTo(4);
         assertThat(value(anotherOwnClass, "MIN_MEMBERS_PER_GROUP")).isEqualTo(5);
+    }
+
+    @Test
+    void lecturerCanEnableSeAndTheSavedChoiceOverridesItsDisabledDefault() throws Exception {
+        mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(payload(0, 4, 6, 1)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.rules[6].status").value(true));
+        mvc.perform(get(rulePath(ownClass)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.rules[6].status").value(true))
+                .andExpect(jsonPath("$.data.rules[6].value").value(1));
+        mvc.perform(get(rulePath(anotherOwnClass)))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.rules[6].status").value(false));
     }
 
     @Test
@@ -391,7 +403,8 @@ class LecturerClassRulesTest {
                 .andExpect(jsonPath("$.data.configured").value(false)).andExpect(jsonPath("$.data.version").value(3))
                 .andExpect(jsonPath("$.data.rules[1].value").value(8))
                 .andExpect(jsonPath("$.data.rules[6].code").value("MIN_SE_MEMBERS_PER_GROUP"))
-                .andExpect(jsonPath("$.data.rules[6].value").value(1));
+                .andExpect(jsonPath("$.data.rules[6].value").value(1))
+                .andExpect(jsonPath("$.data.rules[6].status").value(false));
         assertThat(rules.findBySchoolClassId(ownClass.getId())).hasSize(6);
         var incomplete = mapper.readTree(payload(3, 4, 8, 0));
         ((com.fasterxml.jackson.databind.node.ArrayNode) incomplete.path("rules")).remove(6);

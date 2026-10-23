@@ -79,13 +79,8 @@ class GroupConcurrencyAndRuleTest {
         boolean hasHard = ruleValidationService.hasHardRuleViolations(evaluations);
         assertThat(hasHard).isTrue();
 
-        // Check SE rule: we have 1 SE student, so MIN_SE_MEMBERS_PER_GROUP (1) should pass
-        GroupRuleEvaluationDTO seEval = evaluations.stream()
-            .filter(e -> e.getCode() == GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP)
-            .findFirst()
-            .orElse(null);
-        assertThat(seEval).isNotNull();
-        assertThat(seEval.isPassed()).isTrue();
+        // SE is optional until the lecturer explicitly enables it for this class.
+        assertThat(evaluations).noneMatch(e -> e.getCode() == GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP);
     }
 
     @Test

@@ -58,7 +58,7 @@ Xác minh cho phép đổi giảng viên ngày 13/10/2026: toàn bộ 137 test b
 
 API trả toàn bộ sinh viên của lớp, vì vậy lọc và phân trang được thực hiện trên FE. Dùng component `Pagination` chung, mặc định 10 dòng/trang, chọn 10/20/50/100 dòng; đổi bộ lọc hoặc kích thước trang về trang đầu, và trang hiển thị được giới hạn khi danh sách thay đổi. Các trạng thái tải, lỗi, lớp trống và tìm không thấy được phân biệt. Lỗi 401/403/404 không tự retry. Bảng cuộn ngang trên màn hình nhỏ. Cache và request gắn theo `classId`; request hỗ trợ hủy khi rời trang. Không có thao tác gửi thư hoặc chỉnh sửa sinh viên trong giao diện này.
 
-`Rule.schoolClassId` là Integer, không thêm association JPA. Unique `(school_class_id, code)` thay cho unique `code` toàn hệ thống. `Rule.status` là boolean: `true` bật, `false` tắt, mặc định bật cho dữ liệu cũ và gợi ý mới. Mỗi mã được bật/tắt độc lập theo lớp; tắt vẫn lưu giá trị và ID. `SchoolClass.rulesVersion` tăng sau mỗi lần lưu thành công, kể cả chỉ đổi trạng thái. Mọi bên có quyền ghi, kể cả admin, vẫn phải đáp ứng validation và phiên bản hiện tại.
+`Rule.schoolClassId` là Integer, không thêm association JPA. Unique `(school_class_id, code)` thay cho unique `code` toàn hệ thống. `Rule.status` là boolean: `true` bật, `false` tắt. Khi lớp chưa lưu quy định tương ứng, mặc định số nhóm tối thiểu/tối đa và SE đều tắt; các quy định thành viên/ngành bật. Mỗi mã được bật/tắt độc lập theo lớp; tắt vẫn lưu giá trị và ID. Cấu hình đã lưu luôn được ưu tiên. `SchoolClass.rulesVersion` tăng sau mỗi lần lưu thành công, kể cả chỉ đổi trạng thái. Mọi bên có quyền ghi, kể cả admin, vẫn phải đáp ứng validation và phiên bản hiện tại.
 
 Body PUT:
 
@@ -95,7 +95,7 @@ Body PUT:
 
 ## Database và vận hành
 
-Rule SE là mã mới trong bảng hiện có, không cần thêm cột hay migration mới. Giá trị gợi ý là 1 và chỉ được lưu khi PUT thành công. Lớp đã có sáu Rule giữ nguyên giá trị/ID/phiên bản; GET bổ sung gợi ý SE, đánh dấu `configured=false` và không ghi database. Lần lưu tiếp gửi bảy Rule để bổ sung dòng SE. Cập nhật BE/FE cùng phiên bản vì payload cũ chỉ sáu Rule sẽ trả 400.
+Rule SE là mã mới trong bảng hiện có, không cần thêm cột hay migration mới. Từ 23/10/2026, mặc định SE tắt (`status=false`); giá trị gợi ý vẫn là 1 để giảng viên chủ động bật khi cần, chỉ được lưu khi PUT thành công. Lớp đã có sáu Rule giữ nguyên giá trị/ID/phiên bản; GET bổ sung gợi ý SE đang tắt, đánh dấu `configured=false` và không ghi database. Lớp đã lưu SE giữ nguyên trạng thái và giá trị đã chọn. Lần lưu tiếp gửi bảy Rule để bổ sung dòng SE. Cập nhật BE/FE cùng phiên bản vì payload cũ chỉ sáu Rule sẽ trả 400.
 
 Chạy [migration MySQL](../sql/20261012_class_rules.sql) trước khi khởi động backend cập nhật trên database cũ, sau khi dừng ghi và sao lưu. Hibernate `ddl-auto=update` không tự gỡ unique index cũ trên `code`.
 
