@@ -1,0 +1,320 @@
+.class-major-distribution-card {
+  padding: 1.5rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 14px);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  margin-bottom: 1.25rem;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.class-major-distribution-card:hover {
+  box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.08);
+  border-color: var(--color-primary-border, #bfdbfe);
+}
+
+/* Header */
+.major-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.major-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.major-card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: var(--radius-md, 10px);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.12), rgba(99, 102, 241, 0.15));
+  color: var(--color-primary, #3b82f6);
+  flex-shrink: 0;
+}
+
+.major-card-titles h3 {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-text-main, #0f172a);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.major-card-titles p {
+  margin: 0.125rem 0 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+/* View Mode Toggle Button Group */
+.major-card-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: var(--color-surface-hover, #f1f5f9);
+  padding: 0.25rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  gap: 0.25rem;
+}
+
+.major-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #64748b);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.major-toggle-btn:hover {
+  color: var(--color-text-main, #0f172a);
+}
+
+.major-toggle-btn.is-active {
+  background: var(--color-surface, #ffffff);
+  color: var(--color-primary, #3b82f6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Main Content Grid */
+.major-card-content {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) 1fr;
+  gap: 2rem;
+  align-items: center;
+}
+
+/* Chart Container */
+.major-chart-wrapper {
+  position: relative;
+  width: 100%;
+  max-width: 320px;
+  height: 260px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.major-chart-wrapper.bar-mode {
+  max-width: 100%;
+  height: 260px;
+}
+
+/* Center Stat for Doughnut Chart */
+.major-donut-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+}
+
+.donut-center-value {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-text-main, #0f172a);
+}
+
+.donut-center-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #64748b);
+}
+
+/* Legend & Breakdown List */
+.major-breakdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.major-breakdown-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 0.75rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #ffffff);
+  transition: all 0.15s ease;
+}
+
+.major-breakdown-item:hover,
+.major-breakdown-item.is-highlighted {
+  border-color: var(--color-primary, #3b82f6);
+  background: var(--color-surface-hover, #f8fafc);
+  transform: translateX(2px);
+}
+
+.major-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.major-item-identity {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+}
+
+.major-color-indicator {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.major-code-badge {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--color-text-main, #0f172a);
+}
+
+.major-name-text {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.major-item-stats {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+.major-student-count {
+  font-weight: 700;
+  font-size: 0.9375rem;
+  color: var(--color-text-main, #0f172a);
+}
+
+.major-percentage-pill {
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: var(--color-primary-light, #eff6ff);
+  color: var(--color-primary-dark, #1d4ed8);
+}
+
+/* Progress bar showing assigned vs unassigned */
+.major-progress-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.major-progress-bar {
+  display: flex;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--color-surface-hover, #e2e8f0);
+  overflow: hidden;
+}
+
+.major-progress-assigned {
+  background: #10b981;
+  transition: width 0.3s ease;
+}
+
+.major-progress-unassigned {
+  background: #f59e0b;
+  transition: width 0.3s ease;
+}
+
+.major-progress-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6875rem;
+  color: var(--color-text-muted, #64748b);
+}
+
+.major-progress-labels span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.major-progress-labels .dot-assigned {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+}
+
+.major-progress-labels .dot-unassigned {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+}
+
+/* Empty / Loading State */
+.major-card-empty,
+.major-card-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--color-text-muted, #64748b);
+  gap: 0.5rem;
+}
+
+.major-card-loading .spin {
+  animation: spin 1s linear infinite;
+  color: var(--color-primary, #3b82f6);
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 900px) {
+  .major-card-content {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .major-chart-wrapper {
+    max-width: 280px;
+    height: 240px;
+  }
+}

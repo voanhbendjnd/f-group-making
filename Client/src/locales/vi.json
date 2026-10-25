@@ -1870,5 +1870,20 @@
     "empty": "Không có dữ liệu sinh viên",
     "noDataToExport": "Không có dữ liệu sinh viên để xuất file.",
     "footerHint": "Cột Group Mentor trong file Excel sẽ lưu tên nhóm của sinh viên (để trống nếu chưa có nhóm)."
+  },
+  "classMajor": {
+    "title": "Cơ cấu chuyên ngành của lớp",
+    "subtitle": "Phân bổ sinh viên theo ngành học & tỷ lệ ghép nhóm",
+    "donutView": "Biểu đồ tròn (Tỷ lệ)",
+    "barView": "Biểu đồ cột (Phân nhóm)",
+    "studentsUnit": "sinh viên",
+    "totalStudents": "Tổng sinh viên",
+    "assigned": "Đã có nhóm",
+    "unassigned": "Chưa có nhóm",
+    "empty": "Lớp học chưa có dữ liệu sinh viên.",
+    "loading": "Đang phân tích dữ liệu chuyên ngành...",
+    "error": "Không thể tải dữ liệu sinh viên của lớp.",
+    "majorBreakdown": "Chi tiết theo ngành"
   }
 }
+

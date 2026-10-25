@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -20,6 +20,7 @@ import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
 import { fetchClassAllocationData, exportGroupResultExcel } from '@/features/group/utils/exportGroupResultExcel';
+import { ClassMajorDistributionCard } from '@/features/classes/components/ClassMajorDistributionCard';
 import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTypes';
 import { getApiError } from '@/services/api/types';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
@@ -80,6 +81,9 @@ function ReviewContent() {
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
   const rows = reviews.data?.result ?? [];
   const selectedClass = classes.data?.result.find(c => c.id === filters.classId);
+  const assignedStudentIds = useMemo(() => {
+    return new Set(rows.flatMap(r => r.group.members.map(m => m.studentId)));
+  }, [rows]);
   const openBoard = (cid: number) => {
     const deadlineId = rows.find(row => row.group.schoolClassId === cid)?.group.deadlineId;
     navigate(advancedGroupPath(cid, filterQuery, deadlineId, area));
@@ -223,25 +227,32 @@ function ReviewContent() {
       )}
     </section>}
     {selectedClass ? (
-      <div className="card review-selected-class-banner" role="region" aria-label={t('groupReview.selectedClassHeading')}>
-        <div className="selected-class-info">
-          <div className="selected-class-icon" aria-hidden="true"><Sparkles size={24} /></div>
-          <div className="selected-class-details">
-            <div className="selected-class-pretitle">{t('groupReview.managingClass')}</div>
-            <h3 className="selected-class-title">{selectedClass.name}</h3>
-            <div className="selected-class-badges">
-              <span className="badge badge-neutral"><Users size={13} aria-hidden="true" />{t('groupReview.studentCount', { count: selectedClass.studentCount })}</span>
-              {reviews.data && <span className="badge badge-info">{t('groupReview.classGroupsCount', { count: reviews.data.meta.total })}</span>}
+      <>
+        <div className="card review-selected-class-banner" role="region" aria-label={t('groupReview.selectedClassHeading')}>
+          <div className="selected-class-info">
+            <div className="selected-class-icon" aria-hidden="true"><Sparkles size={24} /></div>
+            <div className="selected-class-details">
+              <div className="selected-class-pretitle">{t('groupReview.managingClass')}</div>
+              <h3 className="selected-class-title">{selectedClass.name}</h3>
+              <div className="selected-class-badges">
+                <span className="badge badge-neutral"><Users size={13} aria-hidden="true" />{t('groupReview.studentCount', { count: selectedClass.studentCount })}</span>
+                {reviews.data && <span className="badge badge-info">{t('groupReview.classGroupsCount', { count: reviews.data.meta.total })}</span>}
+              </div>
             </div>
           </div>
+          <div className="selected-class-actions">
+            <Button variant="secondary" icon={<Eye size={16} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
+            <Button variant="primary" icon={<FileSpreadsheet size={16} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
+            <Button variant="secondary" icon={<SlidersHorizontal size={16} />} onClick={() => openBoard(selectedClass.id)} disabled={classes.isError || classes.isPending}>{t('groupReview.openAdvancedAction')}</Button>
+            <Button variant="secondary" onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>{t('groupReview.viewAllClasses')}</Button>
+          </div>
         </div>
-        <div className="selected-class-actions">
-          <Button variant="secondary" icon={<Eye size={16} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
-          <Button variant="primary" icon={<FileSpreadsheet size={16} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
-          <Button variant="secondary" icon={<SlidersHorizontal size={16} />} onClick={() => openBoard(selectedClass.id)} disabled={classes.isError || classes.isPending}>{t('groupReview.openAdvancedAction')}</Button>
-          <Button variant="secondary" onClick={() => { setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null); }}>{t('groupReview.viewAllClasses')}</Button>
-        </div>
-      </div>
+        <ClassMajorDistributionCard
+          classId={selectedClass.id}
+          className={selectedClass.name}
+          assignedStudentIds={assignedStudentIds}
+        />
+      </>
     ) : (
       <div className="review-class-prompt-banner"><Info size={18} aria-hidden="true" /><span>{t('groupReview.selectClassPrompt')}</span></div>
     )}

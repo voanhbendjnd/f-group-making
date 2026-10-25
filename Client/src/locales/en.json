@@ -1870,5 +1870,20 @@
     "empty": "No student data found",
     "noDataToExport": "No student data available to export.",
     "footerHint": "The Group Mentor column in Excel will store the student's group name (left blank if unassigned)."
+  },
+  "classMajor": {
+    "title": "Class Major Distribution",
+    "subtitle": "Student distribution by major & grouping status",
+    "donutView": "Donut Chart (Ratio)",
+    "barView": "Stacked Bar (Grouping)",
+    "studentsUnit": "students",
+    "totalStudents": "Total Students",
+    "assigned": "Assigned",
+    "unassigned": "Unassigned",
+    "empty": "No student data available for this class.",
+    "loading": "Analyzing major distribution...",
+    "error": "Unable to load class students.",
+    "majorBreakdown": "Major Breakdown"
   }
 }
+
