@@ -35,6 +35,8 @@ interface Props {
   onReject: () => void;
   onUnlock: () => void;
   onDisband: () => void;
+  isSelected?: boolean;
+  onToggleSelect?: (groupId: number, checked: boolean) => void;
 }
 
 export function GroupBoardColumn(props: Props) {
@@ -59,7 +61,7 @@ export function GroupBoardColumn(props: Props) {
 
   return (
     <section
-      className={`group-board-column group-card-dropzone ${props.dragOver ? 'is-drag-over' : ''}`}
+      className={`group-board-column group-card-dropzone ${props.dragOver ? 'is-drag-over' : ''} ${props.isSelected ? 'is-selected' : ''}`}
       data-group-id={group.id}
       aria-label={group.name}
       onDragOver={props.onDragOver}
@@ -67,6 +69,17 @@ export function GroupBoardColumn(props: Props) {
     >
       <header className="board-column-header">
         <div className="board-column-title">
+          {props.canManage && (
+            <input
+              type="checkbox"
+              className="board-group-select-checkbox"
+              checked={!!props.isSelected}
+              disabled={pending}
+              onChange={(e) => props.onToggleSelect?.(group.id, e.target.checked)}
+              title={t('groupWorkspace.selectToDisband')}
+              aria-label={t('groupWorkspace.selectGroup', { name: group.name })}
+            />
+          )}
           {groupCode(group) && <span className="board-group-code">{groupCode(group)}</span>}
           <h2>{group.name}</h2>
           <span className="board-member-count">

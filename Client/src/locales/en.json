@@ -1701,11 +1701,34 @@
     "revokeApproval": "Revoke Approval",
     "reject": "Reject",
     "disband": "Disband group",
+    "selectAll": "Select all",
+    "selectedCount": "{{count}} selected",
+    "disbandSelected": "Disband Selected ({{count}})",
+    "disbandAll": "Disband All Groups",
+    "disbandSelectedSuccess": "Successfully disbanded selected groups.",
+    "disbandAllSuccess": "Successfully disbanded all groups in the class.",
+    "selectToDisband": "Select this group to disband",
+    "cannotSelectLocked": "Approved or pending group",
+    "selectGroup": "Select {{name}}",
     "disbandConfirm": {
       "title": "Disband group \"{{name}}\"?",
       "content": "All members of this group will be returned to the unassigned student pool.",
       "warning": "This action will be synchronized immediately to all students' interfaces.",
       "ok": "Disband group",
+      "cancel": "Cancel"
+    },
+    "disbandSelectedConfirm": {
+      "title": "Disband {{count}} selected groups?",
+      "content": "All members of the selected groups will be returned to the unassigned student pool.",
+      "warning": "This will disband {{count}} selected groups. Are you sure you want to proceed?",
+      "ok": "Disband {{count}} groups",
+      "cancel": "Cancel"
+    },
+    "disbandAllConfirm": {
+      "title": "Disband ALL groups in this class?",
+      "content": "All {{count}} groups in this class will be disbanded. All students will be returned to the unassigned pool to regroup from scratch.",
+      "warning": "This action cannot be undone and will update immediately.",
+      "ok": "Disband All",
       "cancel": "Cancel"
     },
     "messages": {

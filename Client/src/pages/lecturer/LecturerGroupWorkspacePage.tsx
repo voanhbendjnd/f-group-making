@@ -3,7 +3,7 @@ import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next';
 import { Modal } from 'antd';
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, FileSpreadsheet, Plus, RefreshCw, Search, Users } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, EyeOff, FileSpreadsheet, Plus, RefreshCw, Search, Trash2, Users } from 'lucide-react';
 import { Button } from '@/components/common/Button';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { ErrorState } from '@/components/common/ErrorState';
@@ -52,6 +52,7 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   const [showRules, setShowRules] = useState(false);
   const [rejectId, setRejectId] = useState<number | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set());
   const dragged = useRef<DragStudent | null>(null); const [draggedId, setDraggedId] = useState<number | null>(null);
   const [over, setOver] = useState<number | 'pool' | 'create' | null>(null);
   const data = workspace.data;
@@ -73,6 +74,15 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
   }, [poolRecs]);
 
   useEffect(() => { if (!requestedDeadline && deadlineId) setDeadline(deadlineId); }, [deadlineId, requestedDeadline, setDeadline]);
+  useEffect(() => {
+    if (!data?.groups) return;
+    const existing = new Set(data.groups.map(g => g.id));
+    setSelectedGroupIds(prev => {
+      const next = new Set([...prev].filter(id => existing.has(id)));
+      if (next.size !== prev.size) return next;
+      return prev;
+    });
+  }, [data?.groups]);
   const clearDrag = () => { dragged.current = null; setDraggedId(null); setOver(null); stopAutoScroll(); };
   const back = area === 'admin' && params.get('source') === 'class' && classId
     ? `/admin/classes/${classId}?tab=groups` : reviewPath(params, area);
@@ -145,6 +155,96 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
     }
     event.preventDefault(); event.dataTransfer.dropEffect = 'move'; setOver(target);
   };
+
+  const toggleSelectGroup = (groupId: number, checked: boolean) => {
+    setSelectedGroupIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(groupId);
+      else next.delete(groupId);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedGroupIds(new Set(groups.map(g => g.id)));
+    } else {
+      setSelectedGroupIds(new Set());
+    }
+  };
+
+  const disbandGroupSafely = async (group: GroupDTO) => {
+    if (group.status === 'ACCEPTED') {
+      await groupApi.revokeGroup(deadlineId!, classId!, group.id);
+    } else if (group.status === 'PENDING') {
+      await groupApi.rejectGroup(deadlineId!, classId!, group.id, { reason: t('groupWorkspace.disband') });
+    }
+    await groupApi.lecturerDisbandGroup(deadlineId!, classId!, group.id);
+  };
+
+  const disbandSelected = () => {
+    if (!canManage || pending || selectedGroupIds.size === 0) return;
+    const targetGroups = data.groups.filter(g => selectedGroupIds.has(g.id));
+    if (targetGroups.length === 0) return;
+    const totalMembers = targetGroups.reduce((acc, g) => acc + g.memberCount, 0);
+
+    Modal.confirm({
+      title: t('groupWorkspace.disbandSelectedConfirm.title', { count: targetGroups.length }),
+      content: (
+        <div>
+          <p>
+            {t('groupWorkspace.disbandSelectedConfirm.content')}{' '}
+            {t('groupWorkspace.disbandSelectedConfirm.warning', { count: targetGroups.length })}
+          </p>
+          <p style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+            {targetGroups.map(g => g.name).join(', ')} ({totalMembers} {t('classMajor.studentsUnit', 'sinh viên')})
+          </p>
+        </div>
+      ),
+      okText: t('groupWorkspace.disbandSelectedConfirm.ok', { count: targetGroups.length }),
+      cancelText: t('groupWorkspace.disbandSelectedConfirm.cancel'),
+      okButtonProps: { danger: true },
+      onOk: () =>
+        run(async () => {
+          for (const g of targetGroups) {
+            await disbandGroupSafely(g);
+          }
+          setSelectedGroupIds(new Set());
+        }, 'groupWorkspace.disbandSelectedSuccess'),
+    });
+  };
+
+  const disbandAll = () => {
+    if (!canManage || pending || data.groups.length === 0) return;
+    const totalGroups = data.groups.length;
+    const totalMembers = data.groups.reduce((acc, g) => acc + g.memberCount, 0);
+
+    Modal.confirm({
+      title: t('groupWorkspace.disbandAllConfirm.title'),
+      content: (
+        <div>
+          <p>
+            {t('groupWorkspace.disbandAllConfirm.content', { count: totalGroups })}{' '}
+            {t('groupWorkspace.disbandAllConfirm.warning')}
+          </p>
+          <p style={{ marginTop: '0.5rem', fontWeight: 600 }}>
+            {t('groupBoard.groupCount', { count: totalGroups })} · {totalMembers} {t('classMajor.studentsUnit', 'sinh viên')}
+          </p>
+        </div>
+      ),
+      okText: t('groupWorkspace.disbandAllConfirm.ok'),
+      cancelText: t('groupWorkspace.disbandAllConfirm.cancel'),
+      okButtonProps: { danger: true },
+      onOk: () =>
+        run(async () => {
+          for (const g of data.groups) {
+            await disbandGroupSafely(g);
+          }
+          setSelectedGroupIds(new Set());
+        }, 'groupWorkspace.disbandAllSuccess'),
+    });
+  };
+
   const disband = (group: GroupDTO) => {
     if (!editable(group) || pending) return;
     Modal.confirm({ title: t('groupWorkspace.disbandConfirm.title', { name: group.name }),
@@ -193,6 +293,57 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
       <span className="board-count">{t('groupBoard.groupCount', { count: data.groups.length })}</span>
       <span title={`Deadline: ${data.deadlineName}`}><DeadlineStatusBadge status={data.deadlineStatus === 'UNSCHEDULED' ? 'UNSCHEDULED' : data.deadlineStatus === 'ACTIVE' ? 'ACTIVE' : data.deadlineStatus === 'UPCOMING' ? 'UPCOMING' : data.deadlineStatus === 'CANCELLED' ? 'CANCELLED' : 'EXPIRED'} /></span>
       <button className="board-rules-link" type="button" onClick={() => setShowRules(true)}>{t('groupReview.rules')}</button>
+
+      {canManage && data.groups.length > 0 && (
+        <div className="board-bulk-actions">
+          <label className="board-select-all-label">
+            <input
+              type="checkbox"
+              className="board-group-select-checkbox"
+              checked={groups.length > 0 && groups.every(g => selectedGroupIds.has(g.id))}
+              ref={el => {
+                if (el) {
+                  const someSelected = groups.some(g => selectedGroupIds.has(g.id));
+                  const allSelected = groups.length > 0 && groups.every(g => selectedGroupIds.has(g.id));
+                  el.indeterminate = someSelected && !allSelected;
+                }
+              }}
+              onChange={e => toggleSelectAll(e.target.checked)}
+              disabled={pending}
+            />
+            <span>
+              {selectedGroupIds.size > 0
+                ? t('groupWorkspace.selectedCount', { count: selectedGroupIds.size })
+                : t('groupWorkspace.selectAll')}
+            </span>
+          </label>
+
+          {selectedGroupIds.size > 0 && (
+            <Button
+              size="sm"
+              variant="danger"
+              className="board-disband-selected-btn"
+              disabled={pending}
+              icon={<Trash2 size={14} />}
+              onClick={disbandSelected}
+            >
+              {t('groupWorkspace.disbandSelected', { count: selectedGroupIds.size })}
+            </Button>
+          )}
+
+          <Button
+            size="sm"
+            variant="secondary"
+            className="board-disband-all-btn"
+            disabled={pending || data.groups.length === 0}
+            icon={<Trash2 size={14} />}
+            onClick={disbandAll}
+          >
+            {t('groupWorkspace.disbandAll')}
+          </Button>
+        </div>
+      )}
+
       <span role="status" className="board-save-status">{pending ? t('groupBoard.saving') : t('groupBoard.savedHint')}</span>
     </div>
     {!canManage && <p className="alert alert-info">{t('groupBoard.readOnly')}</p>}
@@ -243,6 +394,8 @@ function GroupBoard({ classId, requestedDeadline, params, setDeadline }: {
         onDragLeave={event => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setOver(null); }}>
         {groups.map(group => <GroupBoardColumn key={group.id} deadlineId={deadlineId} classId={classId} group={group} targets={targets} editable={editable(group)} canManage={canManage} canUnlock={!!canUnlock} pending={pending}
           unassignedStudents={data.unassignedStudents}
+          isSelected={selectedGroupIds.has(group.id)}
+          onToggleSelect={toggleSelectGroup}
           dragOver={over === group.id} draggedId={draggedId} onDragStart={startDrag} onDragEnd={clearDrag}
           onDragOver={event => dragOver(event, group.id)} onDrop={event => drop(event, group.id)}
           onMove={(studentId, target) => quiet(move(studentId, group.id, target))} onRemove={studentId => remove(group, studentId)}

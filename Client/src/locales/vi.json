@@ -1701,11 +1701,34 @@
     "revokeApproval": "Thu hồi duyệt",
     "reject": "Từ chối",
     "disband": "Giải tán nhóm",
+    "selectAll": "Chọn tất cả",
+    "selectedCount": "Đã chọn {{count}}",
+    "disbandSelected": "Rã nhóm đã chọn ({{count}})",
+    "disbandAll": "Rã tất cả nhóm",
+    "disbandSelectedSuccess": "Đã giải tán thành công các nhóm đã chọn.",
+    "disbandAllSuccess": "Đã giải tán toàn bộ nhóm trong lớp thành công.",
+    "selectToDisband": "Chọn nhóm này để giải tán",
+    "cannotSelectLocked": "Nhóm đã duyệt hoặc chờ duyệt",
+    "selectGroup": "Chọn {{name}}",
     "disbandConfirm": {
       "title": "Giải tán nhóm \"{{name}}\"?",
       "content": "Tất cả các thành viên trong nhóm sẽ được đưa về danh sách sinh viên tự do.",
       "warning": "Hành động này sẽ cập nhật ngay lập tức đến giao diện của các sinh viên.",
       "ok": "Giải tán nhóm",
+      "cancel": "Hủy"
+    },
+    "disbandSelectedConfirm": {
+      "title": "Giải tán {{count}} nhóm đã chọn?",
+      "content": "Toàn bộ thành viên của các nhóm đã chọn sẽ được đưa về danh sách sinh viên chưa phân nhóm.",
+      "warning": "Thao tác này sẽ giải tán {{count}} nhóm được chọn. Bạn có chắc chắn muốn tiếp tục?",
+      "ok": "Giải tán {{count}} nhóm",
+      "cancel": "Hủy"
+    },
+    "disbandAllConfirm": {
+      "title": "Giải tán TẤT CẢ nhóm trong lớp?",
+      "content": "Toàn bộ {{count}} nhóm trong lớp sẽ bị giải tán. Tất cả sinh viên sẽ được đưa về danh sách Chưa phân nhóm để sắp xếp lại từ đầu.",
+      "warning": "Hành động này không thể hoàn tác và sẽ cập nhật ngay lập tức.",
+      "ok": "Giải tán tất cả",
       "cancel": "Hủy"
     },
     "messages": {

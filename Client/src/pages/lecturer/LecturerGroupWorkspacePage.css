@@ -127,3 +127,66 @@
 .board-rec-add-btn { color: #16a34a !important; width: 24px !important; height: 24px !important; }
 .board-rec-add-btn:hover { background: #bbf7d0 !important; color: #15803d !important; }
 
+/* Group multi-selection and bulk disband actions */
+.group-board-column.is-selected {
+  border-color: var(--color-primary, #3b82f6);
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.board-group-select-checkbox {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-primary, #2563eb);
+  flex-shrink: 0;
+  margin-right: 0.2rem;
+}
+
+.board-bulk-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.board-select-all-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-main, #334155);
+  cursor: pointer;
+  padding: 0.3rem 0.55rem;
+  border-radius: 6px;
+  background: #ffffff;
+  border: 1px solid #dce4ef;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+
+.board-select-all-label:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.board-disband-selected-btn {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  box-shadow: 0 1px 3px rgba(239, 68, 68, 0.25);
+}
+
+.board-disband-all-btn {
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  color: #b91c1c !important;
+  border-color: #fca5a5 !important;
+  background: #fef2f2 !important;
+  transition: all 0.15s ease;
+}
+
+.board-disband-all-btn:hover:not(:disabled) {
+  background: #fee2e2 !important;
+  border-color: #f87171 !important;
+  color: #991b1b !important;
+}
