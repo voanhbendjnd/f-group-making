@@ -293,9 +293,12 @@ Client không tự retry; form giữ dữ liệu khi thất bại và giữ vers
 - LECTURER ghi/xóa khóa row Lecturer; CLASS khóa row SchoolClass. Unique scope key và @Version ngăn trùng/lưu đè.
 - Common share cập nhật phát `ZALO_SHARE_UPDATED` không chứa nội dung riêng cho tất cả lớp của owner **cùng kỳ**,
   qua publisher hiện tại sau commit. AssignClassLecturer phát cùng tín hiệu cho lớp bị đổi, không sửa nghiệp vụ assignment.
-- RealtimeProvider nhận event cấp lớp không cần deadlineId; xóa cache Zalo nhạy cảm và tải lại.
+- RealtimeProvider nhận event cấp lớp không cần deadlineId; đánh dấu cache Zalo cần tải lại từ endpoint có kiểm tra quyền,
+  không gán tạm dữ liệu thành `[]` trong lúc chờ response.
   Student panel không subscribe hoặc thay đổi quyền theo Group membership/status event.
-  Fallback revalidate khi focus/mỗi 30 giây; cache không persist. Chưa kiểm thử socket thật end-to-end.
+  Student giữ fallback poll 30 giây; focus chỉ refetch khi đã stale. Cache metadata theo tài khoản/scope,
+  staleTime 30 giây, gcTime 60 giây; không persist, được QueryProvider xóa khi đổi tài khoản/logout.
+  Lỗi scope/quyền 401/403/404 hoặc mã lỗi Zalo tương ứng vẫn ẩn nội dung cache. Chưa kiểm thử socket thật end-to-end.
 
 Lỗi giữ nguyên các mã `zaloInvalidLink`, `zaloInvalidScope`, `zaloInvalidData`, `zaloImageSize`, `zaloImageType` (400),
 `zaloForbidden` (403), `zaloNotFound` (404), `zaloConflict` (409), `zaloStorageUnavailable` (503), có bản dịch VI/EN.
@@ -355,3 +358,46 @@ Kết quả thực chạy sau refactor:
 Tham chiếu: [Zalo OA GMF](https://oa.zalo.me/home/documents/vie/guides/quan-ly-nhom-gmf_1954166378348758227),
 [Cloudinary media access control](https://cloudinary.com/documentation/control_access_to_media),
 [Java SDK](https://cloudinary.com/documentation/java_integration).
+
+### Kiểm tra và sửa nhấp nháy Student Zalo (26/10/2026)
+
+- Source mới có route `/student/zalo-groups` riêng, Segmented Lecturer/Class chỉ ẩn/hiện hai pane đã mount.
+  Đổi scope hoặc VI/EN là re-render bình thường, không đổi query key hay chạy lại QR effect.
+- Nguyên nhân chính: `isPending || isFetching` thay toàn bộ card bằng Skeleton cho mọi background read,
+  khiến QR unmount/revoke blob URL rồi tải lại. `staleTime=0`, focus=`always`, gcTime=0 làm dữ liệu luôn stale
+  và xóa ngay khi rời trang. Realtime còn gán `[]`, có thể đổi autoScope tạm thời. Key gồm version cũng remount
+  toàn card mỗi lần cập nhật; chỉ QR cần revalidate theo version.
+- Đã giữ card khi background read, chỉ Skeleton khi chưa có dữ liệu; dùng key theo share.id, để QR effect xử lý
+  version và cleanup như cũ. Thêm cleanup timer phản hồi sao chép. Metadata cache ngắn như policy phía trên;
+  không cache/persist QR blob giữa các mount và không sửa Cloudinary/API/Backend.
+- Lecturer management vốn không nhấp nháy khi refresh một cấu hình đang có. Bổ sung cache ngắn khi đổi scope
+  rồi quay lại, giữ editor/version khi refetch tạm lỗi kể cả cấu hình null, hiển thị lỗi nền. Nếu quyền/scope bị từ chối,
+  ẩn editor/cache. Manual refresh dùng cancelRefetch=false để không hủy/gọi lại request đang chạy.
+- Realtime chỉ invalidate Zalo khi có ZALO_SHARE_UPDATED đúng dạng, giữ event-ID dedup và cleanup hiện tại.
+  Không sửa syncDeadlineQueries, status/subscribe Context, StrictMode, Auth/Term hoặc các module nghiệp vụ khác.
+  Query key được TanStack hash theo giá trị nên target object mới cùng nội dung không gây fetch; không thêm memoization.
+
+Chrome headless/Vite dev (giữ StrictMode), API/QR fixtures đúng contract, hai card có QR, đếm request thực tế:
+
+| Tình huống | Trước: danh sách / QR | Sau: danh sách / QR |
+|---|---:|---:|
+| Mở trang lần đầu | 1 / 2 | 1 / 2 |
+| Đổi Lecturer/Class và VI/EN | 0 / 0 | 0 / 0 |
+| Một lần Làm mới | 1 / 2 | 1 / 0 |
+| Ba lần trở lại cửa sổ khi dữ liệu mới | 3 / 6 | 0 / 0 |
+| Chờ 31 giây để fallback poll | 1 / 2 | 1 / 0 |
+| Rời trang rồi quay lại nhanh | 1 / 2 | 0 / 2 |
+
+Trong manual refresh, trước sửa số card trong DOM là 0, sau sửa vẫn là 2; giữ nguyên identity card và blob URL.
+QR vẫn đọc qua API có authorization khi mount mới hoặc version đổi. Lecturer manual refresh trước/sau đều
+1 request cấu hình, 0 QR thêm và giữ card. Có screenshots desktop 1440/mobile 390; mọi API đều bị mock,
+không gọi API ghi/MySQL hoặc Cloudinary thật. Realtime/update/remove/forbidden được kiểm tra bằng STOMP mock,
+chưa kiểm tra websocket thật end-to-end.
+
+Verification sau bản sửa: **36/36 Zalo tests PASS** (`zaloRefetch`, `zaloRealtime`, `zaloSharing`, `zaloApi`),
+**27/27 regression tests PASS** (Student Profile, Lecturer routes, Group Review realtime, recommendations realtime).
+Bao gồm giữ DOM/QR khi refresh và polling, cache khi quay lại nhanh, version đổi chỉ reload QR bị ảnh hưởng,
+không request khi đổi scope/VI/EN hoặc focus khi còn fresh, realtime dedup/cleanup, response xóa chia sẻ,
+ẩn cache/editor khi mất quyền và giữ editor cấu hình null khi lỗi 503. TypeScript/Vite build và lint exit 0;
+còn warning có sẵn ngoài module Zalo, bundle lớn và jsdom pseudo-element. Không sửa Backend, database,
+API contract, Cloudinary hoặc các thuật toán Allocation/Recommendation; không commit/push.

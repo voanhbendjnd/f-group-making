@@ -55,13 +55,17 @@ export function ZaloShareCard({ share, preview = false }: { share: ZaloShare; pr
   const toast = useToast();
   const safe = isZaloInvite(share.inviteUrl);
   const [copied, setCopied] = useState(false);
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(share.inviteUrl);
       setCopied(true);
       toast.success(t('zalo.copied'));
-      setTimeout(() => setCopied(false), 2000);
     } catch {
       toast.error(t('zalo.copyFailed'));
     }

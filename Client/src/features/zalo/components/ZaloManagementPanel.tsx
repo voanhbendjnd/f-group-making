@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useTerm } from '@/app/providers/TermContext';
 import { useToast } from '@/app/providers/ToastContext';
-import { zaloError } from '../api/zaloErrors';
+import { isZaloAccessError, zaloError } from '../api/zaloErrors';
 import { zaloApi, isZaloInvite, type ZaloShare, type ZaloWrite, type ZaloTarget } from '../api/zaloApi';
 import { ZaloShareCard, ZaloQr, ZaloEmpty } from './ZaloShareCard';
 
@@ -22,7 +22,8 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
     queryKey: key,
     queryFn: ({ signal }) => zaloApi.management(target, signal),
     retry: false,
-    gcTime: 0
+    staleTime: 30000,
+    gcTime: 60000
   });
 
   const [editing, setEditing] = useState(false);
@@ -79,7 +80,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
           icon={<RefreshCw size={14} className={query.isFetching ? 'animate-spin' : ''} />}
           disabled={editing || deleting}
           loading={query.isFetching}
-          onClick={() => void query.refetch()}
+          onClick={() => void query.refetch({ cancelRefetch: false })}
         >
           {t('zalo.refresh')}
         </Button>
@@ -94,15 +95,17 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
 
       {query.isPending ? (
         <Skeleton active paragraph={{ rows: 5 }} />
-      ) : query.isError && !query.data ? (
+      ) : query.isError && (query.data === undefined || isZaloAccessError(query.error)) ? (
         <Alert
           type="error"
           showIcon
           title={zaloError(query.error, t)}
-          action={<Button onClick={() => void query.refetch()}>{t('zalo.retry')}</Button>}
+          action={<Button onClick={() => void query.refetch({ cancelRefetch: false })}>{t('zalo.retry')}</Button>}
         />
       ) : (
         <>
+          {query.isError && <Alert type="error" showIcon title={zaloError(query.error, t)}
+            action={<Button onClick={() => void query.refetch({ cancelRefetch: false })}>{t('zalo.retry')}</Button>} />}
           {error != null && <Alert type="error" showIcon title={zaloError(error, t)} />}
           {editing ? (
             <ZaloEditor

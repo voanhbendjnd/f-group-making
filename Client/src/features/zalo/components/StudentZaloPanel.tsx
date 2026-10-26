@@ -5,6 +5,7 @@ import { GraduationCap, RefreshCw, UserCheck } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { zaloApi } from '../api/zaloApi';
+import { isZaloAccessError } from '../api/zaloErrors';
 import { ZaloShareCard, ZaloEmpty } from './ZaloShareCard';
 
 export function StudentZaloPanel() {
@@ -16,11 +17,13 @@ export function StudentZaloPanel() {
     queryFn: ({ signal }) => zaloApi.mine(signal),
     enabled: !!user,
     retry: false,
-    staleTime: 0,
-    gcTime: 0,
+    // Match the 30-second fallback freshness window; the account QueryProvider clears on logout.
+    staleTime: 30000,
+    gcTime: 60000,
     refetchInterval: 30000,
-    refetchOnWindowFocus: 'always'
+    refetchOnWindowFocus: true
   });
+  const showContent = query.data !== undefined && !(query.isError && isZaloAccessError(query.error));
 
   const hasClass = query.data?.some(share => share.scope === 'CLASS') ?? false;
   const hasLecturer = query.data?.some(share => share.scope === 'LECTURER') ?? false;
@@ -35,7 +38,7 @@ export function StudentZaloPanel() {
   const activeScope = userScope ?? autoScope;
 
   return (
-    <section className="zalo-student-panel" aria-label={t('zalo.title')}>
+    <section className="zalo-student-panel" aria-label={t('zalo.title')} aria-busy={query.isFetching}>
       <div className="zalo-student-toolbar">
         <Segmented<'CLASS' | 'LECTURER'>
           className="zalo-scope-segmented"
@@ -68,22 +71,24 @@ export function StudentZaloPanel() {
           className="zalo-refresh-btn"
           icon={<RefreshCw size={14} className={query.isFetching ? 'animate-spin' : ''} />}
           loading={query.isFetching}
-          onClick={() => void query.refetch()}
+          onClick={() => void query.refetch({ cancelRefetch: false })}
         >
           {t('zalo.refresh')}
         </Button>
       </div>
 
-      {query.isPending || query.isFetching ? (
+      {query.isPending ? (
         <Skeleton active paragraph={{ rows: 4 }} />
-      ) : query.isError ? (
+      ) : null}
+      {query.isError && (
         <Alert
           type="error"
           showIcon
           title={t('zalo.loadFailed')}
-          action={<Button onClick={() => void query.refetch()}>{t('zalo.retry')}</Button>}
+          action={<Button onClick={() => void query.refetch({ cancelRefetch: false })}>{t('zalo.retry')}</Button>}
         />
-      ) : (
+      )}
+      {showContent && (
         <div className="zalo-single-card-view">
           {(['CLASS', 'LECTURER'] as const).map(scope => {
             const isCurrent = scope === activeScope;
@@ -96,7 +101,7 @@ export function StudentZaloPanel() {
               >
                 {items.length > 0 ? (
                   items.map(share => (
-                    <ZaloShareCard key={`${share.id}-${share.version}`} share={share} />
+                    <ZaloShareCard key={share.id} share={share} />
                   ))
                 ) : (
                   <ZaloEmpty scope={scope} />

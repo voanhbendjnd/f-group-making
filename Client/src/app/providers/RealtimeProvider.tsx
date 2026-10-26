@@ -40,8 +40,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
         if (classShareChanged) {
           // A class can share Zalo before a grouping session/deadline exists.
-          // Clear private previews before fetching the current server-authorized links.
-          for (const [key] of clientQueries.getQueriesData({ queryKey: ['zalo-mine'] })) clientQueries.setQueryData(key, []);
+          // Revalidate through the authorized endpoint without replacing cards with a temporary empty list.
+          // The Zalo panel hides cached data on access errors and applies removals from the fresh response.
           void clientQueries.invalidateQueries({ queryKey: ['zalo-mine'] });
         } else {
           void syncDeadlineQueries(clientQueries, event);

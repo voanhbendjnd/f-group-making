@@ -137,6 +137,44 @@ class AllocationResourceTest {
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.planId").isEmpty());
     }
 
+    @Test void recommendationPrefersFullerGroupsWithoutChangingTheApiSavedPlansOrGroupData() throws Exception {
+        // Only disposable H2 fixtures: start with eight unassigned students and configured MAX=8.
+        for (Long groupId : groupIds) members.deleteByGroupId(groupId);
+        members.flush(); groups.deleteAllById(groupIds); groups.flush();
+        Rule maximum = new Rule(); maximum.setSchoolClassId(own.getId()); maximum.setCode("MAX_MEMBERS_PER_GROUP");
+        maximum.setValue(8); maximum.setStatus(true); rules.saveAndFlush(maximum); em.clear();
+        var split = preview("{\"targetGroupCount\":2,\"seed\":42}");
+        var full = preview("{\"targetGroupCount\":1,\"seed\":43}");
+        assertThat(split.path("result").path("status").asText()).isEqualTo("FEASIBLE");
+        assertThat(full.path("result").path("status").asText()).isEqualTo("FEASIBLE");
+        var splitId = split.path("previewId").asText(); var fullId = full.path("previewId").asText();
+        String splitPayload = em.find(AllocationPreview.class, splitId).getPayload();
+        String fullPayload = em.find(AllocationPreview.class, fullId).getPayload();
+        var statistics = em.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();
+        statistics.clear(); clearInvocations(engine, events);
+        for (int retry = 0; retry < 2; retry++) {
+            var response = mvc.perform(get(path("plans/recommendation")).with(user(teacher.getEmail()).roles("LECTURE")))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+            var data = mapper.readTree(response).path("data");
+            assertThat(data.path("planId").asText()).isEqualTo(fullId);
+            assertThat(data.path("targetGroupCount").asInt()).isEqualTo(1);
+            assertThat(data.path("eligiblePlans").asInt()).isEqualTo(2);
+            assertThat(data.path("equivalentPlans").asInt()).isEqualTo(1);
+            assertThat(data.path("metrics").path("excessMajorPairs").asLong()).isZero();
+            assertThat(data.path("metrics").path("sizeDistribution").get(0).path("members").asInt()).isEqualTo(8);
+            var fields = new HashSet<String>(); data.fieldNames().forEachRemaining(fields::add);
+            assertThat(fields).containsExactlyInAnyOrder("snapshotFingerprint", "planId", "targetGroupCount",
+                "eligiblePlans", "equivalentPlans", "metrics", "reasons");
+        }
+        em.flush();
+        assertThat(statistics.getEntityInsertCount()).isZero(); assertThat(statistics.getEntityUpdateCount()).isZero();
+        assertThat(statistics.getEntityDeleteCount()).isZero();
+        assertThat(em.find(AllocationPreview.class, splitId).getPayload()).isEqualTo(splitPayload);
+        assertThat(em.find(AllocationPreview.class, fullId).getPayload()).isEqualTo(fullPayload);
+        assertThat(members.count()).isZero(); assertThat(groups.count()).isZero();
+        verify(engine, never()).allocate(any(), anyInt(), anyLong()); verifyNoInteractions(events, notifications, mail);
+    }
+
     @ParameterizedTest @ValueSource(strings = {"LECTURE", "LECTURE_MASTER"})
     void recommendationDoesNotExposeAnotherLecturersClass(String role) throws Exception {
         var otherTeacher = users.findById(other.getLecturerId()).orElseThrow();

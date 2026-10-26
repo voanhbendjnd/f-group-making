@@ -1123,7 +1123,9 @@ target 8, seed 42 và SearchLimits mặc định. Mỗi ô là `(SE, IB, GD)`; �
   không khẳng định lower bound luôn đạt được. Unknown Major không tự gán ngành; trả số lượng và warning riêng.
 - Xếp hạng theo thứ tự: Excess thấp hơn → giữ nguyên nhiều draft vốn hợp lệ hơn → giữ nhiều Leader cũ hơn
   → ít sinh viên đang có nhóm phải chuyển hơn. Unassigned không tính là sinh viên chuyển từ nhóm cũ.
-  Chất lượng bằng nhau dùng `planFingerprint`, rồi `previewId` theo thứ tự từ điển; không dùng target/time làm ưu tiên.
+  Từ mục 8.15, nếu các tiêu chí này hòa và MAX_MEMBERS đang bật/xác định được, xét độ thiếu sĩ số trung bình
+  so với MAX thấp hơn, rồi số nhóm ít hơn. Sau đó dùng `planFingerprint`, rồi `previewId` theo thứ tự từ điển.
+  Không dùng thời gian tạo làm ưu tiên; thiếu/tắt MAX thì giữ tie-break cũ.
   `equivalentPlans` cho biết có bao nhiêu phương án cùng chất lượng trước bước chọn ổn định.
 - Đây là ưu tiên **chọn giữa các phương án đã lưu** theo yêu cầu Recommended; không sửa chính sách của engine
   ưu tiên giữ draft/Leader/movements trước bước cân ngành. Không sửa nội dung bất kỳ History nào.
@@ -1160,8 +1162,9 @@ Fixture thuần gồm 36 sinh viên, 12 SE/12 IB/12 GD, cùng rules 4–6 ngư�
 | 8 | 4 nhóm × 4 + 4 nhóm × 5 | 12 | 12 | 0 |
 | 9 | 9 nhóm × 4 | 9 | 9 | 0 |
 
-Cả bốn phương án đều đạt rules, Group Score 100%, ngang chất lượng khi không có nhóm cũ.
-Trong fixture, fingerprint nhỏ nhất thuộc phương án 8 nhóm nên được chọn; đây không phải quy tắc ưu tiên 8 nhóm.
+Cả bốn phương án đều đạt rules, Group Score 100%, ngang các tiêu chí ngành/bảo toàn khi không có nhóm cũ.
+Khi triển khai ban đầu (trước mục 8.15), fingerprint nhỏ nhất trong fixture thuộc phương án 8 nhóm nên được chọn;
+đây không phải quy tắc ưu tiên 8 nhóm. Sau mục 8.15, MAX=6 khiến phương án 6 nhóm được ưu tiên khi các tiêu chí trên hòa.
 Một fixture 8 nhóm khác đổi phân bố SE của hai nhóm từ 2/2 sang 1/3, vẫn đạt rules/sĩ số nhưng P=13,
 Excess=1; phương án P=12/Excess=0 được chọn trước. Có test protected buộc giữ cụm 3 SE: vẫn chỉ đề xuất
 phương án hợp lệ đã lưu và báo hạn chế, không sửa protected hoặc tuyên bố đã tối ưu toàn cục.
@@ -1189,6 +1192,8 @@ Files bổ sung/sửa trong lượt Recommended Plan:
 - Tài liệu: chỉ cập nhật file thống nhất này.
 
 ### 8.14. Audit Recommendation và Smart Group Suggestions UI (26/10/2026)
+
+Phần audit dưới đây ghi nhận thời điểm chưa thêm tiêu chí sĩ số; đề xuất ranking đã được triển khai tại mục 8.15.
 
 #### Kết quả audit — không đổi thuật toán
 
@@ -1258,3 +1263,52 @@ hay luôn ưu tiên 5–6 người, và có muốn tiêu chí này vượt tiêu
   1440/1024/768/390px, reduced-motion, badge đúng planId Backend, Random Again, View/Apply confirmation,
   trạng thái History sau Apply đều PASS, có screenshots. Tất cả request ghi trong browser bị mock;
   không gọi Preview/Apply thật, không sửa schema/migration, không kiểm thử E2E lưu MySQL thật.
+
+### 8.15. Ưu tiên sĩ số gần MAX trong Recommendation (26/10/2026)
+
+#### Tiêu chí mềm và thứ tự ưu tiên
+
+- Giữ nguyên eligibility: scope/owner/snapshot, rules, balance tối đa 1, membership/Leader và protected đều
+  được kiểm tra trước ranking. Không dùng sĩ số để cứu một phương án vi phạm quy định.
+- Đọc MAX_MEMBERS_PER_GROUP từ rules **đã resolve trong snapshot hiện tại**, không đọc rules theo từng phương án.
+  Cấu hình DB chưa lưu vẫn được validator resolve default theo policy hiện có. Nếu snapshot không có MAX đang bật
+  với giá trị dương xác định được, bỏ toàn bộ tie-break sĩ số/số nhóm mới; không tự hardcode MAX=6.
+- Với các nhóm không được bảo vệ của phương án, tính `C = Σ(M − n_g)² / G_editable`, trong đó M là MAX đang bật,
+  n_g là sĩ số nhóm và G_editable là số nhóm OPEN/REVOKED hoặc nhóm mới. Không có nhóm editable thì C=0.
+  PENDING/ACCEPTED bị loại khỏi phép tính, giữ nguyên các kiểm tra bất biến cũ.
+- Sau khi eligibility đạt, comparator lần lượt xét: **Excess ngành thấp hơn → nhiều draft hợp lệ giữ nguyên hơn
+  → nhiều Leader cũ giữ nguyên hơn → ít sinh viên cũ chuyển nhóm hơn → C thấp hơn → ít nhóm tổng hơn
+  → planFingerprint → previewId**. Hai bước C/số nhóm chỉ áp dụng khi MAX xác định được như trên.
+  Không đánh đổi ngành, bảo toàn hoặc movements để làm đầy nhóm.
+- Đây là tie-break nội bộ của AllocationRecommendationService, không phải Group Score/Compatibility Score mới.
+  Lưu tổng bình phương và mẫu số trong private record, so sánh phân số chính xác bằng BigInteger nhân chéo;
+  không làm tròn hoặc so sánh phần trăm có thể tạo hòa giả. Không thêm field/reason code vào API DTO.
+  equivalentPlans giờ tính cả tiêu chí mới trước bước fingerprint/ID; các reasons/metrics cũ vẫn lấy số liệu thật.
+
+Với EXE101_G201 theo bộ số liệu đã audit: 36 sinh viên, MAX=6, không protected và các tiêu chí trước đó hòa:
+
+| Target | Sĩ số | C | Ưu tiên mới |
+|---|---|---:|---:|
+| 6 | 6 × 6 | 0 | 1 |
+| 7 | 6 × 5 + 1 × 6 | 6/7 | 2 |
+| 8 | 4 × 4 + 4 × 5 | 2.5 | 3 |
+| 9 | 9 × 4 | 4 | 4 |
+
+Trước: phương án 9 thắng vì fingerprint nhỏ hơn. Sau: phương án 6 thắng qua C, không còn dùng fingerprint
+để phân biệt bốn phương án này. Đây là kết quả theo dữ liệu/rules đã nêu và fixture kiểm thử, không phải
+một lần Random/Apply hay ghi dữ liệu trên MySQL ứng dụng. Nếu phương án 6 có ngành/bảo toàn kém hơn,
+phương án nhiều nhóm hơn vẫn có thể thắng qua tiêu chí đứng trước.
+
+#### Kiểm thử và phạm vi
+
+- **167 Backend tests PASS**, 0 failure/error: Recommendation 24, AllocationResource 45, SmartAllocation engine 43,
+  Group Score 18, Atomic Apply/History 37. `bootJar` PASS; datasource integration là H2 riêng, MySQL test opt-in tắt.
+- Bổ sung tests 36 sinh viên/target 6–9, MAX=4/6/9, MAX thiếu/tắt, vi phạm rules, ngành kém hơn,
+  giữ draft hợp lệ, ít movements khi các ưu tiên trước hòa, PENDING/ACCEPTED, fully-equivalent fingerprint/ID,
+  thứ tự History đảo ngược và snapshot/saved plan không mutation.
+- HTTP integration dùng MAX=8 với 8 sinh viên, tạo hai Preview thật bằng engine trong H2 (1 × 8 và 2 × 4),
+  Recommendation chọn 1 × 8; giữ JSON contract, payload Preview byte-for-byte, 0 insert/update/delete trong
+  Recommendation, không gọi engine.allocate, không event/email và không đổi group/membership.
+- Chỉ sửa production logic trong AllocationRecommendationService.java; cập nhật hai test classes tương ứng và tài liệu này.
+  Không sửa Engine, DTO/API, Preview/History/Apply production, scoring, UI/i18n, Zalo/Cloudinary, schema hoặc migration.
+  Giữ các thay đổi Zalo chưa commit có sẵn; không truy cập/ghi MySQL thật, không commit/push.
