@@ -31,19 +31,22 @@ public class SchoolClassService {
     private final SchoolClassAccessService accessService;
     private final TermService termService;
     private final LecturerRepository lecturerRepository;
+    private final GroupEventPublisher groupEventPublisher;
 
     public SchoolClassService(
             SchoolClassRepository schoolClassRepository,
             StudentRepository studentRepository,
             SchoolClassAccessService accessService,
             TermService termService,
-            LecturerRepository lecturerRepository
+            LecturerRepository lecturerRepository,
+            GroupEventPublisher groupEventPublisher
     ) {
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
         this.accessService = accessService;
         this.termService = termService;
         this.lecturerRepository = lecturerRepository;
+        this.groupEventPublisher = groupEventPublisher;
     }
 
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
@@ -62,6 +65,8 @@ public class SchoolClassService {
         if (!Objects.equals(schoolClass.getLecturerId(), lecturerId)) {
             schoolClass.setLecturerId(lecturerId);
             schoolClassRepository.saveAndFlush(schoolClass);
+            // Assignment changes also change which lecturer-wide Zalo students may view.
+            groupEventPublisher.publish("ZALO_SHARE_UPDATED", null, null, classId, null, null);
         }
         return schoolClassRepository.findClassDTOById(classId).orElseThrow();
     }

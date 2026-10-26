@@ -1,5 +1,6 @@
 import { LecturerGroupReviewPage } from '@/pages/lecturer/LecturerGroupReviewPage';
 import { LecturerAllocationPage } from '@/pages/lecturer/LecturerAllocationPage';
+import { LecturerZaloPage } from '@/pages/lecturer/LecturerZaloPage';
 import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
@@ -34,6 +35,7 @@ import { LecturerGroupWorkspacePage } from '@/pages/lecturer/LecturerGroupWorksp
 import { StudentDashboardPage } from '@/pages/student/StudentDashboardPage';
 import { StudentProfilePage } from '@/pages/student/StudentProfilePage';
 import { SelectGroupPage } from '@/pages/student/SelectGroupPage';
+import { StudentZaloPage } from '@/pages/student/StudentZaloPage';
 import { UnauthorizedPage } from '@/pages/errors/UnauthorizedPage';
 import { NotFoundPage } from '@/pages/errors/NotFoundPage';
 
@@ -149,6 +151,7 @@ export const router = createBrowserRouter([
       { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
       { path: 'automatic-allocation', element: <LecturerAllocationPage /> },
       { path: 'automatic-allocation/:classId', element: <LecturerAllocationPage /> },
+      { path: 'zalo-groups', element: <LecturerZaloPage /> },
     ],
   },
 
@@ -166,6 +169,7 @@ export const router = createBrowserRouter([
       { path: 'classes/:id', element: <LecturerClassDetailPage /> },
       { path: 'deadlines', element: <LecturerDeadlinePage /> },
       { path: 'profile', element: <LecturerProfilePage /> },
+      { path: 'zalo-groups', element: <LecturerZaloPage /> },
       { path: 'groups', element: <LecturerGroupWorkspacePage /> },
       { path: 'group-review', element: <LecturerGroupReviewPage /> },
       { path: 'automatic-allocation', element: <LecturerAllocationPage /> },
@@ -202,6 +206,14 @@ export const router = createBrowserRouter([
       {
         path: 'select-group',
         element: <SelectGroupPage />,
+      },
+      {
+        path: 'zalo-groups',
+        element: <StudentZaloPage />,
+      },
+      {
+        path: 'zalo',
+        element: <Navigate to="/student/zalo-groups" replace />,
       },
     ],
   },

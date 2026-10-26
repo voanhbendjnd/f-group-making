@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigInteger;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -44,6 +45,9 @@ public class AllocationRecommendationService {
         if (AllocationPreviewService.isAllocationComplete(current.overview())
                 || "CANCELLED".equals(current.overview().scope().deadlineStatus())) return empty(fingerprint);
         Long owner = access.currentLecturerId();
+        Integer maximumMembers = current.snapshot().rules().stream()
+            .filter(rule -> rule.code() == MAX_MEMBERS_PER_GROUP && Boolean.TRUE.equals(rule.status()))
+            .map(GroupingRuleDTO::value).filter(value -> value != null && value > 0).findFirst().orElse(null);
         Candidate best = null;
         int eligible = 0, equivalent = 0, page = 0;
         boolean more;
@@ -61,8 +65,9 @@ public class AllocationRecommendationService {
                     Metrics metrics = evaluate(current, saved);
                     if (metrics == null) continue;
                     eligible++;
-                    var candidate = new Candidate(row.getId(), row.getPlanFingerprint(), metrics, saved.result().searchComplete());
-                    int comparison = best == null ? -1 : compareQuality(candidate.metrics(), best.metrics());
+                    var candidate = new Candidate(row.getId(), row.getPlanFingerprint(), metrics, saved.result().searchComplete(),
+                        sizePreference(maximumMembers, saved.groups()));
+                    int comparison = best == null ? -1 : compareQuality(candidate, best);
                     if (comparison < 0) { best = candidate; equivalent = 1; }
                     else if (comparison == 0) {
                         equivalent++;
@@ -77,7 +82,21 @@ public class AllocationRecommendationService {
             best.metrics(), reasons(best, equivalent));
     }
 
-    private record Candidate(String id, String fingerprint, Metrics metrics, boolean searchComplete) {}
+    private record Candidate(String id, String fingerprint, Metrics metrics, boolean searchComplete, SizePreference sizePreference) {}
+    // Internal tie-break only: keep the exact mean as a fraction, without rounding or changing the API/Group Score.
+    private record SizePreference(BigInteger squaredShortfall, int groups) implements Comparable<SizePreference> {
+        @Override public int compareTo(SizePreference other) {
+            return squaredShortfall.multiply(BigInteger.valueOf(other.groups))
+                .compareTo(other.squaredShortfall.multiply(BigInteger.valueOf(groups)));
+        }
+    }
+    private static SizePreference sizePreference(Integer maximumMembers, List<GroupView> groups) {
+        if (maximumMembers == null) return null; // Missing/disabled MAX adds no new ranking preference.
+        var editable = groups.stream().filter(group -> !group.protectedGroup()).toList();
+        var sum = editable.stream().map(group -> BigInteger.valueOf((long) maximumMembers - group.members().size()).pow(2))
+            .reduce(BigInteger.ZERO, BigInteger::add);
+        return new SizePreference(sum, Math.max(1, editable.size())); // No editable groups: mean shortfall is zero.
+    }
     private static AllocationRecommendationDTO empty(String fingerprint) {
         return new AllocationRecommendationDTO(fingerprint, null, null, 0, 0, null, List.of());
     }
@@ -162,11 +181,16 @@ public class AllocationRecommendationService {
 
     private static Set<Long> ids(List<GroupMemberDTO> members) { return members.stream().map(GroupMemberDTO::getStudentId).collect(Collectors.toSet()); }
     private static boolean draft(GroupStatus status) { return status == GroupStatus.OPEN || status == GroupStatus.REVOKED; }
-    private static int compareQuality(Metrics a, Metrics b) {
+    private static int compareQuality(Candidate first, Candidate second) {
+        Metrics a = first.metrics(), b = second.metrics();
         int cmp = Long.compare(a.excessMajorPairs(), b.excessMajorPairs());
         if (cmp == 0) cmp = Integer.compare(b.validDraftsPreserved(), a.validDraftsPreserved());
         if (cmp == 0) cmp = Integer.compare(b.leadersPreserved(), a.leadersPreserved());
         if (cmp == 0) cmp = Integer.compare(a.movedStudents(), b.movedStudents());
+        if (cmp == 0 && first.sizePreference() != null && second.sizePreference() != null) {
+            cmp = first.sizePreference().compareTo(second.sizePreference());
+            if (cmp == 0) cmp = Integer.compare(a.groups(), b.groups());
+        }
         // Group Score and candidate Compatibility Score are diagnostic, not additional weighted terms:
         // eligibility has already checked the same rules. Admission utility is not comparable across targets.
         return cmp;

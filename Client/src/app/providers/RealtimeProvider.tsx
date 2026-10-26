@@ -26,7 +26,9 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     entry.subscription = client.subscribe(topic, frame => {
       try {
         const event: RealtimeEvent = JSON.parse(frame.body);
-        if (!event.eventType || !event.deadlineId) return;
+        const classShareChanged = event.eventType === 'ZALO_SHARE_UPDATED'
+          && Number.isSafeInteger(event.schoolClassId) && Number(event.schoolClassId) > 0;
+        if (!event.eventType || (!event.deadlineId && !classShareChanged)) return;
         if (event.eventType.startsWith('DEADLINE_') && event.version !== undefined) {
           if (event.version < (receivedVersions.current.get(event.deadlineId) ?? -1)) return;
           receivedVersions.current.set(event.deadlineId, event.version);
@@ -36,7 +38,14 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           seen.current.add(event.eventId);
           if (seen.current.size > 500) seen.current.delete(seen.current.values().next().value!);
         }
-        void syncDeadlineQueries(clientQueries, event);
+        if (classShareChanged) {
+          // A class can share Zalo before a grouping session/deadline exists.
+          // Revalidate through the authorized endpoint without replacing cards with a temporary empty list.
+          // The Zalo panel hides cached data on access errors and applies removals from the fresh response.
+          void clientQueries.invalidateQueries({ queryKey: ['zalo-mine'] });
+        } else {
+          void syncDeadlineQueries(clientQueries, event);
+        }
         for (const value of entries.current.values()) value.listeners.forEach(listener => listener(event));
       } catch (error) { console.error('Invalid realtime message', error); }
     });

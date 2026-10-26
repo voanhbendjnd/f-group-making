@@ -57,7 +57,7 @@ export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint
       {error !== null && failure(error)}
       {history.isError && failure(history.error)}
       {(!history.isError || history.data) && <Table className="allocation-plan-history-table" tableLayout="fixed" rowKey="planId" loading={history.isPending} dataSource={history.data?.result ?? []} size="small" scroll={{ x: 1030 }}
-        locale={{ emptyText: t('allocation.noRandomHistory') }} pagination={{ current: page, pageSize: 10, total: history.data?.meta.total ?? 0, showSizeChanger: false, position: ['bottomRight'], onChange: setPage }} columns={[
+        locale={{ emptyText: t('allocation.noRandomHistory') }} pagination={{ current: page, pageSize: 10, total: history.data?.meta.total ?? 0, showSizeChanger: false, placement: ['bottomEnd'], onChange: setPage }} columns={[
           { title: t('allocation.randomAt'), width: 124, render: (_, row) => <time className="allocation-table-time" dateTime={row.createdAt}><strong>{new Date(row.createdAt).toLocaleDateString(i18n.language)}</strong><span>{new Date(row.createdAt).toLocaleTimeString(i18n.language)}</span></time> },
           { title: t('allocation.actor'), width: 146, render: (_, row) => actor(row) },
           { title: t('allocation.target'), dataIndex: 'targetGroupCount', width: 130, align: 'center', className: 'allocation-history-number' },

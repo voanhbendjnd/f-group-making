@@ -11,6 +11,7 @@ import {
   GraduationCap,
   Layers,
   Clock,
+  MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '@/app/providers/AuthContext';
 import { TermSelect } from '@/features/terms/components/TermSelect';
@@ -62,6 +63,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: <Layers size={18} />,
         },
         { to: '/admin/group-review', label: t('groupReview.title'), icon: <Users size={18} /> },
+        { to: '/admin/zalo-groups', label: t('zalo.title'), icon: <MessageCircle size={18} /> },
         {
           to: '/admin/students',
           group: 'adminUx.navigationPeople',
@@ -80,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { to: '/lecturer/deadlines', label: t('nav.lecturerDeadlines'), icon: <Clock size={18} /> },
         { to: '/lecturer/automatic-allocation', label: t('allocation.title'), icon: <Sparkles size={18} /> },
         { to: '/lecturer/classes', label: t('lecturer.classesAndRules'), icon: <Layers size={18} /> },
+        { to: '/lecturer/zalo-groups', label: t('zalo.title'), icon: <MessageCircle size={18} /> },
       ] : [
         {
           to: '/student/dashboard',
@@ -90,6 +93,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           to: '/student/groups/select',
           label: t('nav.selectGroup', 'Chọn nhóm'),
           icon: <Users size={18} />,
+        },
+        {
+          to: '/student/zalo-groups',
+          label: t('zalo.title'),
+          icon: <MessageCircle size={18} />,
         },
       ];
 

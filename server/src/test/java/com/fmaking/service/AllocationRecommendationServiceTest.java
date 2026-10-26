@@ -8,6 +8,9 @@ import com.fmaking.service.dto.AllocationPreviewDTO.*;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.SliceImpl;
 
@@ -49,11 +52,12 @@ class AllocationRecommendationServiceTest {
             });
     }
 
-    @Test void comparesSixSevenEightNineWithoutFavoringMoreGroupsOrNewerRandoms() {
-        add("p6", "d", plan(6)); add("p7", "c", plan(7)); add("p8", "a", plan(8)); add("p9", "b", plan(9));
+    @Test void prefersSixFullGroupsForThirtySixStudentsWhenEarlierCriteriaAreEqual() {
+        add("p6", "d", plan(6)); add("p7", "c", plan(7)); add("p8", "b", plan(8)); add("p9", "a", plan(9));
         var result = service.recommend(7, 20);
-        assertThat(result.planId()).isEqualTo("p8"); // Stable fingerprint, not target, date or list order.
-        assertThat(result.eligiblePlans()).isEqualTo(4); assertThat(result.equivalentPlans()).isEqualTo(4);
+        assertThat(result.planId()).isEqualTo("p6"); // Fullness now decides before the smaller p9 fingerprint.
+        assertThat(result.eligiblePlans()).isEqualTo(4); assertThat(result.equivalentPlans()).isEqualTo(1);
+        assertThat(result.metrics().sizeDistribution()).containsExactly(new AllocationRecommendationDTO.SizeCount(6, 6));
         assertThat(result.metrics().excessMajorPairs()).isZero();
         var raw = new ArrayList<Long>(); var excess = new ArrayList<Long>();
         for (int count : List.of(6, 7, 8, 9)) {
@@ -67,6 +71,120 @@ class AllocationRecommendationServiceTest {
         assertThat(excess).containsOnly(0L);
         Collections.reverse(rows);
         assertThat(service.recommend(7, 20).planId()).isEqualTo(result.planId());
+        verifyNoInteractions(rulesRepository);
+    }
+
+    @Test void majorQualityOutranksFewerFullGroups() {
+        var compact = plan(6);
+        var groups = new ArrayList<>(compact.groups());
+        var first = new ArrayList<>(groups.get(0).members());
+        var second = new ArrayList<>(groups.get(1).members());
+        // 2/2/2 + 2/2/2 becomes 3/1/2 + 1/3/2, still rule-valid and full.
+        var member = first.get(4); first.set(4, second.get(3)); second.set(3, member);
+        groups.set(0, regroup(groups.get(0), first)); groups.set(1, regroup(groups.get(1), second));
+        compact = withGroups(compact, groups);
+        assertThat(service.evaluate(current, compact).excessMajorPairs()).isGreaterThan(0);
+        assertThat(service.evaluate(current, plan(9)).excessMajorPairs()).isZero();
+        add("full-but-concentrated", "a", compact); add("balanced", "z", plan(9));
+        assertThat(service.recommend(7, 20).planId()).isEqualTo("balanced");
+    }
+
+    @Test void aMoreCompactPlanCannotBypassEnabledRules() {
+        add("oversized", "a", plan(5)); add("valid", "z", plan(6));
+        var result = service.recommend(7, 20);
+        assertThat(result.planId()).isEqualTo("valid"); assertThat(result.eligiblePlans()).isEqualTo(1);
+    }
+
+    @Test void preservingValidDraftsOutranksReducingTheGroupCount() {
+        var students = students(12);
+        var a = existing(1L, GroupStatus.OPEN, students.subList(0, 4));
+        var b = existing(2L, GroupStatus.REVOKED, students.subList(4, 8));
+        var c = existing(3L, GroupStatus.OPEN, students.subList(8, 12));
+        setCurrent(students, List.of(a, b, c), rules());
+        var preserved = withGroups(plan(3), List.of(view(a), view(b), view(c)));
+        var merged = withGroups(plan(2), List.of(assigned(a, students.subList(0, 6), 1L), assigned(b, students.subList(6, 12), 7L)));
+        assertThat(service.evaluate(current, preserved).excessMajorPairs()).isEqualTo(service.evaluate(current, merged).excessMajorPairs());
+        assertThat(service.evaluate(current, preserved).validDraftsPreserved()).isEqualTo(3);
+        assertThat(service.evaluate(current, merged).validDraftsPreserved()).isZero();
+        add("merged-full", "a", merged); add("preserved", "z", preserved);
+        assertThat(service.recommend(7, 20).planId()).isEqualTo("preserved");
+    }
+
+    @Test void fewerMovementsOutrankFullnessWhenMajorsDraftsAndLeadersAreEqual() {
+        var students = students(12);
+        var a = existing(1L, GroupStatus.OPEN, students.subList(0, 2));
+        var b = existing(2L, GroupStatus.REVOKED, students.subList(2, 4));
+        var c = existing(3L, GroupStatus.OPEN, students.subList(4, 6));
+        setCurrent(students, List.of(a, b, c), rules());
+        var fewerMoves = withGroups(plan(3), List.of(assigned(a, students.subList(0, 4), 1L),
+            assigned(c, students.subList(4, 8), 5L), assigned(b, students.subList(8, 12), 9L)));
+        var fuller = withGroups(plan(2), List.of(
+            assigned(a, List.of(students.get(0), students.get(1), students.get(2), students.get(3), students.get(7), students.get(5)), 1L),
+            assigned(c, List.of(students.get(6), students.get(4), students.get(8), students.get(9), students.get(10), students.get(11)), 5L)));
+        var fewerMetrics = service.evaluate(current, fewerMoves); var fullerMetrics = service.evaluate(current, fuller);
+        assertThat(fewerMetrics.excessMajorPairs()).isEqualTo(fullerMetrics.excessMajorPairs());
+        assertThat(fewerMetrics.validDraftsPreserved()).isEqualTo(fullerMetrics.validDraftsPreserved()).isZero();
+        assertThat(fewerMetrics.leadersPreserved()).isEqualTo(fullerMetrics.leadersPreserved()).isEqualTo(2);
+        assertThat(fewerMetrics.movedStudents()).isEqualTo(2); assertThat(fullerMetrics.movedStudents()).isEqualTo(3);
+        add("fuller", "a", fuller); add("fewer-moves", "z", fewerMoves);
+        assertThat(service.recommend(7, 20).planId()).isEqualTo("fewer-moves");
+    }
+
+    @ParameterizedTest @CsvSource({"4,9", "6,6", "9,4"})
+    void adaptsToTheEnabledMaximumInsteadOfHardcodingSix(int maximum, int expectedTarget) {
+        var configured = rules().stream().map(rule -> rule.code() == MAX_MEMBERS_PER_GROUP
+            ? new GroupingRuleDTO(rule.code(), maximum, true) : rule).toList();
+        setCurrent(students(36), List.of(), configured);
+        for (int count : List.of(4, 6, 9)) add("p" + count, "f" + count, plan(count));
+        assertThat(service.recommend(7, 20).targetGroupCount()).isEqualTo(expectedTarget);
+    }
+
+    @Test void missingOrDisabledMaximumKeepsThePreviousFingerprintTieBreak() {
+        var withoutMaximum = rules().stream().filter(rule -> rule.code() != MAX_MEMBERS_PER_GROUP).toList();
+        var disabledMaximum = rules().stream().map(rule -> rule.code() == MAX_MEMBERS_PER_GROUP
+            ? new GroupingRuleDTO(rule.code(), 1000, false) : rule).toList();
+        for (var configured : List.of(withoutMaximum, disabledMaximum)) {
+            rows.clear(); plans.clear(); setCurrent(students(36), List.of(), configured);
+            add("six", "z", plan(6)); add("nine", "a", plan(9));
+            var result = service.recommend(7, 20);
+            assertThat(result.planId()).isEqualTo("nine"); assertThat(result.equivalentPlans()).isEqualTo(2);
+        }
+    }
+
+    @Test void fullyEquivalentPlansStillUseFingerprintThenIdRegardlessOfHistoryOrder() {
+        add("first", "z", plan(6)); add("second", "a", plan(6)); add("third", "a", plan(6));
+        var result = service.recommend(7, 20);
+        assertThat(result.planId()).isEqualTo("second"); assertThat(result.equivalentPlans()).isEqualTo(3);
+        Collections.reverse(rows);
+        assertThat(service.recommend(7, 20)).isEqualTo(result);
+    }
+
+    @ParameterizedTest @EnumSource(value = GroupStatus.class, names = {"PENDING", "ACCEPTED"})
+    void sizePreferenceLeavesProtectedGroupsUnchanged(GroupStatus status) {
+        var students = students(36); var protectedGroup = existing(1L, status, students.subList(0, 6));
+        setCurrent(students, List.of(protectedGroup), rules());
+        for (int count : List.of(6, 7)) {
+            var planned = new ArrayList<GroupView>(); planned.add(view(protectedGroup));
+            planned.addAll(planFromMembers(count - 1, students.subList(6, 36)).groups());
+            add("p" + count, count == 7 ? "a" : "z", withGroups(plan(count), planned));
+        }
+        var result = service.recommend(7, 20);
+        assertThat(result.planId()).isEqualTo("p6"); assertThat(result.eligiblePlans()).isEqualTo(2);
+        assertThat(result.metrics().protectedGroups()).isEqualTo(1);
+        assertThat(protectedGroup.getStatus()).isEqualTo(status);
+        assertThat(plans.get("p6").groups().getFirst().members()).containsExactlyElementsOf(protectedGroup.getMembers());
+        assertThat(plans.get("p6").groups().getFirst().leaderId()).isEqualTo(protectedGroup.getLeaderId());
+    }
+
+    @Test void rankingDoesNotMutateTheSnapshotSavedPlansOrEngineResults() throws Exception {
+        add("six", "z", plan(6)); add("nine", "a", plan(9));
+        var mapper = new ObjectMapper().findAndRegisterModules();
+        String snapshotBefore = mapper.writeValueAsString(current), plansBefore = mapper.writeValueAsString(plans);
+        var first = service.recommend(7, 20);
+        assertThat(service.recommend(7, 20)).isEqualTo(first);
+        assertThat(mapper.writeValueAsString(current)).isEqualTo(snapshotBefore);
+        assertThat(mapper.writeValueAsString(plans)).isEqualTo(plansBefore);
+        verify(repository, never()).save(any()); verify(repository, never()).delete(any());
         verifyNoInteractions(rulesRepository);
     }
 
@@ -269,6 +387,11 @@ class AllocationRecommendationServiceTest {
     private GroupView view(GroupDTO old) {
         return new GroupView(old.getId(), old.getName(), old.getStatus(), old.getLeaderId(), "Leader", old.getStatus() == GroupStatus.ACCEPTED || old.getStatus() == GroupStatus.PENDING,
             old.getMembers(), null, List.of(), true);
+    }
+    private GroupView assigned(GroupDTO old, List<GroupMemberDTO> members, Long leader) {
+        return new GroupView(old.getId(), old.getName(), old.getStatus(), leader, "Leader", false,
+            members.stream().map(member -> copy(member, member.getStudentId().equals(leader) ? GroupMemberRole.LEADER : GroupMemberRole.MEMBER)).toList(),
+            null, List.of(), true);
     }
     private AllocationPreview add(String id, String fingerprint, AllocationPreviewDTO plan) {
         var row = new AllocationPreview(); row.setId(id); row.setOwnerId(7L); row.setSchoolClassId(20); row.setDeadlineId(7);
