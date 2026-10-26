@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, ConfigProvider, Empty, Input, Modal, Pagination, Skeleton, Tabs, Tag, Tooltip } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import enUS from 'antd/locale/en_US';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, History, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Target, TriangleAlert, UserRound, Users, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, GitFork, History, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Target, TriangleAlert, UserRound, Users, UsersRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useTerm } from '@/app/providers/TermContext';
@@ -18,6 +18,7 @@ import { AllocationReport } from '@/features/allocation/components/AllocationRep
 import { AllocationPlanHistory } from '@/features/allocation/components/AllocationPlanHistory';
 import { AllocationApplyHistory } from '@/features/allocation/components/AllocationHistory';
 import { AllocationIllustration } from '@/features/allocation/components/AllocationIllustration';
+import { AllocationThinking } from '@/features/allocation/components/AllocationThinking';
 import { allocationErrorKey } from '@/features/allocation/utils';
 import './LecturerAllocationPage.css';
 
@@ -51,7 +52,7 @@ function AllocationClassSelection() {
     {route.classId && (classes.isPending || classes.isError || !selected) && backAction}
     {!route.classId && <section className="allocation-welcome">
       <header className="allocation-hero allocation-list-hero">
-        <div className="allocation-hero-copy"><span className="allocation-eyebrow">{t('allocation.title')}</span><h1>{t('allocation.heroTitle')}</h1><p>{t('allocation.heroDescription')}</p></div>
+        <div className="allocation-hero-copy"><span className="allocation-eyebrow">{t('allocation.eyebrow')}</span><h1>{t('allocation.heroTitle')}</h1><p>{t('allocation.heroDescription')}</p></div>
         <AllocationIllustration />
       </header>
       <section className="allocation-process" aria-label={t('allocation.howItWorks')}>
@@ -173,13 +174,49 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
         </div>
         <AllocationReasons reasons={[...setup.range.reasons, ...setup.warnings]} />
         <div className="allocation-setup-notes"><p>{t('allocation.preliminaryHint')}</p><p>{t('allocation.balanceHint')}</p>
-          <details><summary>{t('allocation.searchDetails')}</summary><p>{t('allocation.searchLimits', { nodes: setup.limits.maximumSearchNodes, depth: setup.limits.maximumSearchDepth })}</p></details>
+          <details><summary>{t('allocation.searchDetails')}</summary><p>{t('allocation.searchLimits', { nodes: setup.limits.maximumSearchNodes, depth: setup.limits.maximumSearchDepth })}</p>
+            <p>{t(setup.limits.createsNewGroups ? 'allocation.newGroupsAllowed' : 'allocation.noNewGroups')}</p></details>
         </div></div>
-        {flow.previewLoading && <div role="status" aria-label={t('allocation.calculating')}><Skeleton active /><p>{t('allocation.calculating')}</p></div>}
+        {flow.previewLoading && <AllocationThinking />}
         {flow.previewError !== null && <AllocationError error={flow.previewError} retry={flow.autoAgain} />}
         {flow.preview && <div className="allocation-preview" aria-label={t('allocation.previewData')}>
-          <div className="allocation-heading"><div><h2>{t('allocation.previewData')}</h2><p>{t('allocation.planSavedHint')}</p></div>
-            <Tag color={flow.preview.result.status === 'FEASIBLE' ? 'success' : 'warning'}>{t(`allocation.status.${flow.preview.result.status}`)}</Tag></div>
+          <div className={flow.preview.result.status === 'FEASIBLE' ? 'allocation-smart-suggestion-banner' : 'allocation-heading'}>
+            <div className="allocation-smart-suggestion-top">
+              <div className="allocation-smart-suggestion-title">
+                {flow.preview.result.status === 'FEASIBLE' && <span className="allocation-smart-suggestion-badge">
+                <Sparkles size={14} aria-hidden="true" />
+                <span>{t(flow.savedPlan ? 'allocation.savedPlan' : 'allocation.smartSuggestions.badge')}</span>
+                </span>}
+                <h2>{t(flow.preview.result.status === 'FEASIBLE' ? 'allocation.previewData' : 'allocation.targetResult')}</h2>
+              </div>
+              <Tag color={flow.preview.result.status === 'FEASIBLE' ? 'success' : 'warning'}>{t(`allocation.status.${flow.preview.result.status}`)}</Tag>
+            </div>
+            {flow.preview.result.status === 'FEASIBLE' && <div className="allocation-smart-suggestion-body">
+              <p className="allocation-smart-suggestion-target">{t('allocation.recommendation.target', { count: flow.preview.result.targetGroupCount })}</p>
+              <p className="allocation-smart-suggestion-desc">
+                {t(flow.savedPlan ? 'allocation.savedPlanHint' : 'allocation.planSavedHint')}
+              </p>
+              {flow.preview.result.optimization && (
+                <div className="allocation-smart-metrics">
+                  <div className="allocation-smart-metric-pill">
+                    <ShieldCheck size={14} aria-hidden="true" />
+                    <span>{t('allocation.smartSuggestions.validKept')}: <strong>{flow.preview.result.optimization.validGroupsPreserved}</strong></span>
+                  </div>
+                  <div className="allocation-smart-metric-pill">
+                    <UserRound size={14} aria-hidden="true" />
+                    <span>{t('allocation.smartSuggestions.leadersKept')}: <strong>{flow.preview.result.optimization.leadersPreserved}</strong></span>
+                  </div>
+                  {report && <><div className="allocation-smart-metric-pill">
+                    <GitFork size={14} aria-hidden="true" />
+                    <span>{t('allocation.smartSuggestions.studentsMoved')}: <strong>{report.movements.filter(movement => !movement.previouslyUnassigned).length}</strong></span>
+                  </div><div className="allocation-smart-metric-pill">
+                    <Users size={14} aria-hidden="true" />
+                    <span>{t('allocation.allocated')}: <strong>{report.movements.filter(movement => movement.previouslyUnassigned).length}</strong></span>
+                  </div></>}
+                </div>
+              )}
+            </div>}
+          </div>
           <AllocationReasons reasons={flow.preview.result.warnings} />
           {flow.preview.sameAsPreviousPlan && <Alert type="info" title={t('allocation.samePlan')} />}
           {flow.stale && <Alert type="warning" title={t('allocation.errors.allocationPreviewStale')} />}

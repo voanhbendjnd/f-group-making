@@ -22,7 +22,7 @@ export function AllocationApplyHistory({ classId, deadlineId }: { classId: numbe
       <Button icon={<RefreshCw size={15} aria-hidden="true" />} loading={history.isFetching} onClick={() => void history.refetch()}>{t('allocation.refresh')}</Button></div>
     {history.isError ? <Alert type="error" showIcon title={t(`allocation.errors.${allocationErrorKey(history.error)}`, { defaultValue: t('allocation.errors.other') })} /> :
       <Table rowKey="runId" loading={history.isPending} dataSource={history.data?.result ?? []} size="small" scroll={{ x: 580 }}
-        locale={{ emptyText: t('allocation.noHistory') }} pagination={{ current: page, pageSize: 10, total: history.data?.meta.total ?? 0, showSizeChanger: false, position: ['bottomRight'], onChange: setPage }} columns={[
+        locale={{ emptyText: t('allocation.noHistory') }} pagination={{ current: page, pageSize: 10, total: history.data?.meta.total ?? 0, showSizeChanger: false, placement: ['bottomEnd'], onChange: setPage }} columns={[
           { title: t('allocation.appliedAt'), render: (_, row) => <time className="allocation-table-time" dateTime={row.appliedAt}><strong>{new Date(row.appliedAt).toLocaleDateString(i18n.language)}</strong><span>{new Date(row.appliedAt).toLocaleTimeString(i18n.language)}</span></time> },
           { title: t('allocation.actor'), render: (_, row) => actor(row.actorId) },
           { title: t('allocation.target'), dataIndex: 'targetGroupCount' },

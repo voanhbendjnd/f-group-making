@@ -1187,3 +1187,74 @@ Files bổ sung/sửa trong lượt Recommended Plan:
 - Tests: `AllocationRecommendationServiceTest.java`, `AllocationResourceTest.java`,
   `Client/src/test/allocationFlow.test.tsx`, `allocationApi.test.ts`, `allocationFixtures.ts`.
 - Tài liệu: chỉ cập nhật file thống nhất này.
+
+### 8.14. Audit Recommendation và Smart Group Suggestions UI (26/10/2026)
+
+#### Kết quả audit — không đổi thuật toán
+
+`AllocationRecommendationService.compareQuality` vẫn so sánh theo thứ tự: Excess ngành nhỏ hơn →
+giữ nhiều draft vốn hợp lệ hơn → giữ nhiều Leader cũ hơn → ít sinh viên từ nhóm cũ phải chuyển hơn.
+Nếu hòa, chọn `planFingerprint` rồi `previewId` nhỏ hơn theo thứ tự từ điển. Không có ưu tiên sĩ số 5–6,
+gần MAX_MEMBERS, số nhóm ít hơn, thời gian tạo hay Group Score cao hơn trong comparator.
+Group Score và Compatibility utility không được cộng vào ranking. Scan toàn bộ History đủ điều kiện,
+theo batch 50, cùng owner/scope/snapshot, chưa Apply và được validator xác minh lại; không chỉ trang UI.
+
+Đọc MySQL **chỉ SELECT** tìm thấy đúng bộ bốn phương án lớp EXE101_G201 (class 20/session 7),
+36 sinh viên: 10 SE và 13 ngành khác, mỗi ngành 2 sinh viên. Cùng snapshot fingerprint `1f733649…`,
+chưa Apply; tại thời điểm đọc không có nhóm thật trong scope này. Rules bật: 4–6 thành viên, 2–6 ngành,
+ít nhất 1 SE; MIN/MAX_GROUPS tắt. Số liệu tính lại từ members của payload:
+
+| Target | Sĩ số | P | Lower bound L | Excess P−L | Nhóm ≥3 cùng ngành | Group Score | Plan fingerprint |
+| --- | --- | ---: | ---: | ---: | ---: | --- | --- |
+| 6 | 6 × 6 | 4 | 4 | 0 | 0 | tất cả 100% | f2ba6cd4… |
+| 7 | 6 × 5 + 1 × 6 | 3 | 3 | 0 | 0 | tất cả 100% | de6d6f55… |
+| 8 | 4 × 4 + 4 × 5 | 2 | 2 | 0 | 0 | tất cả 100% | 96aec8d5… |
+| 9 | 9 × 4 | 1 | 1 | 0 | 0 | tất cả 100% | 7215896d… |
+
+Không có nhóm cũ nên các tiêu chí bảo toàn/dời sinh viên cũ đều hòa ở 0. Comparator do đó chọn target 9
+qua fingerprint `72…`, không phải vì 9 nhóm được chứng minh tốt hơn 6. Raw P nhỏ hơn cũng không phải
+nguyên nhân: comparator dùng Excess đã trừ lower bound theo target. MAX_MEMBERS chỉ là điều kiện hợp lệ;
+nhóm 4 người vẫn có thể đạt Group Score 100% khi MIN_MEMBERS=4. Đối chiếu này dựa trên source và payload
+đọc trực tiếp; chưa gọi authenticated Recommendation API trên Backend/MySQL đang chạy.
+
+**Đề xuất để duyệt sau, chưa triển khai:** khi các tiêu chí chất lượng/bảo toàn hiện tại hòa, thêm tiêu chí mềm
+`C = mean((M − size[g])²)` trên các nhóm có thể tái cơ cấu, với M là MAX_MEMBERS đang bật, trước fingerprint.
+Với bộ dữ liệu trên, C lần lượt là 0, 6/7, 2.5, 4 nên 6 nhóm có lợi thế mà không lấn át rules/chất lượng ngành
+hay phá protected. Nếu MAX_MEMBERS tắt thì bỏ tiêu chí này. Cần xác nhận mục tiêu là gần MAX cấu hình
+hay luôn ưu tiên 5–6 người, và có muốn tiêu chí này vượt tiêu chí bảo toàn nào không; không tự chốt trong lượt UI.
+
+#### UI được hoàn thiện
+
+- Tên hiển thị VI/EN: **Đề xuất phân nhóm thông minh / Smart Group Suggestions**. Dùng cùng key ở Sidebar,
+  tiêu đề list/detail và liên kết mở từ quản lý lớp; đổi copy thiết lập, xác nhận, preview, history, empty states.
+  Giữ ý nghĩa Random Again, xem History và xác nhận Apply/approval. Không đổi identifier/route/API.
+- Giữ hướng giao diện Antigravity, gộp banner và heading preview để tránh trùng tiêu đề.
+  Chỉ FEASIBLE mới hiển thị banner phương án đã lưu/metrics; infeasible và search limit hiển thị đúng kết quả,
+  không tuyên bố có phương án thành công. Mở History dùng lời giải thích về dữ liệu đã lưu.
+- Pill chuyển nhóm dùng report.movements không phải previouslyUnassigned; số sinh viên mới được phân bổ
+  hiển thị riêng. Engine optimization.movedStudents bao gồm Unassigned nên không dùng làm số chuyển nhóm cũ.
+- Thông tin tạo nhóm mới đọc `setup.limits.createsNewGroups`; bỏ câu phủ định hardcode đã lỗi thời.
+- Thinking chỉ mount trong thời gian request thật. Không thêm delay hoặc request, không timer luân phiên
+  các bước như tiến độ từ Backend. Hiển thị checklist tiêu chí trung tính, trạng thái chờ được dịch VI/EN,
+  aria-busy và CSS animation trang trí hỗ trợ prefers-reduced-motion. Không tuyên bố sử dụng mô hình AI.
+- Badge Recommended giữ nguyên: planId do Backend trả, đúng scope/fingerprint, chưa Apply/canApply;
+  không tự chọn theo target, số thứ tự, trang hoặc banner preview. Lý do vẫn dùng DTO thật.
+- Pagination hai bảng History dùng `placement: ['bottomEnd']` của Ant Design 6 thay cho `position`
+  đã deprecated; giữ vị trí cuối bảng và hành vi phân trang.
+- Không thay đổi hook/useAllocationFlow, Random/search, scoring, Preview/History/Apply API, idempotency,
+  realtime, Group Sequence, Rename Group, Zalo/Cloudinary hoặc dữ liệu nghiệp vụ.
+
+#### Kiểm thử thực chạy
+
+- **58 Frontend tests PASS / 3 files**: Allocation Flow, API contracts và VI/EN. Bổ sung kiểm tra Thinking
+  theo request thật/không giả tiến độ/không double-request, banner infeasible/search-limit, tách số liệu chuyển
+  nhóm và phân bổ Unassigned, cờ tạo nhóm mới. Các assertions nhãn cũ được cập nhật theo copy mới;
+  giữ nguyên kiểm tra request, quyền, History, Recommended, stale, Apply và idempotency.
+- **74 Backend tests PASS**: Recommendation 12, Group Score 18, AllocationResource 44; bootJar PASS.
+  Backend không sửa source; tests dùng mocks/H2 riêng, không ghi MySQL ứng dụng.
+- `npm run build` (TypeScript + Vite) PASS; lint exit 0, warning ngoài phần sửa và bundle lớn còn tồn tại.
+  jsdom còn warning pseudo-element Ant Design.
+- Chrome headless với API fixtures đúng DTO: VI/EN, list/detail/Thinking/preview/History ở
+  1440/1024/768/390px, reduced-motion, badge đúng planId Backend, Random Again, View/Apply confirmation,
+  trạng thái History sau Apply đều PASS, có screenshots. Tất cả request ghi trong browser bị mock;
+  không gọi Preview/Apply thật, không sửa schema/migration, không kiểm thử E2E lưu MySQL thật.

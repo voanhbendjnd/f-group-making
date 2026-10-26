@@ -80,12 +80,24 @@
     "lecturersStart": "Điền sheet Mentors từ dòng 2. Giữ tiêu đề Mentor và Email ở dòng 1. Tệp .xlsx tối đa 5 MB.",
     "viewStructure": "Xem cột bắt buộc và cách điền",
     "columnsLabel": "Cấu trúc Excel nhập dữ liệu",
-    "column": "Cột", "header": "Tiêu đề", "meaning": "Thông tin bắt buộc", "example": "Ví dụ minh họa",
+    "column": "Cột",
+    "header": "Tiêu đề",
+    "meaning": "Thông tin bắt buộc",
+    "example": "Ví dụ minh họa",
     "keepFormat": "Giữ nguyên tên cột, thứ tự cột và dòng bắt đầu nhập trong mẫu. Ví dụ trên trang chỉ để tham khảo; điền thông tin thực tế vào tệp.",
     "studentRules": "Khóa được lưu nguyên chuỗi; dạng PREFIX_MANGANH_... đồng thời xác định ngành (BEN_SE_ET_26 lấy mã SE). SlotType ở cột G được lưu theo file, có thể để trống với file cũ. GroupName là tên lớp. GV phải là mã giảng viên đã có; tạo/import giảng viên trước khi nhập sinh viên. Giữ vị trí các cột A, H, K dù không cần điền.",
     "studentUniqueValues": "Mã sinh viên, mã thành viên và email phải duy nhất. Hệ thống kiểm tra trùng và dữ liệu liên quan khi xác nhận nhập.",
     "lecturerUniqueValues": "Mã giảng viên và email phải duy nhất. Hệ thống kiểm tra trùng khi xác nhận nhập.",
-    "fields": { "rollNumber": "Mã sinh viên", "fullName": "Họ tên (tối đa 50 ký tự)", "major": "Nguyên chuỗi Khóa (tối đa 255 ký tự)", "slotType": "Loại slot (không bắt buộc, tối đa 255 ký tự)", "memberCode": "Mã thành viên", "email": "Địa chỉ email hợp lệ", "className": "Tên lớp (tối đa 50 ký tự)", "lecturerCode": "Mã giảng viên" }
+    "fields": {
+      "rollNumber": "Mã sinh viên",
+      "fullName": "Họ tên (tối đa 50 ký tự)",
+      "major": "Nguyên chuỗi Khóa (tối đa 255 ký tự)",
+      "slotType": "Loại slot (không bắt buộc, tối đa 255 ký tự)",
+      "memberCode": "Mã thành viên",
+      "email": "Địa chỉ email hợp lệ",
+      "className": "Tên lớp (tối đa 50 ký tự)",
+      "lecturerCode": "Mã giảng viên"
+    }
   },
   "adminUx": {
     "lecturerDropHint": "Hỗ trợ .xlsx tối đa 5 MB. Tệp giảng viên có tiêu đề Mentor và Email ở dòng đầu, dữ liệu từ dòng 2.",
@@ -139,7 +151,7 @@
     "deadlines": "Hạn chót",
     "students": "Sinh viên",
     "openGroups": "Quản lý nhóm",
-    "openAllocation": "Phân nhóm tự động",
+    "openAllocation": "Đề xuất phân nhóm thông minh",
     "selectSession": "Chọn đợt ghép nhóm",
     "sessionHint": "Thao tác nhóm áp dụng cho lớp và đợt được chọn.",
     "noSession": "Lớp chưa có đợt ghép nhóm trong học kỳ này.",
@@ -205,13 +217,17 @@
     "selectedTermDestination": "Kỳ đích: {{term}}"
   },
   "allocation": {
-    "heroTitle": "Phân bổ nhóm thông minh",
-    "heroDescription": "Chia nhóm cân bằng, công bằng theo quy định của lớp. Kiểm tra từng phương án trước khi áp dụng.",
-    "chooseClassHint": "Chọn lớp được phân công để mở trang phân bổ tự động.",
+    "noNewGroups": "Phạm vi hiện tại chỉ giữ hoặc gộp các nhóm đã có.",
+    "newGroupsAllowed": "Có thể đề xuất nhóm mới khi cần; chỉ tạo nhóm thật khi áp dụng thành công.",
+    "targetResult": "Kết quả kiểm tra mục tiêu",
+    "eyebrow": "Dựa trên quy định và dữ liệu lớp",
+    "heroTitle": "Đề xuất phân nhóm thông minh",
+    "heroDescription": "Xây dựng phương án dựa trên dữ liệu và quy định của lớp. Xem xét, so sánh và quyết định trước khi áp dụng.",
+    "chooseClassHint": "Chọn lớp được phân công để xem và xây dựng phương án phân nhóm.",
     "detailHint": "Kiểm tra lớp, chuẩn bị phương án và xác nhận khi sẵn sàng áp dụng.",
     "overview": "Tổng quan lớp",
     "activeRules": "{{count}} đang bật",
-    "confirmTargetHint": "Chọn mục tiêu rồi xác nhận để tạo và lưu phương án ngẫu nhiên.",
+    "confirmTargetHint": "Chọn số nhóm mục tiêu, rồi xác nhận để tạo và lưu phương án đề xuất.",
     "suggestionDetails": "Vì sao có gợi ý này?",
     "searchDetails": "Thông tin tìm kiếm",
     "readyToApplyHint": "Chỉ có thể áp dụng khi phương án khả thi và dữ liệu hiện tại đã được kiểm tra.",
@@ -222,18 +238,22 @@
     "acceptedWithUnassigned": "Nhóm đã duyệt vẫn được bảo vệ. Hệ thống có thể đề xuất nhóm mới cho sinh viên chưa có nhóm nếu đáp ứng toàn bộ quy định đang bật và cân bằng sĩ số.",
     "classList": "Lớp được phân công",
     "searchClasses": "Tìm kiếm lớp",
-    "openClass": "Mở phân bổ",
+    "openClass": "Mở đề xuất phân nhóm",
     "backToClasses": "Quay lại danh sách lớp",
     "classUnavailable": "Lớp không thuộc học kỳ đang chọn hoặc ngoài phạm vi được phân công.",
-    "confirmTarget": "Xác nhận mục tiêu và chia ngẫu nhiên",
+    "confirmTarget": "Xác nhận và tạo phương án",
     "balanceHint": "Sĩ số giữa các nhóm chênh lệch tối đa 1 sinh viên, tính cả nhóm được bảo vệ.",
-    "planSavedHint": "Phương án đã được lưu vào lịch sử. Nhóm thực tế chỉ thay đổi sau khi áp dụng thành công.",
-    "randomHistory": "Lịch sử chia ngẫu nhiên",
-    "randomHistoryHint": "Mỗi lần Random và Random Again thành công đều được lưu. Mở lại để xem đúng phương án hoặc áp dụng sau khi kiểm tra.",
+    "planSavedHint": "Phương án đã được lưu vào lịch sử. Nhóm thực tế chỉ thay đổi khi bạn xác nhận áp dụng thành công.",
+    "randomHistory": "Lịch sử phương án",
+    "randomHistoryHint": "Mỗi lần tạo phương án hoặc phân nhóm ngẫu nhiên lại thành công đều được lưu. Xem lại đúng phương án và kiểm tra trước khi áp dụng.",
     "noRandomHistory": "Chưa có phương án đã lưu. Xác nhận mục tiêu để tạo phương án.",
-    "randomAt": "Thời gian chia",
+    "randomAt": "Thời gian tạo",
     "planStatusLabel": "Trạng thái phương án",
-    "planStatuses": { "UNAPPLIED": "Chưa áp dụng", "APPLIED": "Đã áp dụng", "INVALID": "Không còn hợp lệ" },
+    "planStatuses": {
+      "UNAPPLIED": "Chưa áp dụng",
+      "APPLIED": "Đã áp dụng",
+      "INVALID": "Không còn hợp lệ"
+    },
     "recommendation": {
       "badge": "Đề xuất tốt nhất",
       "why": "Vì sao đề xuất phương án này?",
@@ -264,9 +284,9 @@
     "createdCount": "Tạo mới: {{count}}",
     "viewPlan": "Xem phương án",
     "applyPlan": "Áp dụng phương án",
-    "savedPlan": "Phương án ngẫu nhiên đã lưu",
-    "savedPlanHint": "Đây là kết quả được lưu lúc Random. Chỉ xem không thay đổi nhóm hoặc chạy ngẫu nhiên lại.",
-    "openPlan": "Mở trong màn hình phân bổ",
+    "savedPlan": "Phương án đã lưu",
+    "savedPlanHint": "Đây là phương án đã lưu. Xem lại không chạy phân nhóm hoặc thay đổi nhóm thực tế.",
+    "openPlan": "Mở trong màn hình đề xuất",
     "applyAudit": "Lịch sử áp dụng thành công",
     "applying": "Đang áp dụng phân bổ…",
     "waitForApply": "Vui lòng chờ máy chủ kiểm tra và lưu yêu cầu này.",
@@ -277,9 +297,9 @@
       "UPCOMING": "Sắp diễn ra",
       "CANCELLED": "Đã hủy"
     },
-    "title": "Phân bổ tự động",
-    "description": "Xem nhóm theo lớp, lưu phương án ngẫu nhiên và xác nhận trước khi áp dụng.",
-    "howItWorks": "Cách phân bổ tự động hoạt động",
+    "title": "Đề xuất phân nhóm thông minh",
+    "description": "Xem nhóm theo lớp, tạo và so sánh phương án trước khi xác nhận áp dụng.",
+    "howItWorks": "Cách đề xuất phân nhóm hoạt động",
     "steps": [
       {
         "title": "Xem các nhóm",
@@ -303,11 +323,11 @@
     "chooseClass": "Chọn lớp",
     "noClasses": "Bạn chưa được phân công lớp trong học kỳ này.",
     "noSession": "Lớp chưa có phiên chọn nhóm.",
-    "autoAllocate": "Phân bổ tự động",
+    "autoAllocate": "Tạo phương án đề xuất",
     "refresh": "Làm mới",
     "retry": "Thử lại",
     "cancel": "Hủy",
-    "setup": "Thiết lập phân bổ",
+    "setup": "Thiết lập phương án",
     "totalStudents": "Sinh viên",
     "totalGroups": "Nhóm",
     "valid": "Đạt quy định",
@@ -346,9 +366,9 @@
     "targetHint": "Nhập số nguyên từ {{min}} đến {{max}}.",
     "invalidTarget": "Cần nhập số nguyên dương từ {{min}} đến {{max}}.",
     "previewOnly": "Chỉ xem trước",
-    "searchLimits": "Giới hạn tìm kiếm: {{nodes}} nút; độ sâu tối đa {{depth}}. Không tạo nhóm mới.",
-    "calculating": "Đang tính toán phương án phân bổ…",
-    "previewData": "Phương án dự kiến",
+    "searchLimits": "Giới hạn tìm kiếm: {{nodes}} nút; độ sâu tối đa {{depth}}.",
+    "calculating": "Đang phân tích và xây dựng phương án...",
+    "previewData": "Phương án được đề xuất",
     "currentData": "Nhóm hiện tại đã lưu",
     "notSaved": "Phương án chưa được lưu. Nhóm được bảo vệ giữ nguyên.",
     "status": {
@@ -359,9 +379,9 @@
     "samePlan": "Phương án giống lần trước. Không bảo đảm luôn có phương án hợp lệ khác.",
     "expiration": "Thời hạn phương án",
     "expiresIn": "Phương án hết hạn sau {{time}}",
-    "autoAgain": "Phân bổ lại",
-    "apply": "Áp dụng và duyệt",
-    "confirmTitle": "Xác nhận phân bổ và duyệt nhóm",
+    "autoAgain": "Phân nhóm ngẫu nhiên lại",
+    "apply": "Áp dụng phương án",
+    "confirmTitle": "Xác nhận áp dụng và duyệt nhóm",
     "confirmApply": "Xác nhận áp dụng",
     "noUndo": "Thao tác sẽ thay đổi nhóm đã lưu và duyệt các nhóm đủ điều kiện. Không có hoàn tác.",
     "kept": "Được giữ",
@@ -454,6 +474,25 @@
       "allocationHistoryNotFound": "Không tìm thấy lần phân bổ trong phạm vi đã chọn.",
       "allocationRequestNotFound": "Chưa xác định được yêu cầu. Kiểm tra Lịch sử trước khi tiếp tục.",
       "invalidIdempotencyKey": "Khóa yêu cầu không hợp lệ. Yêu cầu này chưa áp dụng phân bổ."
+    },
+    "thinking": {
+      "criteria": "Các tiêu chí được xem xét — không phải tiến độ trực tiếp:",
+      "analyzing": "Đang phân tích",
+      "title": "Đang xây dựng phương án",
+      "subtitle": "Đang chờ kết quả từ máy chủ. Chưa có thay đổi nào được áp dụng.",
+      "step1": "Sĩ số và cơ cấu chuyên ngành",
+      "step2": "Quy định phân nhóm của lớp",
+      "step3": "Nhóm và trưởng nhóm hiện có",
+      "step4": "Cân bằng sĩ số giữa các nhóm",
+      "step5": "Phương án và thay đổi dự kiến"
+    },
+    "smartSuggestions": {
+      "badge": "Đề xuất theo quy định",
+      "title": "Phương án được đề xuất",
+      "subtitle": "Phương án dựa trên dữ liệu lớp và quy định đang bật; cần xác nhận trước khi áp dụng.",
+      "validKept": "Nhóm hợp lệ giữ lại",
+      "leadersKept": "Trưởng nhóm giữ nguyên",
+      "studentsMoved": "Sinh viên chuyển nhóm"
     }
   },
   "deadlineDetail": {
@@ -1415,7 +1454,10 @@
       "verifying": "Đang kiểm tra thời hạn và thông tin lớp học..."
     },
     "closed": {
-      "UNSCHEDULED": { "title": "Chưa mở thời gian chọn nhóm", "description": "Giảng viên vẫn có thể sắp nhóm cho lớp. Sinh viên được thay đổi nhóm trong thời gian chọn nhóm được mở." },
+      "UNSCHEDULED": {
+        "title": "Chưa mở thời gian chọn nhóm",
+        "description": "Giảng viên vẫn có thể sắp nhóm cho lớp. Sinh viên được thay đổi nhóm trong thời gian chọn nhóm được mở."
+      },
       "CANCELLED": {
         "title": "Đợt chọn nhóm đã bị hủy",
         "description": "Đợt này đã ngừng nhận đăng ký. Nhóm và lịch sử hiện có được giữ lại để xem; mọi thao tác thay đổi trong đợt đã bị khóa."
@@ -1982,4 +2024,3 @@
     "majorBreakdown": "Chi tiết theo ngành"
   }
 }
-
