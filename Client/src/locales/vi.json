@@ -151,7 +151,7 @@
     "deadlines": "Hạn chót",
     "students": "Sinh viên",
     "openGroups": "Quản lý nhóm",
-    "openAllocation": "Đề xuất phân nhóm thông minh",
+    "openAllocation": "Đề xuất nhóm thông minh",
     "selectSession": "Chọn đợt ghép nhóm",
     "sessionHint": "Thao tác nhóm áp dụng cho lớp và đợt được chọn.",
     "noSession": "Lớp chưa có đợt ghép nhóm trong học kỳ này.",
@@ -297,7 +297,7 @@
       "UPCOMING": "Sắp diễn ra",
       "CANCELLED": "Đã hủy"
     },
-    "title": "Đề xuất phân nhóm thông minh",
+    "title": "Đề xuất nhóm thông minh",
     "description": "Xem nhóm theo lớp, tạo và so sánh phương án trước khi xác nhận áp dụng.",
     "howItWorks": "Cách đề xuất phân nhóm hoạt động",
     "steps": [

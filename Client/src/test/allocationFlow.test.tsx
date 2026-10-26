@@ -61,20 +61,46 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 
 describe('automatic allocation workflow', () => {
-  it('localizes the thinking panel without simulating server stages or starting requests', async () => {
+  it('localizes the thinking criteria without claiming live server progress or starting requests', async () => {
     const interval = vi.spyOn(globalThis, 'setInterval');
     await i18n.changeLanguage('vi');
     const view = render(<AllocationThinking />);
     expect(screen.getByRole('status', { name: i18n.t('allocation.calculating') })).toHaveAttribute('aria-busy', 'true');
     expect(screen.getByText(i18n.t('allocation.thinking.analyzing'))).toBeInTheDocument();
     expect(screen.queryByText('Analyzing')).not.toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    expect(screen.getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.getAllByRole('listitem', { hidden: true })).toHaveLength(5);
+    expect(screen.queryByText('AI ENGINE ANALYZING')).not.toBeInTheDocument();
     expect(interval).not.toHaveBeenCalled();
     await act(async () => { await i18n.changeLanguage('en'); });
     expect(screen.getByText('Analyzing')).toBeInTheDocument();
     expect(screen.getByText(i18n.t('allocation.thinking.criteria'))).toBeInTheDocument();
     expect(allocationApi.preview).not.toHaveBeenCalled();
     view.unmount(); interval.mockRestore();
+  });
+  it('moves the text focus downward, retains earlier lines and stops at the final criterion', () => {
+    vi.useFakeTimers();
+    const view = render(<AllocationThinking />);
+    const lines = screen.getAllByRole('listitem', { hidden: true });
+    expect(lines[0]).toHaveClass('is-active');
+    expect(lines[1]).toHaveClass('is-upcoming');
+    for (let index = 1; index < lines.length; index++) {
+      act(() => { vi.advanceTimersByTime(1100); });
+      expect(lines[index]).toHaveClass('is-active');
+      expect(lines[index - 1]).toHaveClass('is-past');
+      expect(lines[index - 1]).not.toHaveAttribute('aria-hidden');
+      expect(screen.getAllByRole('listitem')).toHaveLength(index + 1);
+    }
+    expect(vi.getTimerCount()).toBe(0);
+    expect(allocationApi.preview).not.toHaveBeenCalled();
+    view.unmount();
+  });
+  it('cleans up the presentation timer immediately when the thinking panel unmounts', () => {
+    vi.useFakeTimers();
+    const view = render(<AllocationThinking />);
+    expect(vi.getTimerCount()).toBe(1);
+    view.unmount();
+    expect(vi.getTimerCount()).toBe(0);
   });
   it('shows thinking only during the real request and displays the result without an artificial delay', async () => {
     let resolve!: (value: ReturnType<typeof previewFixture>) => void;

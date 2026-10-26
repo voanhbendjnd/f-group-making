@@ -1,52 +1,38 @@
-import { GitFork, Scale, ShieldCheck, Sparkles, Users } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const criteria = ['step1', 'step2', 'step3', 'step4', 'step5'] as const;
 
 export function AllocationThinking() {
   const { t } = useTranslation();
-  const steps = [
-    { text: t('allocation.thinking.step1'), icon: Users },
-    { text: t('allocation.thinking.step2'), icon: ShieldCheck },
-    { text: t('allocation.thinking.step3'), icon: GitFork },
-    { text: t('allocation.thinking.step4'), icon: Scale },
-    { text: t('allocation.thinking.step5'), icon: Sparkles }
-  ];
+  const captionId = useId();
+  const [activeStep, setActiveStep] = useState(0);
+
+  useEffect(() => {
+    if (activeStep === criteria.length - 1) return;
+    // Presentation only: the API does not report individual processing stages.
+    // The parent unmounts this panel as soon as the request settles.
+    const timer = setTimeout(() => setActiveStep(step => step + 1), 1100);
+    return () => clearTimeout(timer);
+  }, [activeStep]);
 
   return (
-    <div className="allocation-thinking-card" role="status" aria-busy="true" aria-label={t('allocation.calculating')}>
-      <div className="allocation-thinking-shimmer" aria-hidden="true" />
-      <div className="allocation-thinking-header">
-        <div className="allocation-thinking-icon-glow">
-          <Sparkles className="allocation-thinking-icon" size={24} aria-hidden="true" />
-        </div>
-        <div className="allocation-thinking-header-text">
-          <div className="allocation-thinking-title-row">
-            <h3>{t('allocation.thinking.title')}</h3>
-            <span className="allocation-thinking-pulse-badge">
-              <span className="allocation-thinking-pulse-dot" aria-hidden="true" />
-              {t('allocation.thinking.analyzing')}
-            </span>
-          </div>
-          <p className="allocation-thinking-subtitle">{t('allocation.thinking.subtitle')}</p>
-        </div>
-      </div>
-
-      <p className="allocation-thinking-caption">{t('allocation.thinking.criteria')}</p>
-      <ul className="allocation-thinking-steps">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          return (
-            <li
-              key={index}
-              className="allocation-thinking-step"
-            >
-              <div className="allocation-thinking-step-icon">
-                <Icon size={16} aria-hidden="true" />
-              </div>
-              <span className="allocation-thinking-step-text">{step.text}</span>
-            </li>
-          );
-        })}
+    <section className="allocation-thinking-card" role="status" aria-busy="true"
+      aria-label={t('allocation.calculating')} aria-describedby={captionId}>
+      <header className="allocation-thinking-header">
+        <span className="allocation-thinking-label">{t('allocation.thinking.analyzing')}</span>
+        <h3 className="allocation-thinking-title">{t('allocation.thinking.title')}</h3>
+        <p className="allocation-thinking-subtitle">{t('allocation.thinking.subtitle')}</p>
+      </header>
+      <p className="allocation-thinking-caption" id={captionId}>{t('allocation.thinking.criteria')}</p>
+      <ul className="allocation-thinking-lines" aria-live="off">
+        {criteria.map((key, index) => (
+          <li key={key} className={`allocation-thinking-line ${index === activeStep ? 'is-active' : index < activeStep ? 'is-past' : 'is-upcoming'}`}
+            aria-hidden={index > activeStep ? true : undefined}>
+            {t(`allocation.thinking.${key}`)}
+          </li>
+        ))}
       </ul>
-    </div>
+    </section>
   );
 }
