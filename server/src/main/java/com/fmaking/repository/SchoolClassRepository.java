@@ -25,6 +25,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
     Optional<SchoolClass> findByNameAndTermIdForUpdate(@Param("name") String name, @Param("termId") Integer termId);
 
     List<SchoolClass> findByTermId(Integer termId);
+    List<SchoolClass> findByLecturerIdAndTermId(Long lecturerId, Integer termId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sc FROM SchoolClass sc WHERE sc.id = :classId")

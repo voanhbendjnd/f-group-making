@@ -14,6 +14,8 @@ import { getApiError } from '@/services/api/types';
 import { useAuth } from '@/app/providers/AuthContext';
 import { canManageClassRules } from '@/features/auth/utils/roleRouting';
 import { advancedGroupPath } from '@/features/group/navigation';
+import { Tabs } from 'antd';
+import { ZaloManagementPanel } from '@/features/zalo/components/ZaloManagementPanel';
 
 export function LecturerClassDetailPage() {
   return <TermScope><LecturerClassDetailPageContent /></TermScope>;
@@ -34,7 +36,7 @@ function LecturerClassDetailPageContent() {
   });
   const back = <Link to="/lecturer/classes" className="btn btn-secondary"><ArrowLeft size={18} aria-hidden="true" />{t('lecturer.back')}</Link>;
   const actionButtons = (
-    <div style={{ display: 'flex', gap: '8px' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
       {back}
       <Link to={advancedGroupPath(classId, new URLSearchParams({ termId: String(selectedTermId) }))} className="btn btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
         <Users size={18} aria-hidden="true" />
@@ -63,7 +65,12 @@ function LecturerClassDetailPageContent() {
       <div><dt>{t('lecturer.studentCount')}</dt><dd>{t('lecturer.students', { count: schoolClass.studentCount })}</dd></div>
       <div><dt>{t('lecturer.assignedLecturer')}</dt><dd>{schoolClass.lecturerName || schoolClass.lecturerCode || '—'}</dd></div>
     </dl>
-    <ClassRulesDisclosure key={`${classId}-${readOnly}`} classId={classId} readOnly={readOnly} />
-    <ClassStudentsPanel key={classId} classId={classId} />
+    <Tabs key={classId} defaultActiveKey="details" items={[
+      { key: 'details', label: t('zalo.classDetails'), children: <div className="space-y-6">
+        <ClassRulesDisclosure key={`${classId}-${readOnly}`} classId={classId} readOnly={readOnly} />
+        <ClassStudentsPanel key={classId} classId={classId} />
+      </div> },
+      ...(!readOnly ? [{ key: 'zalo', label: t('zalo.classScope'), children: <div style={{ paddingTop: 16 }}><ZaloManagementPanel target={{ scope: 'CLASS', classId, termId: selectedTermId! }} /></div> }] : []),
+    ]} />
   </div>;
 }

@@ -223,3 +223,135 @@ Academic Term catalog access update (15/10/2026): GET /api/terms (currentAndFutu
 > 16/10/2026: [Group session / deadline / reapproval policy](../15-group-session-deadline-approval.md) supersedes conflicting earlier lifecycle rules. Shared deadline updates require confirmedClassIds; EXPIRED may reopen, CANCELLED may not. Lecturer-created groups are drafts; member moves use one atomic request.
 
 > M2: Lecturer Group Review at `/lecturer/group-review` uses `GET /api/me/group-reviews` with required termId, optional classId/status/search and server pagination. Only personally assigned classes are listed, including for Lecturer Master. Approve/reject/revoke reuse the existing scoped endpoints. See the M2 section in the policy above for the response and realtime behavior.
+
+## 9. Zalo Sharing — LECTURER / CLASS (26/10/2026)
+
+### Quyết định nghiệp vụ và mô hình hiện tại
+
+Chức năng chia sẻ link/QR do giảng viên cung cấp, không tự tạo nhóm Zalo.
+Chỉ có `LECTURER` và `CLASS`; không còn scope GROUP, groupId, membership nhóm hay điều kiện Group Status/Deadline.
+
+Đã xác minh source: `SchoolClass.lecturerId` là một giảng viên phụ trách, `SchoolClass.termId` là một học kỳ;
+`Student.schoolClassId` là một lớp hiện tại. Chưa có mô hình nhiều lớp/sinh viên hoặc đồng giảng viên trong assignment này.
+Không dùng quyền Lecturer Master đọc toàn hệ thống để cấp quyền quản lý Zalo ngoài lớp được phân công.
+
+**Đã được người dùng chốt:** một Zalo chung cho mỗi giảng viên **trong từng học kỳ**.
+Không chia sẻ chéo kỳ. Giảng viên phụ trách ba lớp cùng kỳ chỉ cần một bản ghi LECTURER;
+sinh viên của ba lớp cùng thấy bản ghi đó. Lớp ở kỳ khác không được xem cấu hình này.
+Zalo CLASS gắn với lớp, không gắn cố định với giảng viên cũ; khi phân công thay đổi, giảng viên mới được quản lý,
+giảng viên cũ mất quyền, sinh viên vẫn xem Zalo riêng của lớp mình và Zalo chung của giảng viên mới/cùng kỳ.
+
+### UI và điều hướng
+
+- `/lecturer/zalo-groups`: Sidebar Nhóm Zalo, hai chế độ **Zalo chung của tôi** và **Zalo riêng từng lớp**.
+  Dùng TermContext hiện tại; chung của tôi không cần chọn lớp. Lớp riêng dùng API lớp được phân công có tìm kiếm.
+- `/admin/zalo-groups`: Admin chọn giảng viên để quản lý Zalo chung theo kỳ, hoặc chọn lớp để quản lý Zalo riêng.
+- Tab trong Class Detail chỉ quản lý **CLASS**, không khiến người dùng hiểu nhầm Zalo chung thuộc một lớp.
+- Student Dashboard hiển thị tối đa hai card: Zalo chung của giảng viên (tên giảng viên/kỳ) và Zalo riêng của lớp
+  (tên lớp/kỳ). Không cần tham gia nhóm sinh viên. Có empty/loading/error, QR, tham gia và sao chép link, VI/EN.
+
+### API contracts
+
+JSON dùng envelope `{statusCode, message, data}` hiện tại. GET cấu hình chưa có trả `data:null`;
+QR binary và DELETE 204 không có envelope.
+
+| Method / path | Input | Response `data` / quyền |
+|---|---|---|
+| `GET /api/lecturers/{lecturerId}/zalo-share?termId=...` | ID thật + học kỳ bắt buộc | `ZaloShare` hoặc null; chính giảng viên đó hoặc Admin |
+| `PUT /api/lecturers/{lecturerId}/zalo-share?termId=...` | Multipart `data` JSON, `qr` tùy chọn | `ZaloShare` đã lưu; cùng quyền |
+| `DELETE /api/lecturers/{lecturerId}/zalo-share/{id}?termId=...&version=...` | Scope/version đã đọc | 204; cùng quyền |
+| `GET /api/school-classes/{classId}/zalo-shares?termId=...` | Class + term thực tế | `ZaloShare` hoặc null; giảng viên phụ trách/Admin |
+| `PUT /api/school-classes/{classId}/zalo-shares?termId=...` | Multipart như trên | `ZaloShare` đã lưu; cùng quyền |
+| `DELETE /api/school-classes/{classId}/zalo-shares/{id}?termId=...&version=...` | Scope/version | 204; cùng quyền |
+| `GET /api/me/zalo-shares` | Không nhận userId/classId/lecturerId từ client | Danh sách tối đa 2 cấu hình được phép; Student |
+| `GET /api/zalo-shares/{id}/qr` | Share ID | Binary PNG/JPEG/WebP; kiểm tra quyền lại mỗi lần, no-store/nosniff |
+
+`ZaloShare = {id, classId|null, className|null, lecturerId|null, lecturerName|null, termId, termName,
+scope:LECTURER|CLASS, title, inviteUrl, description|null, hasQr, version, updatedAt|null}`.
+`lecturerId/lecturerName` trong DTO CLASS chỉ là thông tin giảng viên hiện đang được phân công;
+entity CLASS có `lecturer_id=NULL`. Entity LECTURER có `school_class_id=NULL`.
+Không trả Cloudinary public ID, signed URL, secret, dữ liệu nhóm sinh viên hoặc link lớp khác.
+
+JSON part ghi: `{scope, title, inviteUrl, description, version, removeQr}`.
+Không nhận IDs người tạo, groupId hoặc metadata ảnh từ client. Route lecturer chỉ nhận LECTURER;
+route class chỉ nhận CLASS. Tạo mới dùng version null; cập nhật/xóa dùng đúng version đã đọc.
+Client không tự retry; form giữ dữ liệu khi thất bại và giữ version lúc mở form kể cả khi background query cập nhật.
+
+### Validation, authorization và realtime
+
+- Giữ nguyên title trim/bắt buộc/tối đa 100, description tối đa 500.
+- Link HTTPS chính xác host `zalo.me`, path `/g/{mã chữ/số}`, không userinfo/port/query/fragment;
+  server không fetch link và không xác nhận được nhóm Zalo bên ngoài còn tồn tại.
+- QR tùy chọn, PNG/JPG/JPEG/WebP tối đa 5 MB. MIME/extension/magic bytes, PNG/JPEG kiểm tra decode và kích thước
+  tối đa 4096 × 4096; WebP còn được provider xác thực lúc upload. Không crop/encode lại QR.
+- Backend giải quyết người đăng nhập từ SecurityContext. LECTURER kiểm tra đúng owner + Lecturer record + Term;
+  CLASS tái sử dụng `SchoolClassAccessService.requireWriteAccess` và đối chiếu term với class record.
+  Lecturer Master không vượt quyền owner hoặc assignment. Admin giữ quyền quản trị hiện có.
+- Student dùng `Student.schoolClassId` rồi đọc phân công giảng viên và học kỳ của lớp tại thời điểm request.
+  Query scope keys hiện tại trong một lần đọc, không liên quan `Student.groupId` hay `group_members`.
+  Sinh viên chuyển lớp hoặc lớp đổi giảng viên không được lấy link/QR của scope cũ.
+- LECTURER ghi/xóa khóa row Lecturer; CLASS khóa row SchoolClass. Unique scope key và @Version ngăn trùng/lưu đè.
+- Common share cập nhật phát `ZALO_SHARE_UPDATED` không chứa nội dung riêng cho tất cả lớp của owner **cùng kỳ**,
+  qua publisher hiện tại sau commit. AssignClassLecturer phát cùng tín hiệu cho lớp bị đổi, không sửa nghiệp vụ assignment.
+- RealtimeProvider nhận event cấp lớp không cần deadlineId; xóa cache Zalo nhạy cảm và tải lại.
+  Student panel không subscribe hoặc thay đổi quyền theo Group membership/status event.
+  Fallback revalidate khi focus/mỗi 30 giây; cache không persist. Chưa kiểm thử socket thật end-to-end.
+
+Lỗi giữ nguyên các mã `zaloInvalidLink`, `zaloInvalidScope`, `zaloInvalidData`, `zaloImageSize`, `zaloImageType` (400),
+`zaloForbidden` (403), `zaloNotFound` (404), `zaloConflict` (409), `zaloStorageUnavailable` (503), có bản dịch VI/EN.
+
+### Cloudinary được giữ nguyên
+
+Tái sử dụng hoàn toàn `ZaloQrStorage`, validation ảnh, form upload/preview, QR component và API QR đã bảo vệ.
+Không sửa credentials/cấu hình/dependency hoặc thực hiện lại setup Cloudinary.
+Upload `resource_type=image`, `type=authenticated`, UUID public ID, `overwrite=false`.
+Backend tạo download URL ngắn hạn và proxy binary, không phát URL Cloudinary cho browser.
+Rollback dọn ảnh mới; ảnh cũ chỉ được dọn sau commit; metadata/public ID tiếp tục nằm trong bản ghi chia sẻ.
+Cleanup thất bại có warning asset ID để xử lý thủ công; chưa có durable cleanup queue nên process crash/provider outage
+có thể để lại ảnh mồ côi được bảo vệ. Link/QR người dùng đã tự lưu bên ngoài không thể bị thu hồi bởi ứng dụng này.
+
+### Schema thực tế và migration ĐÃ DUYỆT TẠO SCRIPT, CHƯA DUYỆT CHẠY
+
+Đọc MySQL local ngày 26/10/2026 phát hiện `zalo_shares` **đã tồn tại**, có 0 rows,
+`scope ENUM('CLASS','GROUP')`, group_id, school_class_id NOT NULL, PK/unique scope key/index class, chưa có FK/CHECK.
+Cấu trúc phù hợp với Hibernate ddl-auto=update; không khẳng định migration cũ đã được chạy.
+Do đó giữ nguyên `../sql/20261026_zalo_shares.sql` thay vì sửa lịch sử triển khai.
+
+Người dùng đã duyệt tạo `../sql/20261026_zalo_shares_lecturer_class.sql`, **không chạy MySQL**:
+- Guard bảng phải còn rỗng trước DDL. Nếu phát sinh bất kỳ row nào, dừng để review chuyển đổi riêng;
+  không tự map GROUP sang CLASS/LECTURER và không xóa dữ liệu/ảnh.
+- Thêm lecturer_id BIGINT và term_id INT; class nullable với LECTURER; bỏ group_id, scope VARCHAR(10).
+- Scope key duy nhất `LECTURER:{lecturerId}:TERM:{termId}` hoặc `CLASS:{classId}`; thêm FK Lecturer/Term/Class,
+  index lecturer/term, CHECK scope và QR metadata. Entity dùng VARCHAR enum rõ ràng, khớp script.
+- Trước khi triển khai: dừng mọi Backend instance, backup, xác minh schema, disable ddl-auto=update,
+  áp dụng script sau khi được duyệt riêng rồi dùng ddl-auto=validate/none. DDL auto-commit, script một lần,
+  không giả định rollback transaction có thể hoàn tác DDL; phục hồi backup nếu bước chuyển đổi lỗi.
+- Fresh install dùng script tạo cũ rồi script chuyển đổi khi bảng rỗng. Không chạy riêng script cũ với app mới.
+- Không đổi bảng/quan hệ Group, Allocation, Student, Class hoặc Lecturer. H2 tests không chạy migration MySQL.
+
+### Tests và giới hạn xác minh
+
+Backend: `ZaloShareValidationTest`, `ZaloShareResourceTest`, H2 và mock Cloudinary/email/realtime.
+Các ca gồm một giảng viên/ba lớp cùng kỳ, chặn lớp và kỳ khác, class riêng, chưa có group vẫn xem được,
+đổi assignment/chuyển lớp, Lecturer Master/owner/Admin, DTO không lộ QR metadata, scope GROUP bị từ chối,
+version conflict, validation ảnh/link, rollback upload/DB và cleanup sau commit.
+Frontend: `zaloApi.test.ts`, `zaloSharing.test.tsx`, `zaloRealtime.test.tsx`, tích hợp route/TermContext/class select,
+VI/EN, input preservation, double-submit, preview QR, đối chiếu query/body contract mới, không dùng Group scope.
+Các tests runtime MySQL và upload/download/cleanup Cloudinary thật chưa được chạy; không ghi MySQL ứng dụng.
+
+Kết quả thực chạy sau refactor:
+- Backend: **175 tests PASS**, 0 failure/error (12 suites: Zalo, Class/assignment/rules, session policy,
+  Student Profile và AllocationResource). `bootJar` PASS. Riêng Zalo: 17 integration tests + 12 validation tests.
+- Frontend: **18 Zalo tests PASS**; **88 regression tests PASS** (routes/quyền/lớp, Profile, Group Review realtime,
+  Allocation). Bổ sung kiểm tra đổi Term reset form và chặn URL lớp sai giảng viên/kỳ.
+  Chạy tuần tự `--maxWorkers=1`; lượt chạy song song trước đó có timeout trong Allocation nên không tính lượt đó là PASS.
+- `npm run build` (TypeScript + Vite) PASS; `npm run lint` không có error, còn các warning ngoài module Zalo.
+  Vite còn cảnh báo chunk lớn; jsdom còn cảnh báo getComputedStyle pseudo-element.
+- Chrome headless với API fixtures theo DTO mới: **24 tổ hợp PASS**, ba màn hình (giảng viên chung/lớp riêng,
+  Student Dashboard) × VI/EN × 1440/1024/768/390px; có screenshots, kiểm tra overflow, nút, link và focus editor,
+  không gọi API ghi thật. Chưa kiểm tra CRUD qua Backend/MySQL/Cloudinary thật hoặc socket thật.
+- Script MySQL chỉ được review tĩnh; chưa áp dụng hoặc kiểm chứng DDL/locking trên MySQL 8 riêng.
+
+Tham chiếu: [Zalo OA GMF](https://oa.zalo.me/home/documents/vie/guides/quan-ly-nhom-gmf_1954166378348758227),
+[Cloudinary media access control](https://cloudinary.com/documentation/control_access_to_media),
+[Java SDK](https://cloudinary.com/documentation/java_integration).

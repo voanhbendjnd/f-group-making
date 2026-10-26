@@ -20,6 +20,7 @@ import { ClassGroupingSessions } from '@/features/classes/components/ClassGroupi
 import { useTranslation } from 'react-i18next';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
+import { ZaloManagementPanel } from '@/features/zalo/components/ZaloManagementPanel';
 
 
 export const ClassDetailPage: React.FC = () => <TermScope><ClassDetailContent /></TermScope>;
@@ -33,7 +34,7 @@ const ClassDetailContent: React.FC = () => {
   const previousList = typeof location.state?.from === 'string' && /^\/admin\/classes(?:\?|$)/.test(location.state.from) ? location.state.from : '/admin/classes';
   const classId = Number(id);
   const [params, setParams] = useSearchParams();
-  const tab = ['groups', 'deadlines', 'settings'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'students';
+  const tab = ['groups', 'deadlines', 'settings', 'zalo'].includes(params.get('tab') ?? '') ? params.get('tab')! : 'students';
 
   const [searchStudent, setSearchStudent] = useState<string>('');
 
@@ -219,12 +220,13 @@ const ClassDetailContent: React.FC = () => {
       </div>
 
       <nav className="admin-tabs" aria-label={t('adminUx.classDetail')}>
-        {(['students', 'groups', 'deadlines', 'settings'] as const).map(value =>
+        {(['students', 'groups', 'deadlines', 'settings', 'zalo'] as const).map(value =>
           <button type="button" key={value} aria-current={tab === value ? 'page' : undefined}
             onClick={() => { const next = new URLSearchParams(params); next.set('tab', value); setParams(next); }}>
-            {t(`adminUx.${value}`)}{value === 'students' ? ` (${students.length})` : ''}
+            {value === 'zalo' ? t('zalo.title') : t(`adminUx.${value}`)}{value === 'students' ? ` (${students.length})` : ''}
           </button>)}
       </nav>
+      {tab === 'zalo' && <div style={{ paddingTop: 16 }}><ZaloManagementPanel key={classId} target={{ scope: 'CLASS', classId, termId: selectedTermId! }} /></div>}
       {tab === 'settings' && <div className="admin-class-settings">
         <ClassManagementControls key={classId} schoolClass={classDetail} />
       </div>}
