@@ -24,6 +24,7 @@ import { groupCode, compareGroupSequence } from '@/features/group/utils/groupSeq
 import { Button } from '@/components/common/Button';
 import { DeadlineStatusBadge } from '@/features/deadline/components/DeadlineStatusBadge';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
+import { getApiError } from '@/services/api/types';
 import { GroupBoardColumn } from '@/features/group/components/GroupBoardColumn';
 import { BoardStudentCard } from '@/features/group/components/BoardStudentCard';
 import { LecturerGroupModal } from '@/features/group/components/LecturerGroupModal';
@@ -110,7 +111,7 @@ function LecturerGroupWorkspaceContent({
 }) {
   const { t } = useTranslation();
   const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
-  const { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, run, move } =
+  const { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup } =
     useGroupBoard(classId, requestedDeadline, positiveId(params.get('termId')));
   const { boardRef, startAutoScroll, stopAutoScroll } = useBoardAutoScroll();
 
@@ -199,7 +200,8 @@ function LecturerGroupWorkspaceContent({
     pageRef.current?.classList.remove('is-board-dragging');
     pageRef.current?.querySelector('[data-dragging="true"]')?.removeAttribute('data-dragging');
     stopAutoScroll();
-  }, [setOverTarget, stopAutoScroll]);
+    endDrag();
+  }, [setOverTarget, stopAutoScroll, endDrag]);
 
   const startDrag = useCallback(
     (event: DragEvent<HTMLElement>, student: GroupMemberDTO, fromGroupId: number | null) => {
@@ -212,15 +214,17 @@ function LecturerGroupWorkspaceContent({
       event.dataTransfer.setData('text/plain', JSON.stringify(payload));
       event.dataTransfer.effectAllowed = 'move';
       dragged.current = payload;
+      beginDrag();
       const el = event.currentTarget;
       // Hoãn thay đổi DOM sang animation frame sau để trình duyệt chụp drag image xong (tránh giật trên Chrome)
       requestAnimationFrame(() => {
+        if (dragged.current !== payload) return;
         el.setAttribute('data-dragging', 'true');
         pageRef.current?.classList.add('is-board-dragging');
       });
       startAutoScroll();
     },
-    [classId, deadlineId, isBusy, startAutoScroll]
+    [classId, deadlineId, isBusy, beginDrag, startAutoScroll]
   );
 
   const dragOver = useCallback(
@@ -598,7 +602,8 @@ function LecturerGroupWorkspaceContent({
     );
   }
 
-  if (session.isError || workspace.isError || !data) {
+  const workspaceAccessLost = workspace.isError && [401, 403, 404].includes(getApiError(workspace.error).status);
+  if (session.isError || workspaceAccessLost || !data) {
     return (
       <div>
         {breadcrumb}
@@ -657,11 +662,11 @@ function LecturerGroupWorkspaceContent({
           <Button
             size="sm"
             variant="secondary"
-            loading={workspace.isRefetching}
-            icon={<RefreshCw size={14} className={workspace.isRefetching ? 'animate-spin' : ''} />}
+            disabled={pending}
+            icon={<RefreshCw size={14} />}
             aria-label={t('common.refresh')}
             onClick={() => {
-              void workspace.refetch();
+              if (!workspace.isFetching) void workspace.refetch();
             }}
           />
           <Button
@@ -770,6 +775,9 @@ function LecturerGroupWorkspaceContent({
           </div>
         )}
       </div>
+      {workspace.isError && (
+        <p role="alert" className="board-sync-error">{translateErrorMessage(workspace.error)}</p>
+      )}
       <div className="board-work-area">
         {pool !== 'hidden' && (
           <aside
@@ -958,7 +966,7 @@ function LecturerGroupWorkspaceContent({
         onClose={() => {
           if (!pending) setCreate(null);
         }}
-        onSubmit={(values) => run(() => groupApi.lecturerCreateGroup(deadlineId!, classId!, values))}
+        onSubmit={createGroup}
       />
       <RejectGroupModal
         open={rejectId !== null}

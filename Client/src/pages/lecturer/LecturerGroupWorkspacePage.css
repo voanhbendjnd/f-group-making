@@ -196,8 +196,11 @@
 .group-board-page[aria-busy="true"] .board-icon-button,
 .group-board-page[aria-busy="true"] .board-group-select-checkbox {
   pointer-events: none;
-  opacity: 0.6;
 }
+.group-board-page[aria-busy="true"] button:disabled,
+.group-board-page[aria-busy="true"] input:disabled,
+.group-board-page[aria-busy="true"] .board-create-column { opacity: 1; }
+.board-sync-error { margin: .5rem 0; color: #b91c1c; font-size: .85rem; }
 .group-board-page[aria-busy="true"] .draggable-student-card {
   cursor: progress;
 }

@@ -73,7 +73,9 @@ const RecommendationPanel = React.memo(function RecommendationPanel({
 
   const { data: unassigned = [] } = useQuery<WorkspaceDTO, Error, GroupMemberDTO[]>({
     queryKey: ['group-workspace', deadlineId, classId],
-    queryFn: () => Promise.reject(new Error('no fetch')),
+    // This observer shares the board's query. Keep its fetch function valid:
+    // React Query may use these options for an explicit cache invalidation.
+    queryFn: ({ signal }) => groupApi.getWorkspace(deadlineId!, classId!, signal),
     enabled: false,
     select: (d) => d.unassignedStudents,
   });

@@ -1,4 +1,4 @@
-import type { QueryClient, QueryKey } from '@tanstack/react-query';
+import { hashKey, type QueryClient, type QueryKey } from '@tanstack/react-query';
 import type { DeadlineClassWindow } from './types';
 
 export interface RealtimeEvent {
@@ -24,9 +24,26 @@ const keys = new Set([
 ]);
 export const isRealtimeQuery = (key: QueryKey) => keys.has(String(key[0]));
 const versions = new WeakMap<QueryClient, Map<number, number>>();
+const refreshHandlers = new WeakMap<QueryClient, Map<string, () => void>>();
+
+/** Register a mounted interactive view that needs to schedule its own reads. */
+export function registerRealtimeRefresh(client: QueryClient, key: QueryKey, refresh: () => void) {
+  let handlers = refreshHandlers.get(client);
+  if (!handlers) { handlers = new Map(); refreshHandlers.set(client, handlers); }
+  const hash = hashKey(key);
+  handlers.set(hash, refresh);
+  return () => { if (handlers.get(hash) === refresh) handlers.delete(hash); };
+}
 
 export async function syncDeadlineQueries(client: QueryClient, event?: RealtimeEvent) {
   const predicate = (query: { queryKey: QueryKey }) => isRealtimeQuery(query.queryKey);
+  // Interactive boards coalesce refreshes and defer them until a drag/write finishes.
+  // Keep lifecycle patches below immediate, but let the board own its server reads.
+  const handlers = refreshHandlers.get(client);
+  const managed = client.getQueryCache().findAll({ predicate })
+    .filter(query => handlers?.has(query.queryHash));
+  const unmanaged = (query: { queryKey: QueryKey; queryHash: string }) =>
+    predicate(query) && !handlers?.has(query.queryHash);
   const lifecycle = event?.eventType.startsWith('DEADLINE_');
   let known = versions.get(client);
   if (!known) { known = new Map(); versions.set(client, known); }
@@ -35,7 +52,7 @@ export async function syncDeadlineQueries(client: QueryClient, event?: RealtimeE
     known.set(event.deadlineId, event.version);
   }
   // Abort older reads before applying the event; only a fresh server read may enable writes.
-  await client.cancelQueries({ predicate });
+  await client.cancelQueries({ predicate: lifecycle ? predicate : unmanaged });
   if (lifecycle && event && (event.version === undefined || event.version >= (known.get(event.deadlineId) ?? -1))) {
     for (const [key, data] of client.getQueriesData<any>({ predicate })) {
       // Recommendation items describe students/groups, not deadline DTOs.
@@ -69,5 +86,8 @@ export async function syncDeadlineQueries(client: QueryClient, event?: RealtimeE
       client.setQueryData(key, patched);
     }
   }
-  await client.invalidateQueries({ predicate });
+  for (const query of managed) {
+    handlers?.get(query.queryHash)?.();
+  }
+  await client.invalidateQueries({ predicate: unmanaged });
 }

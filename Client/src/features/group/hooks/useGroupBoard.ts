@@ -6,10 +6,10 @@ import { useToast } from '@/app/providers/ToastContext';
 import { useTerm } from '@/app/providers/TermContext';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { classApi } from '@/features/classes/api/classApi';
-import { syncDeadlineQueries } from '@/features/deadline/realtime';
+import { registerRealtimeRefresh, syncDeadlineQueries } from '@/features/deadline/realtime';
 import { translateErrorMessage } from '@/services/api/errorTranslator';
 import { groupApi } from '../api/groupApi';
-import type { GroupDTO, GroupMemberDTO, WorkspaceDTO } from '../types/groupTypes';
+import type { GroupDTO, GroupMemberDTO, LecturerCreateGroupRequest, WorkspaceDTO } from '../types/groupTypes';
 import { useGroupWebSocket } from './useGroupWebSocket';
 import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
 
@@ -25,6 +25,7 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
   const { lockTermSelection } = useTerm();
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
+  const dragging = useRef(false);
   useUnsavedChanges(false, pending);
 
   const session = useQuery({
@@ -45,12 +46,59 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
   const deadlineId = requestedDeadline ?? session.data ?? null;
   const queryKey = useMemo(() => ['group-workspace', deadlineId, classId] as const, [deadlineId, classId]);
 
+  const timer = useRef<number | undefined>(undefined);
+  const refreshRequested = useRef(false);
+  const refreshing = useRef(false);
+  const mounted = useRef(true);
+  const scheduleRefresh = useCallback(() => {
+    if (!mounted.current) return;
+    refreshRequested.current = true;
+    window.clearTimeout(timer.current);
+    if (busy.current || dragging.current || refreshing.current) return;
+    timer.current = window.setTimeout(async () => {
+      if (busy.current || dragging.current) return;
+      refreshRequested.current = false;
+      refreshing.current = true;
+      try {
+        await client.invalidateQueries({ queryKey });
+      } finally {
+        refreshing.current = false;
+        // An event received during a read may describe a newer server state.
+        if (refreshRequested.current) scheduleRefresh();
+      }
+    }, 250);
+  }, [client, queryKey]);
+  useEffect(() => {
+    mounted.current = true;
+    const unregister = registerRealtimeRefresh(client, queryKey, scheduleRefresh);
+    return () => {
+      mounted.current = false;
+      window.clearTimeout(timer.current);
+      unregister();
+    };
+  }, [client, queryKey, scheduleRefresh]);
+
+  const beginDrag = useCallback(() => {
+    dragging.current = true;
+    window.clearTimeout(timer.current);
+    if (client.isFetching({ queryKey })) refreshRequested.current = true;
+    void client.cancelQueries({ queryKey });
+  }, [client, queryKey]);
+  const endDrag = useCallback(() => {
+    dragging.current = false;
+    if (refreshRequested.current) scheduleRefresh();
+  }, [scheduleRefresh]);
+
   const workspace = useQuery({
     queryKey,
     queryFn: ({ signal }) => groupApi.getWorkspace(deadlineId!, classId!, signal),
     enabled: !!classId && !!deadlineId,
     retry: false,
-    refetchInterval: 30000,
+    // RealtimeProvider handles events, reconnects and offline fallback polling.
+    // The registered refresh handler keeps reads out of an active drag/write.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 
   const canManage = !!workspace.data?.canManageGroups;
@@ -63,8 +111,6 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
   const latest = useRef({ t, toast, lockTermSelection, queryKey, deadlineId, classId, canManage });
   latest.current = { t, toast, lockTermSelection, queryKey, deadlineId, classId, canManage };
 
-  const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
   const onEvent = useCallback((event: { eventType: string; payload?: unknown }) => {
     const { queryKey } = latest.current;
     if (event.eventType === 'STUDENT_BIO_UPDATED') {
@@ -84,12 +130,7 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
         });
       }
     }
-    if (busy.current) return;
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(
-      () => void client.invalidateQueries({ queryKey: latest.current.queryKey }),
-      300
-    );
+    // RealtimeProvider already schedules the workspace read through the handler.
   }, [client]);
 
   const { status: connection } = useGroupWebSocket({ deadlineId, classId, onEvent });
@@ -104,6 +145,7 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     const { t, toast, lockTermSelection, queryKey, canManage } = latest.current;
     if (busy.current || !canManage) throw new Error(t('groupBoard.busy'));
     busy.current = true;
+    window.clearTimeout(timer.current);
     setPending(true);
     const unlockTerm = lockTermSelection();
     let before: WorkspaceDTO | undefined;
@@ -122,10 +164,25 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     } finally {
       busy.current = false;
       setPending(false);
-      void client.invalidateQueries({ queryKey });
       void syncDeadlineQueries(client).catch(() => {}).finally(unlockTerm);
     }
   }, [client]);
+
+  const createGroup = useCallback((request: LecturerCreateGroupRequest) => run(async () => {
+    const { queryKey, deadlineId, classId } = latest.current;
+    const group = await groupApi.lecturerCreateGroup(deadlineId!, classId!, request);
+    // Apply the saved result before closing the modal so the next drag cannot
+    // select students that have just been assigned while reconciliation waits.
+    client.setQueryData<WorkspaceDTO>(queryKey, data => {
+      if (!data) return data;
+      const assigned = new Set(group.members.map(member => member.studentId));
+      return {
+        ...data,
+        groups: [...data.groups.filter(existing => existing.id !== group.id), group],
+        unassignedStudents: data.unassignedStudents.filter(student => !assigned.has(student.studentId)),
+      };
+    });
+  }), [client, run]);
 
   const move = useCallback(async (studentId: number, sourceId: number | null, targetId: number) => {
     const { t, toast, queryKey, deadlineId, classId } = latest.current;
@@ -169,5 +226,5 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     );
   }, [client, editable, run]);
 
-  return { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, run, move };
+  return { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup };
 }
