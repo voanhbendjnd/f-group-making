@@ -1961,7 +1961,12 @@
     "rejectConfirm": "Trả “{{name}}” về hoàn thiện mà không giải tán? Giáo viên được sửa sau deadline; sinh viên chỉ được sửa khi deadline của lớp đang mở.",
     "reopenConfirm": "Thu hồi duyệt nhóm {{name}}? Giáo viên được sửa kể cả hết deadline. Sinh viên chỉ được sửa khi deadline của lớp đang mở. Nhóm phải nộp và duyệt lại.",
     "awaitSubmit": "Nhóm đạt quy định nhưng phải nộp trước khi được phê duyệt.",
-    "ineligible": "Nhóm chưa đạt toàn bộ quy định nhóm/lớp hoặc có liên kết thành viên không hợp lệ. Cần xử lý trước khi duyệt.",
+    "ineligible": "Cần kiểm tra thành viên, trưởng nhóm và đợt sắp nhóm trước khi duyệt.",
+    "ruleWarning": "Nhóm chưa đáp ứng các tiêu chuẩn sau:",
+    "ruleWarningTitle": "Nhóm “{{name}}” chưa đáp ứng tiêu chuẩn",
+    "confirmApprove": "Xác nhận duyệt",
+    "confirmSubmit": "Xác nhận gửi duyệt",
+    "submitConfirm": "Bạn vẫn muốn gửi nhóm “{{name}}” để duyệt?",
     "statuses": {
       "OPEN": "Đang hình thành",
       "PENDING": "Chờ duyệt",

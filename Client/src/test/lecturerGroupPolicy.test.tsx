@@ -1,4 +1,4 @@
-import { Modal } from 'antd';
+import { ConfigProvider, Modal } from 'antd';
 import { cleanup, render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -14,7 +14,7 @@ const auth = vi.hoisted(() => ({ user: { id: 1, authorities: ['ROLE_LECTURE'] } 
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn() }) }));
 vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ lockTermSelection: () => () => {} }) }));
-vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn(), lecturerSubmitGroup: vi.fn() } }));
+vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn(), lecturerSubmitGroup: vi.fn(), acceptGroup: vi.fn() } }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn(), ensureGroupingSession: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 vi.mock('@/features/group/hooks/useGroupWebSocket', () => ({ useGroupWebSocket: () => ({ status: 'connected' }) }));
@@ -30,7 +30,7 @@ function mount(state: GroupStatus, deadlineStatus = 'EXPIRED', count = 4, prepar
   prepare?.(workspace);
   vi.mocked(groupApi.getWorkspace).mockResolvedValue(workspace);
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  render(<QueryClientProvider client={client}><MemoryRouter initialEntries={[entry]}><LecturerGroupWorkspacePage /></MemoryRouter></QueryClientProvider>);
+  render(<ConfigProvider theme={{ token: { motion: false } }}><QueryClientProvider client={client}><MemoryRouter initialEntries={[entry]}><LecturerGroupWorkspacePage /></MemoryRouter></QueryClientProvider></ConfigProvider>);
 }
 beforeEach(async () => {
   vi.clearAllMocks(); auth.user = { id: 1, authorities: ['ROLE_LECTURE'] }; await i18n.changeLanguage('en');
@@ -41,6 +41,68 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); });
 
 describe('lecturer group policy controls', () => {
+  it.each([['en', 'OPEN'], ['vi', 'REVOKED'], ['en', 'PENDING'], ['vi', 'PENDING']] as const)(
+    'asks for confirmation only after clicking staff review with rule warnings in %s for %s', async (language, state) => {
+      await i18n.changeLanguage(language);
+      mount(state, 'EXPIRED', 2, data => {
+        data.groups[0].allRulesPassed = false;
+        data.groups[0].ruleEvaluations = [{ code: 'MIN_MEMBERS_PER_GROUP', ruleName: 'Minimum members',
+          actualValue: 2, targetValue: 5, passed: false, hardRule: true, message: '' }];
+      });
+      await screen.findByText('Policy group');
+      expect(screen.queryByRole('note')).not.toBeInTheDocument();
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      const action = screen.getByRole('button', { name: i18n.t(state === 'PENDING' ? 'groupWorkspace.approve' : 'groupLifecycle.submit'), exact: true });
+      expect(action).toBeEnabled();
+      fireEvent.click(action);
+      const dialog = await screen.findByRole('dialog');
+      expect(within(dialog).getByRole('note')).toHaveTextContent(i18n.t('groupReview.ruleWarning'));
+      expect(within(dialog).getByRole('listitem')).toHaveTextContent(`${i18n.t('rules.codes.MIN_MEMBERS_PER_GROUP')}: 2 / 5`);
+      const api = state === 'PENDING' ? groupApi.acceptGroup : groupApi.lecturerSubmitGroup;
+      expect(api).not.toHaveBeenCalled();
+      fireEvent.click(within(dialog).getByRole('button', { name: i18n.t('groupReview.cancel'), exact: true }));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+      expect(api).not.toHaveBeenCalled();
+      fireEvent.click(action);
+      const reopened = await screen.findByRole('dialog');
+      fireEvent.click(within(reopened).getByRole('button', {
+        name: i18n.t(state === 'PENDING' ? 'groupReview.confirmApprove' : 'groupReview.confirmSubmit'), exact: true,
+      }));
+      await waitFor(() => expect(api).toHaveBeenCalledExactlyOnceWith(8, 1, 10));
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    }
+  );
+
+  it.each(['OPEN', 'PENDING'] as const)('saves %s directly without a warning dialog when all rules pass', async state => {
+    mount(state); await screen.findByText('Policy group');
+    fireEvent.click(screen.getByRole('button', { name: i18n.t(state === 'PENDING' ? 'groupWorkspace.approve' : 'groupLifecycle.submit'), exact: true }));
+    await waitFor(() => expect(state === 'PENDING' ? groupApi.acceptGroup : groupApi.lecturerSubmitGroup)
+      .toHaveBeenCalledExactlyOnceWith(8, 1, 10));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('retains the warning dialog after a failed save and prevents duplicate confirmation while retrying', async () => {
+    let fixture!: WorkspaceDTO;
+    mount('PENDING', 'EXPIRED', 2, data => { data.groups[0].allRulesPassed = false; fixture = data; });
+    vi.mocked(groupApi.acceptGroup).mockRejectedValueOnce(new Error('Review conflict'));
+    await screen.findByText('Policy group');
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupWorkspace.approve'), exact: true }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: i18n.t('groupReview.confirmApprove'), exact: true }));
+    await waitFor(() => expect(groupApi.acceptGroup).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(within(dialog).getByRole('button', { name: i18n.t('groupReview.confirmApprove'), exact: true })).toBeEnabled());
+    expect(dialog).toBeInTheDocument();
+    let finish!: () => void;
+    vi.mocked(groupApi.acceptGroup).mockImplementationOnce(() => new Promise(resolve => { finish = () => resolve(fixture.groups[0]); }));
+    const confirm = within(dialog).getByRole('button', { name: i18n.t('groupReview.confirmApprove'), exact: true });
+    fireEvent.click(confirm); fireEvent.click(confirm);
+    await waitFor(() => expect(groupApi.acceptGroup).toHaveBeenCalledTimes(2));
+    expect(within(dialog).getByRole('button', { name: i18n.t('groupReview.cancel'), exact: true })).toBeDisabled();
+    await act(async () => { finish(); });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(groupApi.acceptGroup).toHaveBeenCalledTimes(2);
+  });
+
   it('opens a shared unscheduled workspace and permits a manual assignment without a deadline', async () => {
     vi.mocked(classApi.ensureGroupingSession).mockResolvedValue({ id: 8, status: 'UNSCHEDULED', startTime: null, endTime: null } as never);
     mount('OPEN', 'UNSCHEDULED', 1, data => {
