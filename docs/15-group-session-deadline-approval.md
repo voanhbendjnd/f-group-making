@@ -1,5 +1,7 @@
 # Một phiên chọn nhóm, gia hạn và duyệt lại
 
+> Cập nhật 29/10/2026: yêu cầu giáo viên phải đạt rule khi gửi/duyệt nhóm đã được thay bằng [rule cảnh báo cho giáo viên](staff-review-rule-warnings.md). Sinh viên vẫn phải đạt rule trước khi gửi duyệt. Các mô tả bắt buộc rule cho giáo viên bên dưới giữ để đối chiếu lịch sử.
+
 > Cập nhật 16/10/2026: các quy tắc yêu cầu giáo viên sửa `REVOKED` chỉ khi `ACTIVE`, hủy deadline vĩnh viễn và gia hạn chung bắt buộc toàn bộ lớp bên dưới đã được thay thế bởi [flow đã duyệt 16](16-de-xuat-thong-nhat-flow-nhom-va-deadline.md) và [triển khai 17](17-trien-khai-flow-nhom-deadline-theo-lop.md). Nội dung còn lại giữ để đối chiếu lịch sử.
 
 ## M2 — Lecturer Group Review

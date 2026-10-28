@@ -297,7 +297,7 @@ export const GroupBoardColumn = React.memo(function GroupBoardColumn({
           )}
           {canManage && group.status === 'PENDING' && (
             <>
-              <Button size="sm" disabled={pending || !group.allRulesPassed} onClick={() => onApproveGroup(group.id)}>
+              <Button size="sm" disabled={pending} onClick={() => onApproveGroup(group.id)}>
                 {t('groupWorkspace.approve')}
               </Button>
               <Button size="sm" variant="secondary" disabled={pending} onClick={() => onRejectGroup(group.id)}>

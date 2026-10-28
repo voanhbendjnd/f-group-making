@@ -26,6 +26,19 @@ beforeEach(async () => { vi.clearAllMocks(); await i18n.changeLanguage('en'); })
 afterEach(cleanup);
 
 describe('group session policy UI', () => {
+  it.each([['en', 'OPEN'], ['vi', 'REVOKED']] as const)('still requires all rules for student submission in %s for %s', async (language, status) => {
+    await i18n.changeLanguage(language);
+    const testClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const props = { group: { ...group, status, allRulesPassed: false }, isLeader: true, isDeadlineExpired: false,
+      onSubmit: vi.fn(), onCancelSubmit: vi.fn(), onLeave: vi.fn(), onDisband: vi.fn(), onOpenTransferModal: vi.fn() };
+    const view = render(<QueryClientProvider client={testClient}><MyGroupCard {...props} /></QueryClientProvider>);
+    const submit = screen.getByRole('button', { name: i18n.t('studentGroup.myGroup.submitButton') });
+    expect(submit).toBeDisabled(); fireEvent.click(submit); expect(props.onSubmit).not.toHaveBeenCalled();
+    view.rerender(<QueryClientProvider client={testClient}><MyGroupCard {...props} group={{ ...props.group, allRulesPassed: true }} /></QueryClientProvider>);
+    expect(submit).toBeEnabled(); fireEvent.click(submit); expect(props.onSubmit).toHaveBeenCalledOnce();
+    testClient.clear();
+  });
+
   it('offers scheduling for an unscheduled session and submits the new window on its existing ID', async () => {
     const unscheduled: Deadline = { ...deadline, status: 'UNSCHEDULED', startTime: null, endTime: null,
       schoolClassIds: [1], schoolClassNames: ['CLASS_A'] };
