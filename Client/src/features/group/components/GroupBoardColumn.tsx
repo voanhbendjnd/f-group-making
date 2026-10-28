@@ -279,7 +279,7 @@ export const GroupBoardColumn = React.memo(function GroupBoardColumn({
         {details && (
           <div className="board-rule-details">
             {group.rejectReason && <p>{group.rejectReason}</p>}
-            {group.ruleEvaluations.map((rule) => (
+            {group.ruleEvaluations.filter((rule) => rule.code !== 'MAX_MAJORS_PER_GROUP').map((rule) => (
               <div key={rule.code}>
                 <span>{t(`rules.codes.${rule.code}`)}</span>
                 <strong className={rule.passed ? 'is-valid' : 'is-invalid'}>
