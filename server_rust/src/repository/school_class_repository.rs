@@ -316,7 +316,7 @@ impl SchoolClassRepository {
         lecturer_id: Option<i64>,
     ) -> Result<SchoolClass, AppError> {
         let res = sqlx::query(
-            "INSERT INTO school_classes (name, term_id, lecturer_id, created_date, last_modified_date) VALUES (?, ?, ?, NOW(), NOW())",
+            "INSERT INTO school_classes (name, term_id, lecturer_id, rules_version, created_date, last_modified_date) VALUES (?, ?, ?, 0, NOW(), NOW())",
         )
         .bind(name.trim())
         .bind(term_id)

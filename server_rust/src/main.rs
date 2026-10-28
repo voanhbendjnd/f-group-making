@@ -397,6 +397,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .layer(cors)
         .layer(TraceLayer::new_for_http())
+        .layer(axum::extract::DefaultBodyLimit::max(50 * 1024 * 1024))
         .with_state(state);
 
     let addr = format!("{}:{}", config.server_host, config.server_port);

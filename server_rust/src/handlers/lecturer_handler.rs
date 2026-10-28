@@ -80,7 +80,13 @@ pub async fn import_lecturers_from_excel(
 
     let mut file_bytes = None;
 
-    while let Ok(Some(field)) = multipart.next_field().await {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        AppError::bad_request(
+            format!("Failed to read multipart upload: {e}"),
+            "lecturerManagement",
+            "uploaderror",
+        )
+    })? {
         if field.name() == Some("file") {
             let data = field.bytes().await.map_err(|e| {
                 AppError::bad_request(

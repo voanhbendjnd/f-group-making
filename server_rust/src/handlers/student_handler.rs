@@ -126,7 +126,13 @@ pub async fn import_students_from_excel(
         }
     }
 
-    while let Ok(Some(field)) = multipart.next_field().await {
+    while let Some(field) = multipart.next_field().await.map_err(|e| {
+        AppError::bad_request(
+            format!("Failed to read multipart upload: {e}"),
+            "studentManagement",
+            "uploaderror",
+        )
+    })? {
         let name = field.name().unwrap_or("").to_string();
         if name == "file" {
             let data = field.bytes().await.map_err(|e| {
