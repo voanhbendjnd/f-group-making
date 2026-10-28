@@ -152,6 +152,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
               return (
                 <StudentProfilePopover key={member.studentId} student={member} placement="top">
                   <div
+                    className="my-group-member-item"
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -234,7 +235,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
 
       {/* Action Buttons Bar */}
       <div className="my-group-actions">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="my-group-actions-left" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {/* Member Actions */}
           {canModify && group.memberCount < group.maxMembers && (
             <Button
@@ -288,7 +289,7 @@ export const MyGroupCard: React.FC<MyGroupCardProps> = ({
         </div>
 
         {/* Submission Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="my-group-actions-right" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
           {isPending && isLeader && !isDeadlineExpired && (
             <Popconfirm
               title={t('studentGroup.myGroup.cancelSubmitConfirmTitle')}

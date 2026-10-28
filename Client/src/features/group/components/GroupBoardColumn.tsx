@@ -1,12 +1,22 @@
-import { useState, type DragEvent } from 'react';
+import React, { useMemo, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CheckCircle2, ChevronDown, ChevronUp, LockKeyhole, MoreHorizontal, AlertTriangle, Sparkles, Plus, GripVertical } from 'lucide-react';
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  LockKeyhole,
+  MoreHorizontal,
+  AlertTriangle,
+  Sparkles,
+  Plus,
+  GripVertical,
+} from 'lucide-react';
 import { Dropdown } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { groupCode } from '../utils/groupSequence';
 import { Button } from '@/components/common/Button';
 import { groupApi } from '../api/groupApi';
-import type { GroupDTO, GroupMemberDTO } from '../types/groupTypes';
+import type { GroupDTO, GroupMemberDTO, WorkspaceDTO } from '../types/groupTypes';
 import { BoardStudentCard } from './BoardStudentCard';
 import { StudentProfilePopover } from './StudentProfilePopover';
 
@@ -14,92 +24,170 @@ interface Props {
   deadlineId?: number | null;
   classId?: number | null;
   group: GroupDTO;
-  unassignedStudents: GroupMemberDTO[];
-  targets: GroupDTO[];
+  getTargets: () => GroupDTO[];
+  pending?: boolean;
   editable: boolean;
   canManage: boolean;
   canUnlock: boolean;
-  pending: boolean;
-  dragOver: boolean;
-  draggedId: number | null;
-  onDragStart: (event: DragEvent<HTMLDivElement>, student: GroupMemberDTO, sourceId: number | null) => void;
-  onDragEnd: () => void;
-  onDragOver: (event: DragEvent<HTMLElement>) => void;
-  onDrop: (event: DragEvent<HTMLElement>) => void;
-  onMove: (studentId: number, targetId: number) => void;
-  onRemove: (studentId: number) => void;
-  onSetLeader: (studentId: number) => void;
-  onAddMember?: (studentId: number) => void;
-  onSubmit: () => void;
-  onApprove: () => void;
-  onReject: () => void;
-  onUnlock: () => void;
-  onDisband: () => void;
-  isSelected?: boolean;
-  onToggleSelect?: (groupId: number, checked: boolean) => void;
+  isSelected: boolean;
+  onToggleSelect: (groupId: number, checked: boolean) => void;
+  onDragStart: (event: DragEvent<HTMLElement>, student: GroupMemberDTO, sourceId: number | null) => void;
+  onDragOverColumn: (event: DragEvent<HTMLElement>, groupId: number) => void;
+  onDropColumn: (event: DragEvent<HTMLElement>, groupId: number) => void;
+  onMoveStudent: (studentId: number, sourceId: number | null, targetId: number) => void;
+  onRemoveMember: (groupId: number, studentId: number) => void;
+  onSetGroupLeader: (groupId: number, studentId: number) => void;
+  onAddGroupMember: (groupId: number, studentId: number) => void;
+  onSubmitGroup: (groupId: number) => void;
+  onApproveGroup: (groupId: number) => void;
+  onRejectGroup: (groupId: number) => void;
+  onUnlockGroup: (group: GroupDTO) => void;
+  onDisbandGroup: (group: GroupDTO) => void;
 }
 
-export function GroupBoardColumn(props: Props) {
+/** Chỉ mount khi bật "Gợi ý": query + danh sách unassigned nằm ở đây, không làm cột re-render. */
+const RecommendationPanel = React.memo(function RecommendationPanel({
+  deadlineId,
+  classId,
+  groupId,
+  onDragStart,
+  onAdd,
+}: {
+  deadlineId?: number | null;
+  classId?: number | null;
+  groupId: number;
+  onDragStart: Props['onDragStart'];
+  onAdd: (groupId: number, studentId: number) => void;
+}) {
+  const { t } = useTranslation();
+
+  const { data: recommendations = [], isLoading } = useQuery({
+    queryKey: ['recommended-students-group', deadlineId, classId, groupId],
+    queryFn: ({ signal }) =>
+      deadlineId && classId && groupApi.getRecommendedStudents
+        ? groupApi.getRecommendedStudents(deadlineId, classId, groupId, signal)
+        : Promise.resolve([]),
+    enabled: !!deadlineId && !!classId,
+    staleTime: 10000,
+  });
+
+  const { data: unassigned = [] } = useQuery<WorkspaceDTO, Error, GroupMemberDTO[]>({
+    queryKey: ['group-workspace', deadlineId, classId],
+    queryFn: () => Promise.reject(new Error('no fetch')),
+    enabled: false,
+    select: (d) => d.unassignedStudents,
+  });
+
+  const available = useMemo(() => {
+    const ids = new Set(unassigned.map((s) => s.studentId));
+    return recommendations.filter((s) => ids.has(s.studentId));
+  }, [recommendations, unassigned]);
+
+  return (
+    <div className="board-column-recommendations" data-board-scroll>
+      {isLoading ? (
+        <div className="board-recs-loading">{t('common.loading', 'Đang tải gợi ý...')}</div>
+      ) : available.length === 0 ? (
+        <div className="board-recs-empty">{t('groupBoard.noSuggestions', 'Không có sinh viên phù hợp')}</div>
+      ) : (
+        available.map((student) => (
+          <div
+            key={student.studentId}
+            className="board-student draggable-student-card board-rec-student"
+            draggable
+            onDragStart={(event) => onDragStart(event, student, null)}
+          >
+            <GripVertical size={14} className="board-grip" aria-hidden="true" />
+            <StudentProfilePopover student={student} placement="top">
+              <div className="board-student-identity" style={{ cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <strong title={student.fullName}>{student.fullName}</strong>
+                  {typeof student.matchScore === 'number' && student.matchScore > 0 && (
+                    <span className="board-rec-badge">{student.matchScore}%</span>
+                  )}
+                </div>
+                <span>{student.rollNumber}</span>
+              </div>
+            </StudentProfilePopover>
+            <span className="board-major">{student.majorCode || t('groupReview.missing')}</span>
+            <button
+              type="button"
+              className="board-icon-button board-rec-add-btn"
+              title={t('groupBoard.quickAddMember', 'Thêm nhanh vào nhóm')}
+              onClick={() => onAdd(groupId, student.studentId)}
+            >
+              <Plus size={15} />
+            </button>
+          </div>
+        ))
+      )}
+    </div>
+  );
+});
+
+export const GroupBoardColumn = React.memo(function GroupBoardColumn({
+  deadlineId,
+  classId,
+  group,
+  getTargets,
+  pending,
+  editable,
+  canManage,
+  canUnlock,
+  isSelected,
+  onToggleSelect,
+  onDragStart,
+  onDragOverColumn,
+  onDropColumn,
+  onMoveStudent,
+  onRemoveMember,
+  onSetGroupLeader,
+  onAddGroupMember,
+  onSubmitGroup,
+  onApproveGroup,
+  onRejectGroup,
+  onUnlockGroup,
+  onDisbandGroup,
+}: Props) {
   const { t } = useTranslation();
   const [details, setDetails] = useState(false);
   const [showRecs, setShowRecs] = useState(false);
-  const { group, pending } = props;
+  const code = groupCode(group);
 
-  const { data: recommendations = [], isLoading: isRecsLoading } = useQuery({
-    queryKey: ['recommended-students-group', props.deadlineId, props.classId, group.id],
-    queryFn: ({ signal }) =>
-      props.deadlineId && props.classId && groupApi.getRecommendedStudents
-        ? groupApi.getRecommendedStudents(props.deadlineId, props.classId, group.id, signal)
-        : Promise.resolve([]),
-    enabled: showRecs && !!props.deadlineId && !!props.classId && props.editable,
-    staleTime: 10000,
-  });
-  // Workspace updates (including optimistic moves) remove assigned students immediately,
-  // even while a recommendation request is still returning an older snapshot.
-  const unassignedIds = new Set(props.unassignedStudents.map(student => student.studentId));
-  const availableRecommendations = recommendations.filter(student => unassignedIds.has(student.studentId));
+  const menuItems = useMemo(
+    () => [{ key: 'disband', danger: true, label: t('groupWorkspace.disband'), onClick: () => onDisbandGroup(group) }],
+    [t, group, onDisbandGroup]
+  );
 
   return (
     <section
-      className={`group-board-column group-card-dropzone ${props.dragOver ? 'is-drag-over' : ''} ${props.isSelected ? 'is-selected' : ''}`}
+      className={`group-board-column group-card-dropzone ${isSelected ? 'is-selected' : ''}`}
       data-group-id={group.id}
       aria-label={group.name}
-      onDragOver={props.onDragOver}
-      onDrop={props.onDrop}
+      onDragOver={(e) => onDragOverColumn(e, group.id)}
+      onDrop={(e) => onDropColumn(e, group.id)}
     >
       <header className="board-column-header">
         <div className="board-column-title">
-          {props.canManage && (
+          {canManage && (
             <input
               type="checkbox"
               className="board-group-select-checkbox"
-              checked={!!props.isSelected}
+              checked={isSelected}
               disabled={pending}
-              onChange={(e) => props.onToggleSelect?.(group.id, e.target.checked)}
+              onChange={(e) => onToggleSelect(group.id, e.target.checked)}
               title={t('groupWorkspace.selectToDisband')}
               aria-label={t('groupWorkspace.selectGroup', { name: group.name })}
             />
           )}
-          {groupCode(group) && <span className="board-group-code">{groupCode(group)}</span>}
+          {code && <span className="board-group-code">{code}</span>}
           <h2>{group.name}</h2>
           <span className="board-member-count">
             {group.memberCount}
             {group.maxMembers < 2147483647 ? `/${group.maxMembers}` : ''}
           </span>
-          {props.editable && (
-            <Dropdown
-              trigger={['click']}
-              menu={{
-                items: [
-                  {
-                    key: 'disband',
-                    danger: true,
-                    label: t('groupWorkspace.disband'),
-                    onClick: props.onDisband,
-                  },
-                ],
-              }}
-            >
+          {editable && (
+            <Dropdown trigger={['click']} menu={{ items: menuItems }}>
               <button
                 className="board-icon-button"
                 type="button"
@@ -130,8 +218,7 @@ export function GroupBoardColumn(props: Props) {
         )}
       </header>
 
-      {/* Recommended students toggle for this group */}
-      {props.editable && group.memberCount < group.maxMembers && (
+      {editable && group.memberCount < group.maxMembers && (
         <div className="board-column-recommendation-bar">
           <button
             type="button"
@@ -145,52 +232,14 @@ export function GroupBoardColumn(props: Props) {
             </span>
             <span className="toggle-chevron">{showRecs ? <ChevronUp size={13} /> : <ChevronDown size={13} />}</span>
           </button>
-
           {showRecs && (
-            <div className="board-column-recommendations" data-board-scroll>
-              {isRecsLoading ? (
-                <div className="board-recs-loading">{t('common.loading', 'Đang tải gợi ý...')}</div>
-              ) : availableRecommendations.length === 0 ? (
-                <div className="board-recs-empty">{t('groupBoard.noSuggestions', 'Không có sinh viên phù hợp')}</div>
-              ) : (
-                availableRecommendations.map((student) => (
-                  <div
-                    key={student.studentId}
-                    className={`board-student draggable-student-card board-rec-student ${
-                      props.draggedId === student.studentId ? 'is-dragging' : ''
-                    }`}
-                    draggable={!pending}
-                    onDragStart={(event) => props.onDragStart(event, student, null)}
-                    onDragEnd={props.onDragEnd}
-                  >
-                    <GripVertical size={14} className="board-grip" aria-hidden="true" />
-                    <StudentProfilePopover student={student} placement="top">
-                      <div className="board-student-identity" style={{ cursor: 'pointer' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <strong title={student.fullName}>{student.fullName}</strong>
-                          {typeof student.matchScore === 'number' && student.matchScore > 0 && (
-                            <span className="board-rec-badge">{student.matchScore}%</span>
-                          )}
-                        </div>
-                        <span>{student.rollNumber}</span>
-                      </div>
-                    </StudentProfilePopover>
-                    <span className="board-major">{student.majorCode || t('groupReview.missing')}</span>
-                    {props.onAddMember && (
-                      <button
-                        type="button"
-                        className="board-icon-button board-rec-add-btn"
-                        title={t('groupBoard.quickAddMember', 'Thêm nhanh vào nhóm')}
-                        disabled={pending}
-                        onClick={() => props.onAddMember!(student.studentId)}
-                      >
-                        <Plus size={15} />
-                      </button>
-                    )}
-                  </div>
-                ))
-              )}
-            </div>
+            <RecommendationPanel
+              deadlineId={deadlineId}
+              classId={classId}
+              groupId={group.id}
+              onDragStart={onDragStart}
+              onAdd={onAddGroupMember}
+            />
           )}
         </div>
       )}
@@ -200,19 +249,16 @@ export function GroupBoardColumn(props: Props) {
           <BoardStudentCard
             key={student.studentId}
             student={student}
-            source={group}
-            targets={props.targets.filter((target) => target.id !== group.id)}
-            editable={props.editable}
-            pending={pending}
-            dragging={props.draggedId === student.studentId}
-            onDragStart={(event) => props.onDragStart(event, student, group.id)}
-            onDragEnd={props.onDragEnd}
-            onMove={(targetId) => props.onMove(student.studentId, targetId)}
-            onRemove={() => props.onRemove(student.studentId)}
-            onSetLeader={() => props.onSetLeader(student.studentId)}
+            sourceId={group.id}
+            getTargets={getTargets}
+            editable={editable}
+            onDragStart={onDragStart}
+            onMove={onMoveStudent}
+            onRemove={onRemoveMember}
+            onSetLeader={onSetGroupLeader}
           />
         ))}
-        {props.editable && <p className="board-drop-hint">{t('groupBoard.dropHere')}</p>}
+        {editable && <p className="board-drop-hint">{t('groupBoard.dropHere')}</p>}
       </div>
 
       <footer className="board-column-footer">
@@ -220,7 +266,7 @@ export function GroupBoardColumn(props: Props) {
           type="button"
           className={`board-rule-toggle ${group.allRulesPassed ? 'is-valid' : ''}`}
           aria-expanded={details}
-          onClick={() => setDetails((value) => !value)}
+          onClick={() => setDetails((v) => !v)}
         >
           {group.allRulesPassed ? <CheckCircle2 size={14} /> : <AlertTriangle size={14} />}
           <span>
@@ -242,23 +288,23 @@ export function GroupBoardColumn(props: Props) {
           </div>
         )}
         <div className="board-column-actions">
-          {props.editable && (
-            <Button size="sm" disabled={pending} onClick={props.onSubmit}>
+          {editable && (
+            <Button size="sm" disabled={pending} onClick={() => onSubmitGroup(group.id)}>
               {t('groupLifecycle.submit')}
             </Button>
           )}
-          {props.canManage && group.status === 'PENDING' && (
+          {canManage && group.status === 'PENDING' && (
             <>
-              <Button size="sm" disabled={pending || !group.allRulesPassed} onClick={props.onApprove}>
+              <Button size="sm" disabled={pending || !group.allRulesPassed} onClick={() => onApproveGroup(group.id)}>
                 {t('groupWorkspace.approve')}
               </Button>
-              <Button size="sm" variant="secondary" disabled={pending} onClick={props.onReject}>
+              <Button size="sm" variant="secondary" disabled={pending} onClick={() => onRejectGroup(group.id)}>
                 {t('groupWorkspace.reject')}
               </Button>
             </>
           )}
-          {props.canUnlock && group.status === 'ACCEPTED' && (
-            <Button size="sm" variant="secondary" disabled={pending} onClick={props.onUnlock}>
+          {canUnlock && group.status === 'ACCEPTED' && (
+            <Button size="sm" variant="secondary" disabled={pending} onClick={() => onUnlockGroup(group)}>
               {t('groupLifecycle.unlock')}
             </Button>
           )}
@@ -266,4 +312,4 @@ export function GroupBoardColumn(props: Props) {
       </footer>
     </section>
   );
-}
+});

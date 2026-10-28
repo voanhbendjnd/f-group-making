@@ -609,61 +609,226 @@
   gap: 16px;
 }
 
+.student-zalo-container {
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.zalo-mobile-tip {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  background: #f0f7ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #1e40af;
+  line-height: 1.4;
+}
+
+.zalo-mobile-tip-icon {
+  color: var(--zalo-primary, #0068ff);
+  flex-shrink: 0;
+}
+
 /* ==========================================================================
    Responsive Breakpoints
    ========================================================================== */
 @media (max-width: 640px) {
+  .student-zalo-container {
+    padding: 0;
+  }
+
+  .zalo-student-panel {
+    margin: 8px 0 16px;
+    gap: 14px;
+  }
+
   .zalo-student-toolbar {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-    padding: 12px;
+    padding: 10px;
+    border-radius: 12px;
   }
+
   .zalo-scope-segmented {
     width: 100%;
+    display: flex;
+    padding: 3px;
   }
+
   .zalo-scope-segmented .ant-segmented-group {
     width: 100%;
+    display: flex;
   }
+
+  .zalo-scope-segmented .ant-segmented-item {
+    flex: 1;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .zalo-segment-label {
+    justify-content: center;
+    width: 100%;
+    font-size: 13px;
+    padding: 4px 6px;
+    white-space: nowrap;
+  }
+
   .zalo-refresh-btn {
     width: 100%;
     justify-content: center;
+    height: 38px;
   }
+
   .zalo-panel-hero {
     flex-direction: column;
     align-items: flex-start;
     padding: 16px;
   }
+
   .zalo-refresh-button {
     width: 100%;
     justify-content: center;
   }
+
   .zalo-card-content {
+    display: flex;
     flex-direction: column;
-    align-items: center;
-  }
-  .zalo-qr-container {
+    align-items: stretch;
+    gap: 14px;
     width: 100%;
+    min-width: 0;
   }
-  .zalo-share-card,
-  .zalo-editor {
-    padding: 16px;
+
+  .zalo-share-copy {
+    order: 1;
+    width: 100%;
+    gap: 12px;
+    min-width: 0;
   }
+
+  .zalo-qr-container {
+    order: 2;
+    width: 100%;
+    padding-top: 14px;
+    border-top: 1px dashed #e2e8f0;
+  }
+
+  .zalo-qr {
+    width: 160px;
+    height: 160px;
+  }
+
+  .zalo-qr.zalo-qr-empty {
+    width: 160px;
+    height: 160px;
+  }
+
+  .zalo-mobile-tip {
+    display: flex;
+  }
+
+  .zalo-share-card {
+    padding: 16px 14px;
+    border-radius: 14px;
+    gap: 14px;
+  }
+
+  .zalo-card-heading {
+    gap: 12px;
+  }
+
+  .zalo-card-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+  }
+
+  .zalo-card-heading h3 {
+    font-size: 16px;
+    line-height: 1.35;
+  }
+
+  .zalo-card-subtitle {
+    font-size: 12.5px;
+  }
+
+  .zalo-link-wrapper {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+  }
+
+  .zalo-invite-link {
+    font-size: 12.5px;
+  }
+
   .zalo-actions .ant-btn {
     flex: 1;
   }
+
   .zalo-action-row {
+    display: flex;
     flex-direction: column;
+    gap: 8px;
     width: 100%;
   }
-  .zalo-btn-primary,
+
+  .zalo-btn-primary {
+    width: 100% !important;
+    height: 44px !important;
+    font-size: 15px !important;
+    justify-content: center !important;
+  }
+
   .zalo-btn-secondary {
-    width: 100%;
-    justify-content: center;
+    width: 100% !important;
+    height: 40px !important;
+    font-size: 14px !important;
+    justify-content: center !important;
   }
+
+  .zalo-editor {
+    padding: 16px;
+  }
+
   .zalo-management .ant-segmented-item-label {
     white-space: normal;
     line-height: 1.4;
     padding: 8px;
+  }
+}
+
+/* Extra small mobile screens (<= 480px) */
+@media (max-width: 480px) {
+  .zalo-segment-label {
+    font-size: 12px;
+    gap: 4px;
+    padding: 3px 2px;
+  }
+
+  .zalo-segment-label svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  .zalo-share-card {
+    padding: 14px 12px;
+  }
+
+  .zalo-description-quote {
+    padding: 8px 10px;
+  }
+
+  .zalo-description {
+    font-size: 13px;
+  }
+
+  .zalo-empty {
+    padding: 18px 12px;
   }
 }

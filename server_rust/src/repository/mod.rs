@@ -1,0 +1,12 @@
+pub mod allocation_repository;
+pub mod deadline_repository;
+pub mod group_member_repository;
+pub mod group_repository;
+pub mod lecturer_repository;
+pub mod major_repository;
+pub mod rule_repository;
+pub mod school_class_repository;
+pub mod student_repository;
+pub mod term_repository;
+pub mod user_repository;
+pub mod zalo_share_repository;

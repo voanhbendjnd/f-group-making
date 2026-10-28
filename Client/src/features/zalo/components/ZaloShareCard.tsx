@@ -122,6 +122,11 @@ export function ZaloShareCard({ share, preview = false }: { share: ZaloShare; pr
 
           {safe ? (
             <>
+              <div className="zalo-mobile-tip">
+                <Smartphone size={14} className="zalo-mobile-tip-icon" />
+                <span>{t('zalo.mobileOpenHint', 'Chạm vào nút bên dưới để mở nhóm trong ứng dụng Zalo trên điện thoại')}</span>
+              </div>
+
               <div className="zalo-link-wrapper">
                 <span className="zalo-link-icon"><ExternalLink size={14} aria-hidden="true" /></span>
                 <a className="zalo-invite-link" href={share.inviteUrl} target="_blank" rel="noopener noreferrer">

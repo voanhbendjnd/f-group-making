@@ -61,6 +61,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
 
   return (
     <div
+      className="student-group-card-item"
       style={{
         backgroundColor: 'var(--color-surface, #ffffff)',
         borderRadius: '12px',
@@ -141,6 +142,7 @@ export const GroupCard: React.FC<GroupCardProps> = ({
 
       {/* Action footer */}
       <div
+        className="student-group-card-footer"
         style={{
           borderTop: '1px solid var(--color-border, #f1f5f9)',
           paddingTop: '0.875rem',

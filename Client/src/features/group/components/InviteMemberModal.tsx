@@ -155,6 +155,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
             return (
               <div
                 key={student.studentId}
+                className="invite-student-item"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -182,7 +183,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                   }}
                   placement="top"
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, minWidth: 200 }}>
+                  <div className="invite-student-info" style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', flex: 1, minWidth: 200 }}>
                     <div
                       style={{
                         width: 38,
@@ -219,7 +220,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
                   </div>
                 </StudentProfilePopover>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                <div className="invite-student-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                   {/* Status tag */}
                   {student.hasGroup ? (
                     <Tag color="default" style={{ margin: 0, fontSize: '0.75rem', padding: '3px 8px' }}>

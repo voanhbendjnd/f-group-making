@@ -23,6 +23,7 @@
     "localQrAlt": "Selected QR image",
     "qrFailed": "Unable to load this QR code, or access is no longer allowed.",
     "scanHint": "Scan the QR code using Zalo, or use the join button.",
+    "mobileOpenHint": "Tap the button below to open the group in the Zalo mobile app.",
     "join": "Join on Zalo",
     "copy": "Copy link",
     "copied": "Zalo link copied.",
