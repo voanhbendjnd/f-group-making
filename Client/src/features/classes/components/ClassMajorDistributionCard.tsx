@@ -280,26 +280,43 @@ export function ClassMajorDistributionCard({
 
       {/* Main Content: Chart + Detailed Breakdown Legend */}
       <div className="major-card-content">
-        {/* Left Side: Chart Container */}
-        <div
-          className={`major-chart-wrapper ${viewMode === 'stackedBar' ? 'bar-mode' : ''}`}
-          data-testid="major-chart-container"
-        >
-          {viewMode === 'donut' ? (
-            <>
-              <Doughnut data={donutData} options={donutOptions} />
-              <div className="major-donut-center" aria-hidden="true">
-                <span className="donut-center-value">{stats.totalStudents}</span>
-                <span className="donut-center-label">{t('classMajor.totalStudents')}</span>
-              </div>
-            </>
-          ) : (
-            <Bar data={barData} options={barOptions} />
-          )}
+        {/* Left Side: Chart and Grouping Summary */}
+        <div className="major-chart-panel">
+          <div
+            className={`major-chart-wrapper ${viewMode === 'stackedBar' ? 'bar-mode' : ''}`}
+            data-testid="major-chart-container"
+          >
+            {viewMode === 'donut' ? (
+              <>
+                <Doughnut data={donutData} options={donutOptions} />
+                <div className="major-donut-center" aria-hidden="true">
+                  <span className="donut-center-value">{stats.totalStudents}</span>
+                  <span className="donut-center-label">{t('classMajor.totalStudents')}</span>
+                </div>
+              </>
+            ) : (
+              <Bar data={barData} options={barOptions} />
+            )}
+          </div>
+          <div className="major-grouping-summary">
+            <span>
+              <span className="dot-assigned" aria-hidden="true" />
+              {t('classMajor.assigned')}: <strong>{stats.totalAssigned}</strong>
+            </span>
+            <span>
+              <span className="dot-unassigned" aria-hidden="true" />
+              {t('classMajor.unassigned')}: <strong>{stats.totalUnassigned}</strong>
+            </span>
+          </div>
         </div>
 
         {/* Right Side: Interactive Breakdown List */}
-        <div className="major-breakdown-list" role="list" aria-label={t('classMajor.majorBreakdown')}>
+        <div
+          className={`major-breakdown-list ${stats.majors.length > 14 ? 'is-scrollable' : ''}`}
+          role="list"
+          aria-label={t('classMajor.majorBreakdown')}
+          tabIndex={stats.majors.length > 14 ? 0 : undefined}
+        >
           {stats.majors.map((major: MajorStatItem) => {
             const isHovered = hoveredMajor === major.majorCode;
             return (
@@ -314,11 +331,14 @@ export function ClassMajorDistributionCard({
                 <div className="major-item-top">
                   <div className="major-item-identity">
                     <span
-                      className="major-color-indicator"
-                      style={{ backgroundColor: major.color }}
-                      aria-hidden="true"
-                    />
-                    <span className="major-code-badge">{major.majorCode}</span>
+                      className="major-code-badge"
+                      style={{
+                        backgroundColor: `${major.color}1a`,
+                        borderColor: `${major.color}40`,
+                      }}
+                    >
+                      {major.majorCode}
+                    </span>
                     <span className="major-name-text" title={major.majorName}>
                       {major.majorName}
                     </span>
@@ -332,24 +352,19 @@ export function ClassMajorDistributionCard({
                   </div>
                 </div>
 
-                {/* Progress bar showing grouping progress */}
+                {/* Major share of the class, followed by grouping counts */}
                 <div className="major-progress-container">
                   <div
                     className="major-progress-bar"
                     role="progressbar"
-                    aria-valuenow={major.assignedCount}
+                    aria-label={`${major.majorCode} - ${major.majorName}`}
+                    aria-valuenow={major.percentage}
                     aria-valuemin={0}
-                    aria-valuemax={major.count}
+                    aria-valuemax={100}
                   >
                     <div
-                      className="major-progress-assigned"
-                      style={{ width: `${major.assignedPercentage}%` }}
-                      title={`${t('classMajor.assigned')}: ${major.assignedCount}`}
-                    />
-                    <div
-                      className="major-progress-unassigned"
-                      style={{ width: `${100 - major.assignedPercentage}%` }}
-                      title={`${t('classMajor.unassigned')}: ${major.unassignedCount}`}
+                      className="major-progress-fill"
+                      style={{ width: `${major.percentage}%`, backgroundColor: major.color }}
                     />
                   </div>
                   <div className="major-progress-labels">
