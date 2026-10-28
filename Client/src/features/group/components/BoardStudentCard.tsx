@@ -1,4 +1,4 @@
-import type { DragEvent } from 'react';
+import React, { useMemo, useState, type DragEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Dropdown, type MenuProps } from 'antd';
 import { Crown, GripVertical, MoreHorizontal } from 'lucide-react';
@@ -7,67 +7,102 @@ import { StudentProfilePopover } from './StudentProfilePopover';
 
 interface Props {
   student: GroupMemberDTO;
-  source: GroupDTO | null;
-  targets: GroupDTO[];
+  sourceId: number | null;
+  getTargets: () => GroupDTO[];
   editable: boolean;
-  pending: boolean;
-  dragging: boolean;
-  onDragStart: (event: DragEvent<HTMLDivElement>) => void;
-  onDragEnd: () => void;
-  onMove: (targetId: number) => void;
-  onRemove?: () => void;
-  onSetLeader?: () => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>, student: GroupMemberDTO, sourceId: number | null) => void;
+  onMove: (studentId: number, sourceId: number | null, targetId: number) => void;
+  onRemove?: (groupId: number, studentId: number) => void;
+  onSetLeader?: (groupId: number, studentId: number) => void;
 }
 
-export function BoardStudentCard({ student, source, targets, editable, pending, dragging,
-  onDragStart, onDragEnd, onMove, onRemove, onSetLeader }: Props) {
+export const BoardStudentCard = React.memo(function BoardStudentCard({
+  student,
+  sourceId,
+  getTargets,
+  editable,
+  onDragStart,
+  onMove,
+  onRemove,
+  onSetLeader,
+}: Props) {
   const { t } = useTranslation();
-  const items: MenuProps['items'] = [];
-  if (source && student.role !== 'LEADER' && onSetLeader) {
-    items.push({ key: 'leader', label: t('groupWorkspace.makeLeader'), onClick: onSetLeader });
-  }
-  items.push({ key: 'move', label: t('groupBoard.moveTo'), children: targets.length ? targets.map(group => ({
-    key: String(group.id), label: group.name, disabled: group.memberCount >= group.maxMembers,
-    onClick: () => onMove(group.id),
-  })) : [{ key: 'none', label: t('groupBoard.noTargets'), disabled: true }] });
-  if (source && onRemove) items.push({ key: 'remove', label: t('groupWorkspace.removeFromGroup'), onClick: onRemove });
-  return <div className={`board-student draggable-student-card ${dragging ? 'is-dragging' : ''}`}
-    data-student-id={student.studentId} draggable={editable && !pending}
-    onDragStart={onDragStart} onDragEnd={onDragEnd}>
-    <GripVertical size={15} className="board-grip" aria-hidden="true" />
-    <StudentProfilePopover student={student} placement="top">
-      <div className="board-student-identity" style={{ cursor: 'pointer' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-          <strong title={student.fullName}>{student.fullName}</strong>
-          {typeof student.matchScore === 'number' && student.matchScore > 0 && (
-            <span
-              style={{
-                fontSize: '0.65rem',
-                fontWeight: 700,
-                color: '#15803d',
-                backgroundColor: '#dcfce7',
-                borderRadius: 4,
-                padding: '0 4px',
-                lineHeight: '16px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 2,
-              }}
-            >
-              ✨ {student.matchScore}%
-            </span>
-          )}
+  const [menuOpen, setMenuOpen] = useState(false);
+  const inGroup = sourceId !== null;
+
+  // Chỉ build menu khi người dùng mở; đóng thì không tốn gì
+  const items = useMemo<MenuProps['items']>(() => {
+    if (!menuOpen) return [];
+    const targets = getTargets().filter((g) => g.id !== sourceId);
+    const list: NonNullable<MenuProps['items']> = [];
+    if (inGroup && student.role !== 'LEADER' && onSetLeader) {
+      list.push({
+        key: 'leader',
+        label: t('groupWorkspace.makeLeader'),
+        onClick: () => onSetLeader(sourceId!, student.studentId),
+      });
+    }
+    list.push({
+      key: 'move',
+      label: t('groupBoard.moveTo'),
+      children: targets.length
+        ? targets.map((group) => ({
+            key: String(group.id),
+            label: group.name,
+            disabled: group.memberCount >= group.maxMembers,
+            onClick: () => onMove(student.studentId, sourceId, group.id),
+          }))
+        : [{ key: 'none', label: t('groupBoard.noTargets'), disabled: true }],
+    });
+    if (inGroup && onRemove) {
+      list.push({
+        key: 'remove',
+        label: t('groupWorkspace.removeFromGroup'),
+        onClick: () => onRemove(sourceId!, student.studentId),
+      });
+    }
+    return list;
+  }, [menuOpen, getTargets, sourceId, inGroup, student.role, student.studentId, onSetLeader, onMove, onRemove, t]);
+
+  return (
+    <div
+      className="board-student draggable-student-card"
+      data-student-id={student.studentId}
+      draggable={editable}
+      onDragStart={(event) => onDragStart(event, student, sourceId)}
+    >
+      <GripVertical size={15} className="board-grip" aria-hidden="true" />
+      <StudentProfilePopover student={student} placement="top">
+        <div className="board-student-identity" style={{ cursor: 'pointer' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <strong title={student.fullName}>{student.fullName}</strong>
+            {typeof student.matchScore === 'number' && student.matchScore > 0 && (
+              <span className="board-rec-badge">✨ {student.matchScore}%</span>
+            )}
+          </div>
+          <span>{student.rollNumber}</span>
         </div>
-        <span>{student.rollNumber}</span>
-      </div>
-    </StudentProfilePopover>
-    {source && student.role === 'LEADER' && <Crown size={15} className="board-leader" aria-label={t('groupWorkspace.leader')} />}
-    <span className="board-major">{student.majorCode || t('groupReview.missing')}</span>
-    {editable && <Dropdown trigger={['click']} menu={{ items, style: { maxHeight: 320, overflowY: 'auto' } }}>
-      <button type="button" className="board-icon-button" disabled={pending}
-        aria-label={t('groupBoard.studentActions', { name: student.fullName })}>
-        <MoreHorizontal size={17} />
-      </button>
-    </Dropdown>}
-  </div>;
-}
+      </StudentProfilePopover>
+      {inGroup && student.role === 'LEADER' && (
+        <Crown size={15} className="board-leader" aria-label={t('groupWorkspace.leader')} />
+      )}
+      <span className="board-major">{student.majorCode || t('groupReview.missing')}</span>
+      {editable && (
+        <Dropdown
+          trigger={['click']}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          menu={{ items, style: { maxHeight: 320, overflowY: 'auto' } }}
+        >
+          <button
+            type="button"
+            className="board-icon-button"
+            aria-label={t('groupBoard.studentActions', { name: student.fullName })}
+          >
+            <MoreHorizontal size={17} />
+          </button>
+        </Dropdown>
+      )}
+    </div>
+  );
+});

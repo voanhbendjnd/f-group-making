@@ -7,7 +7,7 @@ export const StudentZaloPage: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <div className="space-y-6">
+    <div className="student-zalo-container">
       <PageHeader
         title={t('zalo.title')}
         description={t('zalo.studentDescription')}

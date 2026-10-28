@@ -91,6 +91,7 @@ export const StudentBioCard: React.FC<StudentBioCardProps> = ({ initialBio, onBi
   return (
     <>
       <div
+        className="student-bio-card"
         style={{
           background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
           border: '1px solid #e2e8f0',
@@ -103,8 +104,8 @@ export const StudentBioCard: React.FC<StudentBioCardProps> = ({ initialBio, onBi
           marginBottom: 16,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
             <div
               style={{
                 width: 28,
@@ -115,15 +116,16 @@ export const StudentBioCard: React.FC<StudentBioCardProps> = ({ initialBio, onBi
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <Quote size={15} />
             </div>
-            <div>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <span style={{ fontWeight: 600, fontSize: '0.875rem', color: '#0f172a' }}>
                 {t('studentGroup.bio.cardTitle', 'Mô tả tìm nhóm của bạn')}
               </span>
-              <span style={{ fontSize: '0.75rem', color: '#64748b', marginLeft: 8 }}>
+              <span className="student-bio-subtitle" style={{ fontSize: '0.75rem', color: '#64748b' }}>
                 {t('studentGroup.bio.cardSubtitle', '(Người khác hover vào tên bạn sẽ thấy mô tả này)')}
               </span>
             </div>

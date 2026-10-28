@@ -53,13 +53,25 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   };
   useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const listener = (event: { deadlineId: number; schoolClassId?: number }) => {
-      if (event.deadlineId === deadlineId && (!event.schoolClassId || event.schoolClassId === classId))
-        void client.invalidateQueries({ queryKey: ['allocation'] });
+      if (busy.current) return;
+      if (event.deadlineId === deadlineId && (!event.schoolClassId || event.schoolClassId === classId)) {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => {
+          if (!busy.current) {
+            void client.invalidateQueries({ queryKey: ['allocation'] });
+          }
+        }, 100);
+      }
     };
     const offGroups = subscribe(`/topic/classes/${classId}/deadlines/${deadlineId}/groups`, listener);
     const offDeadline = subscribe(`/topic/classes/${classId}/deadlines`, listener);
-    return () => { offGroups(); offDeadline(); };
+    return () => {
+      window.clearTimeout(timer);
+      offGroups();
+      offDeadline();
+    };
   }, [subscribe, client, classId, deadlineId]);
   const resetPreview = () => {
     generation.current++; controller.current?.abort(); calculating.current = false;
@@ -83,11 +95,11 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     if (busy.current) return;
     if (!attemptRef.current && (!canApply || !preview?.previewId)) return;
     const request = attemptRef.current ?? { previewId: preview!.previewId!, key: newRequestKey(), target: preview!.result.targetGroupCount };
-    busy.current = true; setApplying(true); setApplyError(null); saveAttempt(request);
+    busy.current = true; setApplying(true); setConfiguring(false); setApplyError(null); saveAttempt(request);
     const unlock = lockTermSelection();
     try {
       const result = await allocationApi.apply(deadlineId, classId, request.previewId, request.key);
-      saveAttempt(null); setApplied(result); setPreview(null); setConfiguring(false); toast.success(t('allocation.saved'));
+      saveAttempt(null); setApplied(result); setPreview(null); toast.success(t('allocation.saved'));
       await Promise.allSettled([client.cancelQueries({ queryKey: [...key, 'plans'] })]);
       // Reflect the committed result immediately, even if the following history refresh fails.
       const markApplied = (summary: PlanDetail['summary']): PlanDetail['summary'] => summary.planId === result.previewId

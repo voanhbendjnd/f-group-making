@@ -31,3 +31,10 @@ dist/
 /Client/.idea
 ~$*
 **/~$*
+
+# Rust / Cargo build outputs
+target/
+**/target/
+**/*.rs.bk
+*.pdb
+**/*.pdb

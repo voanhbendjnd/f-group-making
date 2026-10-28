@@ -688,6 +688,7 @@ export const SelectGroupPage: React.FC = () => {
       {/* PENDING INVITATIONS NOTIFICATION / CARD (For unassigned students) */}
       {!workspace?.myGroup && myInvitations.length > 0 && (
         <div
+          className="student-group-invitations-banner"
           style={{
             marginBottom: '1.75rem',
             padding: '1.25rem 1.5rem',
@@ -708,6 +709,7 @@ export const SelectGroupPage: React.FC = () => {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
+                flexShrink: 0,
               }}
             >
               <Mail size={16} />
@@ -728,6 +730,7 @@ export const SelectGroupPage: React.FC = () => {
             {myInvitations.map((inv) => (
               <div
                 key={inv.id}
+                className="student-group-invitation-item"
                 style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -759,7 +762,7 @@ export const SelectGroupPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="student-group-invitation-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <Button
                     variant="primary"
                     icon={<Check size={15} />}
@@ -794,6 +797,7 @@ export const SelectGroupPage: React.FC = () => {
 
           {!workspace?.myGroup && recommendedGroups.length > 0 && (
             <Segmented
+              className="student-group-filter-segmented"
               value={groupFilter}
               onChange={(val) => setGroupFilter(val as 'all' | 'recommended')}
               options={[

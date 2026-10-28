@@ -162,6 +162,8 @@ export const LecturerDeadlinePage: React.FC = () => {
         open={!!visibleEditing}
         onClose={() => setEditingDeadline(null)}
         deadline={visibleEditing}
+        assignedOnly={true}
+        availableClassIds={availableClasses.map((c) => c.id)}
         onSuccess={() => refetch()}
       />
     </div>

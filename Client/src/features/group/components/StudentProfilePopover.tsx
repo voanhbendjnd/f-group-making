@@ -42,7 +42,7 @@ const getMajorColor = (majorCode?: string | null) => {
   }
 };
 
-export const StudentProfilePopover: React.FC<StudentProfilePopoverProps> = ({
+export const StudentProfilePopover: React.FC<StudentProfilePopoverProps> = React.memo(({
   student,
   children,
   placement = 'top',
@@ -228,4 +228,4 @@ export const StudentProfilePopover: React.FC<StudentProfilePopoverProps> = ({
       </span>
     </Popover>
   );
-};
+});

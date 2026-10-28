@@ -23,6 +23,7 @@
     "localQrAlt": "Ảnh QR vừa chọn",
     "qrFailed": "Không thể tải mã QR hoặc bạn không còn quyền xem.",
     "scanHint": "Dùng Zalo quét mã QR hoặc bấm nút tham gia.",
+    "mobileOpenHint": "Chạm vào nút bên dưới để mở nhóm trong ứng dụng Zalo trên điện thoại.",
     "join": "Tham gia Zalo",
     "copy": "Sao chép link",
     "copied": "Đã sao chép link Zalo.",

@@ -1280,6 +1280,10 @@ select.form-control {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
+
+  .my-group-member-item {
+    padding: 0.625rem 0.875rem !important;
+  }
   
   .my-group-actions {
     flex-direction: column;
@@ -1287,7 +1291,9 @@ select.form-control {
     gap: 0.75rem;
   }
   
-  .my-group-actions > div {
+  .my-group-actions > div,
+  .my-group-actions-left,
+  .my-group-actions-right {
     width: 100%;
     display: flex;
     flex-direction: column;
@@ -1300,21 +1306,155 @@ select.form-control {
     justify-content: center;
     height: 42px;
   }
+
+  /* Rule checklist mobile optimization */
+  .rule-checklist-card {
+    padding: 1rem 0.875rem !important;
+    border-radius: 10px !important;
+  }
+
+  .rule-checklist-item {
+    padding: 0.5rem 0.75rem !important;
+    gap: 6px !important;
+  }
+
+  .rule-checklist-badge-group {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+  }
+
+  /* Invitations banner mobile */
+  .student-group-invitations-banner {
+    padding: 1rem !important;
+    margin-bottom: 1.25rem !important;
+  }
+
+  .student-group-invitation-item {
+    flex-direction: column;
+    align-items: stretch !important;
+    gap: 10px !important;
+    padding: 10px 12px !important;
+  }
+
+  .student-group-invitation-actions {
+    width: 100% !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .student-group-invitation-actions > * {
+    width: 100% !important;
+    justify-content: center !important;
+    height: 38px;
+  }
+
+  /* Filter segmented on mobile */
+  .student-group-filter-segmented {
+    width: 100% !important;
+    display: flex !important;
+  }
+
+  .student-group-filter-segmented .ant-segmented-group {
+    width: 100% !important;
+  }
+
+  .student-group-filter-segmented .ant-segmented-item {
+    flex: 1 !important;
+    text-align: center !important;
+  }
   
   .student-group-grid {
     grid-template-columns: 1fr;
     gap: 1rem;
   }
+
+  .student-group-card-item {
+    padding: 1rem !important;
+  }
+
+  .student-group-card-footer {
+    gap: 8px;
+  }
+
+  .student-group-card-footer .ant-btn {
+    min-height: 36px;
+  }
+
+  /* Invite modal responsive list */
+  .invite-student-item {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .invite-student-actions {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .invite-student-actions .ant-btn {
+    height: 34px !important;
+  }
 }
 
 /* Extra small mobile (< 480px) */
 @media (max-width: 480px) {
+  .student-group-container {
+    padding: 0 0.5rem;
+    margin: 0.5rem auto;
+  }
+
+  .student-group-header-card {
+    padding: 0.875rem 1rem;
+  }
+
+  .student-group-header-title {
+    font-size: 1.25rem;
+  }
+
+  .student-group-countdown-box {
+    padding: 8px 12px;
+  }
+
+  .student-group-countdown-value {
+    font-size: 0.9375rem;
+    gap: 4px;
+  }
+
   .student-group-actions-buttons {
     grid-template-columns: 1fr;
   }
   
   .student-group-header-meta {
     font-size: 0.8125rem;
+  }
+
+  .my-group-container {
+    padding: 1rem 0.875rem;
+  }
+
+  .my-group-member-item {
+    padding: 0.5rem 0.625rem !important;
+  }
+
+  .rule-checklist-card {
+    padding: 0.875rem 0.75rem !important;
+  }
+
+  .rule-checklist-item {
+    padding: 0.45rem 0.625rem !important;
+  }
+
+  .student-bio-card {
+    padding: 10px 12px !important;
+  }
+
+  .student-bio-subtitle {
+    font-size: 0.6875rem !important;
+    line-height: 1.3 !important;
+    margin-top: 2px !important;
   }
 }
 
