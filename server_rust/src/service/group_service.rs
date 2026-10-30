@@ -7,9 +7,10 @@ use crate::domain::{
     AuthoritiesConstants, DeadlineStatus, Group, GroupMemberRole, GroupStatus, GroupingRuleCode,
 };
 use crate::dto::group::{
-    CreateGroupRequest, GroupDTO, GroupMemberDTO, GroupReviewDTO, LecturerCreateGroupRequest,
-    RejectGroupRequest, TransferLeaderRequest, WorkspaceDTO,
+    CreateGroupRequest, GroupDTO, GroupMemberDTO, GroupReviewDTO, GroupRuleEvaluationDTO,
+    LecturerCreateGroupRequest, RejectGroupRequest, TransferLeaderRequest, WorkspaceDTO,
 };
+use crate::dto::rule::GroupingRuleDTO;
 use crate::dto::realtime::GroupRealtimeEvent;
 use crate::dto::ResultPaginationDTO;
 use crate::error::AppError;
@@ -101,12 +102,17 @@ impl GroupService {
         let groups =
             GroupRepository::find_by_school_class_id_and_deadline_id(pool, class_id, deadline_id)
                 .await?;
+        let active_group_count = groups
+            .iter()
+            .filter(|g| g.status != GroupStatus::DISBANDED.as_str())
+            .count() as i64;
+
         let mut group_dtos = Vec::new();
         for g in groups {
             if g.status == GroupStatus::DISBANDED.as_str() {
                 continue;
             }
-            let dto = Self::build_group_dto(pool, &g, &class_rules, max_members).await?;
+            let dto = Self::build_group_dto(pool, &g, &class_rules, max_members, Some(active_group_count)).await?;
             group_dtos.push(dto);
         }
 
@@ -203,7 +209,7 @@ impl GroupService {
         let class_rules = GroupRuleValidationService::get_class_rules(pool, class_id).await?;
         let max_members = GroupRuleValidationService::get_max_members(&class_rules);
 
-        Self::build_group_dto(pool, &group, &class_rules, max_members).await
+        Self::build_group_dto(pool, &group, &class_rules, max_members, None).await
     }
 
     pub async fn create_group(
@@ -683,24 +689,11 @@ impl GroupService {
             ));
         }
 
-        if group.status != GroupStatus::OPEN.as_str() {
+        if !Self::is_draft(&group.status) {
             return Err(AppError::conflict(
-                "Nhóm hiện không ở trạng thái mở để nộp duyệt.",
+                "Chỉ có thể nộp nhóm khi đang ở trạng thái OPEN.",
                 "group",
                 "ERR_GROUP_STATE_CONFLICT",
-            ));
-        }
-
-        let class_rules = GroupRuleValidationService::get_class_rules(pool, class_id).await?;
-        let members =
-            GroupMemberRepository::find_member_details_by_group_id(pool, group_id).await?;
-        let evals = GroupRuleValidationService::evaluate_rules(&class_rules, &members);
-
-        if GroupRuleValidationService::has_hard_rule_violations(&evals) {
-            return Err(AppError::unprocessable(
-                "Nhóm chưa đạt đủ các điều kiện bắt buộc để nộp danh sách.",
-                "group",
-                "ERR_HARD_RULE_VIOLATED",
             ));
         }
 
@@ -710,16 +703,16 @@ impl GroupService {
                 AppError::not_found("Class not found", "schoolClass", "classNotFound")
             })?;
 
-        let snapshot = GroupRuleValidationService::serialize_snapshot(&evals);
+        let evaluations = Self::evaluate_complete_group(pool, &group).await?;
+        let snapshot = GroupRuleValidationService::serialize_snapshot(&evaluations);
+        let previous_status = group.status.clone();
         let seq = group
             .sequence_no
             .unwrap_or(Self::compact_group_sequence(pool, class_id, deadline_id).await? + 1);
 
-        GroupRepository::update_group(
+        GroupRepository::update_status_with_rules(
             pool,
             group.id,
-            &group.name,
-            group.leader_id,
             GroupStatus::PENDING.as_str(),
             None,
             Some(school_class.rules_version),
@@ -733,7 +726,7 @@ impl GroupService {
         GroupHistoryRepository::log_status_history(
             pool,
             group_id,
-            GroupStatus::OPEN.as_str(),
+            &previous_status,
             GroupStatus::PENDING.as_str(),
             &auth.email,
             None,
@@ -1187,36 +1180,37 @@ impl GroupService {
             .await?
             .ok_or_else(|| AppError::not_found("Group not found", "group", "groupNotFound"))?;
 
-        if group.status != GroupStatus::OPEN.as_str() {
-            return Err(AppError::conflict(
-                "Group is not open for submission",
-                "group",
-                "ERR_GROUP_STATE_CONFLICT",
-            ));
-        }
+        Self::require_staff_editable(&group)?;
+
+        let (evaluations, snapshot) = Self::capture_staff_review_snapshot(pool, &group).await?;
+        let previous_status = group.status.clone();
 
         let seq = group
             .sequence_no
             .unwrap_or(Self::compact_group_sequence(pool, class_id, deadline_id).await? + 1);
 
-        GroupRepository::update_status(
+        GroupRepository::update_status_with_rules(
             pool,
             group.id,
             GroupStatus::PENDING.as_str(),
             None,
+            Some(school_class.rules_version),
+            Some(&snapshot),
             Some(seq),
             group.version,
             Some(&auth.email),
         )
         .await?;
 
+        let reason = Self::review_audit_reason("Submitted for review by lecturer", &evaluations);
+
         GroupHistoryRepository::log_status_history(
             pool,
             group.id,
-            GroupStatus::OPEN.as_str(),
+            &previous_status,
             GroupStatus::PENDING.as_str(),
             &auth.email,
-            Some("Giảng viên nộp nhóm để xem xét"),
+            Some(&reason),
         )
         .await?;
 
@@ -1369,22 +1363,29 @@ impl GroupService {
 
         if group.status != GroupStatus::PENDING.as_str() {
             return Err(AppError::conflict(
-                "Chỉ có thể phê duyệt nhóm đang ở trạng thái chờ duyệt.",
+                "Chỉ có thể phê duyệt nhóm đang ở trạng thái PENDING.",
                 "group",
                 "ERR_GROUP_STATE_CONFLICT",
             ));
         }
 
-        GroupRepository::update_status(
+        let (evaluations, snapshot) = Self::capture_staff_review_snapshot(pool, &group).await?;
+
+        GroupRepository::update_status_with_rules(
             pool,
             group.id,
             GroupStatus::ACCEPTED.as_str(),
             None,
+            Some(school_class.rules_version),
+            Some(&snapshot),
             group.sequence_no,
             group.version,
             Some(&auth.email),
         )
         .await?;
+
+        let reason =
+            Self::review_audit_reason("Giảng viên chấp thuận cơ cấu thành viên nhóm", &evaluations);
 
         GroupHistoryRepository::log_status_history(
             pool,
@@ -1392,7 +1393,7 @@ impl GroupService {
             GroupStatus::PENDING.as_str(),
             GroupStatus::ACCEPTED.as_str(),
             &auth.email,
-            Some("Giảng viên phê duyệt nhóm"),
+            Some(&reason),
         )
         .await?;
 
@@ -1932,11 +1933,6 @@ impl GroupService {
         let now = Utc::now();
 
         for g in groups {
-            let class_rules =
-                GroupRuleValidationService::get_class_rules(pool, g.school_class_id).await?;
-            let max_members = GroupRuleValidationService::get_max_members(&class_rules);
-            let group_dto = Self::build_group_dto(pool, &g, &class_rules, max_members).await?;
-
             let class_name = class_map
                 .get(&g.school_class_id)
                 .cloned()
@@ -1952,9 +1948,14 @@ impl GroupService {
                 DeadlineStatus::UNSCHEDULED
             };
 
-            let can_review = g.status == GroupStatus::PENDING.as_str();
-            let can_reopen = g.status == GroupStatus::ACCEPTED.as_str();
-            let eligible = group_dto.all_rules_passed;
+            let membership_valid = Self::evaluate_review_group(pool, &g).await.is_ok();
+            let writable = DeadlineRepository::find_all_by_school_class_id(pool, g.school_class_id)
+                .await?
+                .len() == 1;
+            let group_dto = Self::get_group_detail(pool, g.id, g.school_class_id, g.deadline_id).await?;
+            let eligible = membership_valid && group_dto.all_rules_passed;
+            let can_review = writable && membership_valid && g.status == GroupStatus::PENDING.as_str();
+            let can_reopen = writable && g.status == GroupStatus::ACCEPTED.as_str();
 
             review_dtos.push(GroupReviewDTO {
                 group: group_dto,
@@ -2070,15 +2071,224 @@ impl GroupService {
         Ok(sequence)
     }
 
+    pub fn is_draft(status: &str) -> bool {
+        status == GroupStatus::OPEN.as_str() || status == GroupStatus::REVOKED.as_str()
+    }
+
+    pub fn require_staff_editable(group: &Group) -> Result<(), AppError> {
+        if !Self::is_draft(&group.status) {
+            return Err(AppError::conflict(
+                "Only draft groups can be edited. Unlock approved groups or reject pending groups first.",
+                "group",
+                "ERR_GROUP_STATE_CONFLICT",
+            ));
+        }
+        Ok(())
+    }
+
+    pub fn with_class_group_rules(
+        composition: Vec<GroupRuleEvaluationDTO>,
+        rules: &[GroupingRuleDTO],
+        group_count: i64,
+    ) -> Vec<GroupRuleEvaluationDTO> {
+        let mut evaluations = composition;
+        for rule in rules {
+            if rule.status
+                && (rule.code == GroupingRuleCode::MIN_GROUPS_PER_CLASS
+                    || rule.code == GroupingRuleCode::MAX_GROUPS_PER_CLASS)
+            {
+                let passed = if rule.code == GroupingRuleCode::MIN_GROUPS_PER_CLASS {
+                    group_count >= rule.value as i64
+                } else {
+                    group_count <= rule.value as i64
+                };
+                let message = if passed {
+                    format!("Quy định {} đạt yêu cầu", rule.code.as_str())
+                } else {
+                    format!("Quy định {} chưa đạt yêu cầu", rule.code.as_str())
+                };
+                evaluations.push(GroupRuleEvaluationDTO {
+                    code: rule.code.clone(),
+                    rule_name: rule.code.as_str().to_string(),
+                    hard_rule: false,
+                    target_value: rule.value,
+                    actual_value: group_count as i32,
+                    passed,
+                    message,
+                });
+            }
+        }
+        evaluations
+    }
+
+    pub async fn evaluate_current_group_rules(
+        pool: &MySqlPool,
+        class_id: i32,
+        deadline_id: i32,
+        members: &[GroupMemberDTO],
+    ) -> Result<Vec<GroupRuleEvaluationDTO>, AppError> {
+        let rules = GroupRuleValidationService::get_class_rules(pool, class_id).await?;
+        let has_count_rules = rules.iter().any(|r| {
+            r.status
+                && (r.code == GroupingRuleCode::MIN_GROUPS_PER_CLASS
+                    || r.code == GroupingRuleCode::MAX_GROUPS_PER_CLASS)
+        });
+        let group_count = if has_count_rules {
+            GroupRepository::find_by_school_class_id_and_deadline_id(pool, class_id, deadline_id)
+                .await?
+                .into_iter()
+                .filter(|g| g.status != GroupStatus::DISBANDED.as_str())
+                .count() as i64
+        } else {
+            0
+        };
+        let composition = GroupRuleValidationService::evaluate_rules(&rules, members);
+        Ok(Self::with_class_group_rules(composition, &rules, group_count))
+    }
+
+    pub async fn evaluate_review_group(
+        pool: &MySqlPool,
+        group: &Group,
+    ) -> Result<Vec<GroupRuleEvaluationDTO>, AppError> {
+        let rows =
+            StudentRepository::find_students_by_school_class_id(pool, group.school_class_id).await?;
+        let students_map: HashMap<i64, &crate::dto::student::StudentDTO> =
+            rows.iter().map(|s| (s.user_id, s)).collect();
+        let stored_members = GroupMemberRepository::find_by_group_id(pool, group.id).await?;
+
+        let has_invalid_member = stored_members.iter().any(|m| {
+            !students_map.contains_key(&m.student_id)
+                || m.school_class_id != group.school_class_id
+                || m.deadline_id != group.deadline_id
+        });
+        let distinct_count: HashSet<i64> = stored_members.iter().map(|m| m.student_id).collect();
+        let leader_count = stored_members
+            .iter()
+            .filter(|m| m.role == GroupMemberRole::LEADER.as_str())
+            .count();
+        let leader_matches = stored_members.iter().any(|m| {
+            m.role == GroupMemberRole::LEADER.as_str() && m.student_id == group.leader_id
+        });
+
+        if stored_members.is_empty()
+            || has_invalid_member
+            || distinct_count.len() != stored_members.len()
+            || leader_count != 1
+            || !leader_matches
+        {
+            return Err(AppError::conflict(
+                "Invalid group membership or leader",
+                "group",
+                "ERR_GROUP_STATE_CONFLICT",
+            ));
+        }
+
+        let members: Vec<GroupMemberDTO> = stored_members
+            .into_iter()
+            .map(|m| {
+                let s = students_map.get(&m.student_id);
+                GroupMemberDTO {
+                    id: m.id,
+                    group_id: m.group_id,
+                    student_id: m.student_id,
+                    roll_number: s.map(|x| x.roll_number.clone()),
+                    full_name: s.map(|x| x.full_name.clone()),
+                    email: s.map(|x| x.email.clone()),
+                    member_code: s.and_then(|x| x.member_code.clone()),
+                    cohort: s.and_then(|x| x.cohort.clone()),
+                    slot_type: s.and_then(|x| x.slot_type.clone()),
+                    major_id: s.and_then(|x| x.major_id),
+                    major_code: s.and_then(|x| x.major_code.clone()),
+                    major_name: s.and_then(|x| x.major_name.clone()),
+                    role: if m.role == GroupMemberRole::LEADER.as_str() {
+                        GroupMemberRole::LEADER
+                    } else {
+                        GroupMemberRole::MEMBER
+                    },
+                    joined_at: Some(m.joined_at),
+                    self_description: s.and_then(|x| x.self_description.clone()),
+                    match_score: None,
+                    match_reasons: Vec::new(),
+                }
+            })
+            .collect();
+
+        Self::evaluate_current_group_rules(
+            pool,
+            group.school_class_id,
+            group.deadline_id,
+            &members,
+        )
+        .await
+    }
+
+    pub async fn capture_staff_review_snapshot(
+        pool: &MySqlPool,
+        group: &Group,
+    ) -> Result<(Vec<GroupRuleEvaluationDTO>, String), AppError> {
+        let evaluations = Self::evaluate_review_group(pool, group).await?;
+        let snapshot = GroupRuleValidationService::serialize_snapshot(&evaluations);
+        Ok((evaluations, snapshot))
+    }
+
+    pub async fn evaluate_complete_group(
+        pool: &MySqlPool,
+        group: &Group,
+    ) -> Result<Vec<GroupRuleEvaluationDTO>, AppError> {
+        let evaluations = Self::evaluate_review_group(pool, group).await?;
+        if !GroupRuleValidationService::are_all_rules_passed(&evaluations) {
+            return Err(AppError::unprocessable(
+                "Group rules must pass before student submission",
+                "group",
+                "ERR_HARD_RULE_VIOLATED",
+            ));
+        }
+        Ok(evaluations)
+    }
+
+    pub async fn require_complete_group(
+        pool: &MySqlPool,
+        group: &Group,
+    ) -> Result<Vec<GroupRuleEvaluationDTO>, AppError> {
+        let evaluations = Self::evaluate_complete_group(pool, group).await?;
+        let snapshot = GroupRuleValidationService::serialize_snapshot(&evaluations);
+        sqlx::query("UPDATE `groups` SET rules_evaluation_snapshot = ? WHERE id = ?")
+            .bind(&snapshot)
+            .bind(group.id)
+            .execute(pool)
+            .await
+            .map_err(|e| AppError::Internal(format!("Failed to save rules evaluation snapshot: {e}")))?;
+        Ok(evaluations)
+    }
+
+    pub fn review_audit_reason(reason: &str, evaluations: &[GroupRuleEvaluationDTO]) -> String {
+        let warnings: Vec<&str> = evaluations
+            .iter()
+            .filter(|rule| !rule.passed)
+            .map(|rule| rule.code.as_str())
+            .collect();
+        if warnings.is_empty() {
+            reason.to_string()
+        } else {
+            format!("{}; Rule warnings: {}", reason, warnings.join(", "))
+        }
+    }
+
     async fn build_group_dto(
         pool: &MySqlPool,
         group: &Group,
         class_rules: &[crate::dto::rule::GroupingRuleDTO],
         max_members: i32,
+        active_group_count: Option<i64>,
     ) -> Result<GroupDTO, AppError> {
         let members =
             GroupMemberRepository::find_member_details_by_group_id(pool, group.id).await?;
-        let evals = GroupRuleValidationService::evaluate_rules(class_rules, &members);
+        let evals = if let Some(count) = active_group_count {
+            let comp = GroupRuleValidationService::evaluate_rules(class_rules, &members);
+            Self::with_class_group_rules(comp, class_rules, count)
+        } else {
+            Self::evaluate_current_group_rules(pool, group.school_class_id, group.deadline_id, &members).await?
+        };
         let all_passed = GroupRuleValidationService::are_all_rules_passed(&evals);
         let has_hard_violations = GroupRuleValidationService::has_hard_rule_violations(&evals);
 
@@ -2503,6 +2713,10 @@ impl GroupService {
         for proposed in plan {
             if !proposed.protected_group {
                 let gid = proposed.group_id.unwrap();
+                let grp = GroupRepository::find_by_id(pool, gid)
+                    .await?
+                    .ok_or_else(|| AppError::not_found("Group not found", "group", "groupNotFound"))?;
+                Self::require_complete_group(pool, &grp).await?;
                 let _ = Self::lecturer_submit_group(
                     pool,
                     event_sender,
@@ -2533,4 +2747,106 @@ impl GroupService {
 pub struct MaterializedAllocation {
     pub groups: Vec<crate::dto::allocation::GroupView>,
     pub created_group_ids: HashMap<String, i64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_draft() {
+        assert!(GroupService::is_draft("OPEN"));
+        assert!(GroupService::is_draft("REVOKED"));
+        assert!(!GroupService::is_draft("PENDING"));
+        assert!(!GroupService::is_draft("ACCEPTED"));
+        assert!(!GroupService::is_draft("DISBANDED"));
+    }
+
+    #[test]
+    fn test_review_audit_reason() {
+        let all_passed = vec![GroupRuleEvaluationDTO {
+            code: GroupingRuleCode::MIN_MEMBERS_PER_GROUP,
+            rule_name: "MIN_MEMBERS_PER_GROUP".to_string(),
+            hard_rule: true,
+            target_value: 4,
+            actual_value: 5,
+            passed: true,
+            message: "OK".to_string(),
+        }];
+        assert_eq!(
+            GroupService::review_audit_reason("Submitted by lecturer", &all_passed),
+            "Submitted by lecturer"
+        );
+
+        let with_warnings = vec![
+            GroupRuleEvaluationDTO {
+                code: GroupingRuleCode::MIN_MEMBERS_PER_GROUP,
+                rule_name: "MIN_MEMBERS_PER_GROUP".to_string(),
+                hard_rule: true,
+                target_value: 4,
+                actual_value: 3,
+                passed: false,
+                message: "Need 4".to_string(),
+            },
+            GroupRuleEvaluationDTO {
+                code: GroupingRuleCode::MIN_GROUPS_PER_CLASS,
+                rule_name: "MIN_GROUPS_PER_CLASS".to_string(),
+                hard_rule: false,
+                target_value: 5,
+                actual_value: 2,
+                passed: false,
+                message: "Need 5 groups".to_string(),
+            },
+        ];
+        assert_eq!(
+            GroupService::review_audit_reason("Giảng viên phê duyệt", &with_warnings),
+            "Giảng viên phê duyệt; Rule warnings: MIN_MEMBERS_PER_GROUP, MIN_GROUPS_PER_CLASS"
+        );
+    }
+
+    #[test]
+    fn test_with_class_group_rules() {
+        let rules = vec![
+            GroupingRuleDTO {
+                code: GroupingRuleCode::MIN_GROUPS_PER_CLASS,
+                value: 4,
+                status: true,
+            },
+            GroupingRuleDTO {
+                code: GroupingRuleCode::MAX_GROUPS_PER_CLASS,
+                value: 6,
+                status: true,
+            },
+        ];
+
+        let composition = vec![GroupRuleEvaluationDTO {
+            code: GroupingRuleCode::MIN_MEMBERS_PER_GROUP,
+            rule_name: "MIN_MEMBERS_PER_GROUP".to_string(),
+            hard_rule: true,
+            target_value: 4,
+            actual_value: 4,
+            passed: true,
+            message: "OK".to_string(),
+        }];
+
+        // Group count = 3: MIN_GROUPS (4) fails, MAX_GROUPS (6) passes
+        let evals = GroupService::with_class_group_rules(composition, &rules, 3);
+        assert_eq!(evals.len(), 3);
+
+        let min_eval = evals
+            .iter()
+            .find(|e| e.code == GroupingRuleCode::MIN_GROUPS_PER_CLASS)
+            .unwrap();
+        assert!(!min_eval.passed);
+        assert_eq!(min_eval.actual_value, 3);
+        assert!(!min_eval.hard_rule);
+
+        let max_eval = evals
+            .iter()
+            .find(|e| e.code == GroupingRuleCode::MAX_GROUPS_PER_CLASS)
+            .unwrap();
+        assert!(max_eval.passed);
+        assert_eq!(max_eval.actual_value, 3);
+        assert!(!max_eval.hard_rule);
+    }
 }

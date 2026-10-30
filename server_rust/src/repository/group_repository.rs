@@ -263,6 +263,49 @@ impl GroupRepository {
             .ok_or_else(|| AppError::Internal("Group not found".to_string()))
     }
 
+    pub async fn update_status_with_rules(
+        pool: &MySqlPool,
+        id: i64,
+        status: &str,
+        reject_reason: Option<&str>,
+        submitted_rules_version: Option<i64>,
+        rules_evaluation_snapshot: Option<&str>,
+        sequence_no: Option<i32>,
+        version: i64,
+        actor: Option<&str>,
+    ) -> Result<Group, AppError> {
+        let res = sqlx::query(
+            r#"UPDATE `groups`
+               SET status = ?, reject_reason = ?, submitted_rules_version = ?, rules_evaluation_snapshot = ?,
+                   sequence_no = ?, version = version + 1,
+                   last_modified_by = ?, last_modified_date = NOW()
+               WHERE id = ? AND version = ?"#,
+        )
+        .bind(status)
+        .bind(reject_reason)
+        .bind(submitted_rules_version)
+        .bind(rules_evaluation_snapshot)
+        .bind(sequence_no)
+        .bind(actor)
+        .bind(id)
+        .bind(version)
+        .execute(pool)
+        .await
+        .map_err(|e| AppError::Internal(format!("Failed to update group status with rules: {e}")))?;
+
+        if res.rows_affected() == 0 {
+            return Err(AppError::conflict(
+                "Dữ liệu nhóm đã bị thay đổi bởi người khác, vui lòng tải lại trang",
+                "group",
+                "concurrentModification",
+            ));
+        }
+
+        Self::find_by_id(pool, id)
+            .await?
+            .ok_or_else(|| AppError::Internal("Group not found".to_string()))
+    }
+
     #[allow(clippy::too_many_arguments)]
     pub async fn search_group_reviews(
         pool: &MySqlPool,
