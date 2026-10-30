@@ -19,6 +19,7 @@ import { groupApi } from '@/features/group/api/groupApi';
 import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
+import { StaffGroupRuleWarning } from '@/features/group/components/StaffGroupRuleWarning';
 import { fetchClassAllocationData, exportGroupResultExcel } from '@/features/group/utils/exportGroupResultExcel';
 import { ClassMajorDistributionCard } from '@/features/classes/components/ClassMajorDistributionCard';
 import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTypes';
@@ -175,7 +176,7 @@ function ReviewContent() {
     { title: t('groupReview.actions'), key: 'actions', className: 'review-actions-cell', render: (_: unknown, row: GroupReviewRow) => <div className="review-actions">
       <Button size="sm" variant="secondary" onClick={() => setViewId(row.group.id)}>{t('groupReview.view')}</Button>
       {row.canReview && <>
-        <Button size="sm" disabled={!row.eligible || mutation.isPending} onClick={() => begin('approve', row)}>{t('groupReview.approve')}</Button>
+        <Button size="sm" disabled={mutation.isPending} onClick={() => begin('approve', row)}>{t('groupReview.approve')}</Button>
         <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => begin('reject', row)}>{t('groupReview.reject')}</Button>
       </>}
       {row.canReopen && <Button size="sm" variant="secondary" disabled={mutation.isPending} onClick={() => begin('reopen', row)}>{t('groupReview.reopen')}</Button>}
@@ -289,7 +290,11 @@ function ReviewContent() {
         {reviews.data && <div className="review-pagination"><Pagination meta={reviews.data.meta} currentPage={filters.page} onPageChange={page => { setFilters(old => ({ ...old, page })); setViewId(null); }} /></div>}
       </div>
     </>}
-    <Modal className="review-detail-modal" aria-labelledby="review-detail-name" title={<span className="review-detail-title" id="review-detail-name"><ClipboardCheck size={28} aria-hidden="true" />{view?.group.name}</span>} open={Boolean(view)} onCancel={() => setViewId(null)} footer={null} width={1120}>
+    <Modal className="review-detail-modal" aria-labelledby="review-detail-name" title={<span className="review-detail-title" id="review-detail-name"><ClipboardCheck size={28} aria-hidden="true" />{view?.group.name}</span>} open={Boolean(view)} onCancel={() => setViewId(null)} width={1120}
+      footer={view ? <Button icon={<SlidersHorizontal size={16} />} disabled={mutation.isPending}
+        onClick={() => navigate(advancedGroupPath(view.group.schoolClassId, filterQuery, view.group.deadlineId, area))}>
+        {t('groupBoard.open')}
+      </Button> : null}>
       {view && <div className="review-details">
         <div className="review-detail-overview">
           <div className="review-detail-badges">{statusBadge(view.group.status)} {eligibility(view)}</div>
@@ -301,7 +306,7 @@ function ReviewContent() {
           <Target className="review-overview-art" size={76} strokeWidth={1.25} aria-hidden="true" />
         </div>
         {view.group.status === 'OPEN' && view.eligible && <p className="review-header-notice review-header-info"><ClipboardCheck size={16} aria-hidden="true" /><span>{t('groupReview.awaitSubmit')}</span></p>}
-        {!view.eligible && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.ineligible')}</span></p>}
+        {view.group.status === 'PENDING' && !view.canReview && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.ineligible')}</span></p>}
         {view.group.rejectReason && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.reason')}: {view.group.rejectReason}</span></p>}
         <section aria-label={t('groupReview.members')}>
           <div className="review-detail-section-heading"><h3><Users size={22} aria-hidden="true" />{t('groupReview.members')}</h3><span className="badge badge-neutral">{view.group.memberCount}</span></div>
@@ -326,9 +331,10 @@ function ReviewContent() {
         </section>
       </div>}
     </Modal>
-    <Modal title={t(`groupReview.${action?.kind ?? 'approve'}`)} open={Boolean(action)} onCancel={() => { if (!busy.current) discardReview(() => setAction(null)); }}
-      confirmLoading={mutation.isPending} okButtonProps={{ disabled: reviewUnknown }} onOk={() => { void confirm(); }} okText={t(`groupReview.${action?.kind ?? 'approve'}`)} cancelText={t('groupReview.cancel')} cancelButtonProps={{ disabled: mutation.isPending }} closable={!mutation.isPending} mask={{ closable: !mutation.isPending }}>
+    <Modal title={action?.kind === 'approve' && !action.row.group.allRulesPassed ? t('groupReview.ruleWarningTitle', { name: action.row.group.name }) : t(`groupReview.${action?.kind ?? 'approve'}`)} open={Boolean(action)} onCancel={() => { if (!busy.current) discardReview(() => setAction(null)); }}
+      confirmLoading={mutation.isPending} okButtonProps={{ disabled: reviewUnknown }} onOk={() => { void confirm(); }} okText={t(action?.kind === 'approve' && !action.row.group.allRulesPassed ? 'groupReview.confirmApprove' : `groupReview.${action?.kind ?? 'approve'}`)} cancelText={t('groupReview.cancel')} cancelButtonProps={{ disabled: mutation.isPending }} closable={!mutation.isPending} mask={{ closable: !mutation.isPending }}>
       <p>{t(action?.kind === 'reopen' ? 'groupReview.reopenConfirm' : action?.kind === 'reject' ? 'groupReview.rejectConfirm' : 'groupReview.approveConfirm', { name: action?.row.group.name })}</p>
+      {action?.kind === 'approve' && <StaffGroupRuleWarning group={action.row.group} />}
       {action?.kind === 'reject' && <label className="review-reason">{t('groupReview.reason')}<AntInput.TextArea aria-label={t('groupReview.reason')} rows={4} maxLength={2000} value={reason} disabled={mutation.isPending} onChange={event => setReason(event.target.value)} /></label>}
       {(reasonRequired || Boolean(actionError)) && <p className="alert alert-error" role="alert">{reasonRequired ? t('groupReview.reasonRequired') : translateErrorMessage(actionError)}</p>}
       {reviewUnknown && <p role="status">{t('adminUx.unknownWrite')}</p>}

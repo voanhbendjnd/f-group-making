@@ -33,6 +33,7 @@ class GroupReviewResourceTest {
     @Autowired GroupMemberRepository members;
     @Autowired GroupStatusHistoryRepository history;
     @Autowired MajorRepository majors;
+    @Autowired RuleRepository rules;
     @MockitoBean NotificationAsyncService notifications;
     User teacher;
     SchoolClass own;
@@ -124,6 +125,62 @@ class GroupReviewResourceTest {
             .with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("OPEN"));
         assertThat(members.countByGroupId(group.getId())).isEqualTo(4);
         mvc.perform(post(action("/accept")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isConflict());
+    }
+
+    @Test void staffCanSubmitAndApproveRuleWarningsAndWarningsRemainInTheResponseAndAudit() throws Exception {
+        setRule(GroupingRuleCode.MIN_MEMBERS_PER_GROUP, 5);
+        setRule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 3);
+        setRule(GroupingRuleCode.MIN_GROUPS_PER_CLASS, 2);
+        mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString())
+            .with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.result[0].eligible").value(false))
+            .andExpect(jsonPath("$.data.result[0].canReview").value(true))
+            .andExpect(jsonPath("$.data.result[0].group.allRulesPassed").value(false));
+        mvc.perform(post(action("/accept")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACCEPTED"))
+            .andExpect(jsonPath("$.data.allRulesPassed").value(false))
+            .andExpect(jsonPath("$.data.ruleEvaluations[?(@.code == 'MIN_GROUPS_PER_CLASS')].passed").value(false));
+        assertThat(groups.findById(group.getId()).orElseThrow().getRulesEvaluationSnapshot())
+            .contains("MIN_MEMBERS_PER_GROUP", "MIN_MAJORS_PER_GROUP", "MIN_GROUPS_PER_CLASS", "\"passed\":false");
+        assertThat(history.findByGroupIdOrderByCreatedAtDesc(group.getId())).anySatisfy(entry -> {
+            assertThat(entry.getToStatus()).isEqualTo(GroupStatus.ACCEPTED);
+            assertThat(entry.getReason()).contains("Rule warnings", "MIN_GROUPS_PER_CLASS");
+        });
+        mvc.perform(post(action("/revoke")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isOk());
+        mvc.perform(post(action("/submit-review")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"))
+            .andExpect(jsonPath("$.data.allRulesPassed").value(false));
+    }
+
+    @Test void studentMustMeetRulesAndCannotUseStaffReviewEndpointsToBypassThem() throws Exception {
+        group.setStatus(GroupStatus.OPEN); groups.saveAndFlush(group);
+        deadline.setEndTime(Instant.now().plusSeconds(3600)); deadlines.saveAndFlush(deadline);
+        setRule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 3);
+        String leader = users.findById(group.getLeaderId()).orElseThrow().getEmail();
+        mvc.perform(post(action("/submit")).with(user(leader).roles("STUDENT"))).andExpect(status().isUnprocessableEntity());
+        mvc.perform(post(action("/submit-review")).with(user(leader).roles("STUDENT"))).andExpect(status().isForbidden());
+        mvc.perform(post(action("/submit-review")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("PENDING"));
+        mvc.perform(post(action("/accept")).with(user(leader).roles("STUDENT"))).andExpect(status().isForbidden());
+        mvc.perform(post(action("/accept")).with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.status").value("ACCEPTED"));
+    }
+
+    @Test void invalidLeadershipStillBlocksStaffReview() throws Exception {
+        var leader = members.findByGroupIdAndStudentId(group.getId(), group.getLeaderId()).orElseThrow();
+        leader.setRole(GroupMemberRole.MEMBER); members.saveAndFlush(leader);
+        mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString())
+            .with(user(teacher.getEmail()).roles("LECTURE")))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.result[0].canReview").value(false));
+        mvc.perform(post(action("/accept")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isConflict());
+        assertThat(groups.findById(group.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.PENDING);
+        group.setStatus(GroupStatus.OPEN); groups.saveAndFlush(group);
+        mvc.perform(post(action("/submit-review")).with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isConflict());
+    }
+
+    void setRule(GroupingRuleCode code, int value) {
+        var rule = new Rule(); rule.setSchoolClassId(own.getId()); rule.setCode(code.name());
+        rule.setValue(value); rule.setStatus(true); rules.saveAndFlush(rule);
     }
 
     @Test void paginationAndMasterListNeverIncludeAnotherLecturersGroups() throws Exception {

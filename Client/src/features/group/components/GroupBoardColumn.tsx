@@ -279,7 +279,7 @@ export const GroupBoardColumn = React.memo(function GroupBoardColumn({
         {details && (
           <div className="board-rule-details">
             {group.rejectReason && <p>{group.rejectReason}</p>}
-            {group.ruleEvaluations.map((rule) => (
+            {group.ruleEvaluations.filter((rule) => rule.code !== 'MAX_MAJORS_PER_GROUP').map((rule) => (
               <div key={rule.code}>
                 <span>{t(`rules.codes.${rule.code}`)}</span>
                 <strong className={rule.passed ? 'is-valid' : 'is-invalid'}>
@@ -297,7 +297,7 @@ export const GroupBoardColumn = React.memo(function GroupBoardColumn({
           )}
           {canManage && group.status === 'PENDING' && (
             <>
-              <Button size="sm" disabled={pending || !group.allRulesPassed} onClick={() => onApproveGroup(group.id)}>
+              <Button size="sm" disabled={pending} onClick={() => onApproveGroup(group.id)}>
                 {t('groupWorkspace.approve')}
               </Button>
               <Button size="sm" variant="secondary" disabled={pending} onClick={() => onRejectGroup(group.id)}>

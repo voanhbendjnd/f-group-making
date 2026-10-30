@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
@@ -40,11 +40,42 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); vi.unstubAllGlobals(); });
 
 describe('group review', () => {
-  it('opens the selected class and retains review context, even if the status filter has no other groups', async () => {
+  it.each(['en', 'vi'])('allows approval with rule warnings in %s and lists failures before confirmation', async language => {
+    await i18n.changeLanguage(language);
+    const warning = row();
+    warning.eligible = false;
+    warning.group.allRulesPassed = false;
+    warning.group.ruleEvaluations = [{ code: 'MIN_MAJORS_PER_GROUP', ruleName: 'Minimum majors',
+      actualValue: 2, targetValue: 3, passed: false, hardRule: false, message: '' }];
+    mount(warning); await screen.findByText('Review fixture');
+    const approve = screen.getByRole('button', { name: i18n.t('groupReview.approve'), exact: true });
+    expect(approve).toBeEnabled();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+    fireEvent.click(approve);
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('note')).toHaveTextContent(i18n.t('groupReview.ruleWarning'));
+    expect(within(dialog).getByRole('button', { name: i18n.t('groupReview.confirmApprove'), exact: true })).toBeEnabled();
+    expect(within(dialog).getByRole('listitem')).toHaveTextContent(`${i18n.t('rules.codes.MIN_MAJORS_PER_GROUP')}: 2 / 3`);
+    expect(groupApi.acceptGroup).not.toHaveBeenCalled();
+    fireEvent.click(dialog.querySelector('.ant-btn-primary')!);
+    await waitFor(() => expect(groupApi.acceptGroup).toHaveBeenCalledExactlyOnceWith(3, 2, 1));
+  });
+
+  it('does not offer approval when the server rejects membership or session integrity', async () => {
+    const invalid = row(); invalid.canReview = false; invalid.eligible = false;
+    mount(invalid); await screen.findByText('Review fixture');
+    expect(screen.queryByRole('button', { name: i18n.t('groupReview.approve'), exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.view'), exact: true }));
+    expect(await screen.findByText(i18n.t('groupReview.ineligible'))).toBeInTheDocument();
+  });
+
+  it('opens advanced grouping from the viewed group with its class, session and review context', async () => {
     mount(row(), '/lecturer/group-review?termId=8&classId=2&status=PENDING&search=Leader');
     await screen.findByText('Review fixture');
     expect(screen.getByLabelText('Search group or leader')).toHaveValue('Leader');
-    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.openAdvancedAction') }));
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('groupReview.view'), exact: true }));
+    const dialog = await screen.findByRole('dialog');
+    fireEvent.click(within(dialog).getByRole('button', { name: i18n.t('groupBoard.open'), exact: true }));
     const output = await screen.findByTestId('board-url');
     const url = new URL(output.textContent!, 'http://localhost');
     expect(url.pathname).toBe('/lecturer/group-review/advanced');

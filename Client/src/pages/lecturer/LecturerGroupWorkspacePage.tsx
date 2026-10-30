@@ -30,6 +30,7 @@ import { BoardStudentCard } from '@/features/group/components/BoardStudentCard';
 import { LecturerGroupModal } from '@/features/group/components/LecturerGroupModal';
 import { RejectGroupModal } from '@/features/group/components/RejectGroupModal';
 import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
+import { StaffGroupRuleWarning } from '@/features/group/components/StaffGroupRuleWarning';
 import './LecturerGroupWorkspacePage.css';
 
 interface DragStudent {
@@ -38,6 +39,8 @@ interface DragStudent {
   classId: number;
   deadlineId: number;
 }
+
+type StaffReviewKind = 'submit' | 'approve';
 
 const quiet = (promise: Promise<unknown>) => {
   void promise.catch(() => {});
@@ -125,6 +128,7 @@ function LecturerGroupWorkspaceContent({
   const [create, setCreate] = useState<number[] | null>(null);
   const [showRules, setShowRules] = useState(false);
   const [rejectId, setRejectId] = useState<number | null>(null);
+  const [ruleWarningAction, setRuleWarningAction] = useState<{ kind: StaffReviewKind; groupId: number } | null>(null);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = useState<Set<number>>(new Set());
 
@@ -134,6 +138,9 @@ function LecturerGroupWorkspaceContent({
   const overEl = useRef<HTMLElement | null>(null);
 
   const data = workspace.data;
+  const warningGroup = ruleWarningAction ? data?.groups.find(group => group.id === ruleWarningAction.groupId) : undefined;
+  const warningActionAllowed = canManage && !!warningGroup && (ruleWarningAction?.kind === 'approve'
+    ? warningGroup.status === 'PENDING' : editable(warningGroup));
   const dataRef = useRef(data);
   dataRef.current = data;
 
@@ -541,23 +548,24 @@ function LecturerGroupWorkspaceContent({
     [move]
   );
 
-  const handleSubmitGroup = useCallback(
-    (groupId: number) => {
-      if (deadlineId && classId) {
-        quiet(run(() => groupApi.lecturerSubmitGroup(deadlineId, classId, groupId)));
-      }
-    },
-    [run, deadlineId, classId]
-  );
+  const executeStaffReview = useCallback((kind: StaffReviewKind, groupId: number) =>
+    run(() => kind === 'submit'
+      ? groupApi.lecturerSubmitGroup(deadlineId!, classId!, groupId)
+      : groupApi.acceptGroup(deadlineId!, classId!, groupId)),
+  [run, deadlineId, classId]);
 
-  const handleApproveGroup = useCallback(
-    (groupId: number) => {
-      if (deadlineId && classId) {
-        quiet(run(() => groupApi.acceptGroup(deadlineId, classId, groupId)));
-      }
-    },
-    [run, deadlineId, classId]
-  );
+  const requestStaffReview = useCallback((kind: StaffReviewKind, groupId: number) => {
+    const group = dataRef.current?.groups.find(value => value.id === groupId);
+    if (!group || !canManageRef.current || isBusy()) return;
+    if (!group.allRulesPassed) {
+      setRuleWarningAction({ kind, groupId });
+    } else {
+      quiet(executeStaffReview(kind, groupId));
+    }
+  }, [executeStaffReview, isBusy]);
+
+  const handleSubmitGroup = useCallback((groupId: number) => requestStaffReview('submit', groupId), [requestStaffReview]);
+  const handleApproveGroup = useCallback((groupId: number) => requestStaffReview('approve', groupId), [requestStaffReview]);
 
   const handleRejectGroup = useCallback((groupId: number) => {
     setRejectId(groupId);
@@ -943,6 +951,27 @@ function LecturerGroupWorkspaceContent({
         </div>
       </div>
       <p className="board-bottom-hint">{t('groupBoard.edgeHint')}</p>
+      <Modal
+        title={t('groupReview.ruleWarningTitle', { name: warningGroup?.name ?? '' })}
+        open={ruleWarningAction !== null}
+        onCancel={() => { if (!isBusy()) setRuleWarningAction(null); }}
+        onOk={() => {
+          if (!ruleWarningAction || !warningActionAllowed || isBusy()) return;
+          return executeStaffReview(ruleWarningAction.kind, ruleWarningAction.groupId)
+            .then(() => setRuleWarningAction(null)).catch(() => {});
+        }}
+        okText={t(ruleWarningAction?.kind === 'approve' ? 'groupReview.confirmApprove' : 'groupReview.confirmSubmit')}
+        cancelText={t('groupReview.cancel')}
+        confirmLoading={pending}
+        okButtonProps={{ disabled: !warningActionAllowed }}
+        cancelButtonProps={{ disabled: pending }}
+        closable={!pending}
+        mask={{ closable: !pending }}
+      >
+        {warningGroup && <StaffGroupRuleWarning group={warningGroup} />}
+        <p>{t(ruleWarningAction?.kind === 'approve' ? 'groupReview.approveConfirm' : 'groupReview.submitConfirm', { name: warningGroup?.name ?? '' })}</p>
+        {!warningActionAllowed && <p role="alert">{t('groupReview.ineligible')}</p>}
+      </Modal>
       <Modal title={t('groupReview.rules')} open={showRules} onCancel={() => setShowRules(false)} footer={null}>
         <div className="board-rule-details">
           {data.rules

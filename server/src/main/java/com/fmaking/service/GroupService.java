@@ -124,6 +124,8 @@ public class GroupService {
             .collect(Collectors.groupingBy(GroupMember::getGroupId));
 
         int maxMembersLimit = ruleValidationService.getMaxMembers(classId);
+        List<GroupingRuleDTO> classRules = ruleValidationService.getClassRules(classId);
+        long activeGroupCount = groups.stream().filter(group -> group.getStatus() != GroupStatus.DISBANDED).count();
 
         List<GroupDTO> groupDTOs = new ArrayList<>();
         GroupDTO myGroupDTO = null;
@@ -140,7 +142,8 @@ public class GroupService {
                     .thenComparing(GroupMemberDTO::getJoinedAt))
                 .toList();
 
-            List<GroupRuleEvaluationDTO> evaluations = ruleValidationService.evaluateGroup(classId, memberDTOs);
+            List<GroupRuleEvaluationDTO> evaluations = withClassGroupRules(
+                ruleValidationService.evaluateGroup(classId, memberDTOs), classRules, activeGroupCount);
             boolean allPassed = ruleValidationService.areAllRulesPassed(evaluations);
             boolean hasHardViolations = ruleValidationService.hasHardRuleViolations(evaluations);
 
@@ -192,9 +195,6 @@ public class GroupService {
             .map(s -> toMemberDTOFromRow(s, classId, deadlineId))
             .sorted(Comparator.comparing(GroupMemberDTO::getRollNumber))
             .toList();
-
-        // Rules of class
-        List<GroupingRuleDTO> classRules = ruleValidationService.getClassRules(classId);
 
         boolean canCreate = studentCanWrite && myGroupDTO == null && !isLecturerOrAdmin;
         boolean canJoin = studentCanWrite && myGroupDTO == null && !isLecturerOrAdmin;
@@ -261,28 +261,18 @@ public class GroupService {
         var result = page.getContent().stream().map(group -> {
             var schoolClass = schoolClassRepository.findById(group.getSchoolClassId()).orElseThrow();
             var deadline = validateDeadlineExists(group.getDeadlineId(), group.getSchoolClassId());
-            boolean eligible;
-            try { evaluateCompleteGroup(group); eligible = true; }
-            catch (ConflictAlertException | UnprocessableAlertException exception) { eligible = false; }
+            boolean membershipValid;
+            try { evaluateReviewGroup(group); membershipValid = true; }
+            catch (ConflictAlertException exception) { membershipValid = false; }
             boolean writable = deadlineRepository.findAllBySchoolClassId(schoolClass.getId()).size() == 1;
             var submittedAt = groupStatusHistoryRepository.findByGroupIdOrderByCreatedAtDesc(group.getId()).stream()
                 .filter(history -> history.getToStatus() == GroupStatus.PENDING).map(GroupStatusHistory::getCreatedAt).findFirst().orElse(null);
             GroupDTO detail = getGroupDetail(group.getId(), group.getSchoolClassId(), group.getDeadlineId());
-            List<GroupRuleEvaluationDTO> evaluations = new ArrayList<>(detail.getRuleEvaluations());
-            int groupCount = (int) groupRepository.findBySchoolClassIdAndDeadlineId(group.getSchoolClassId(), group.getDeadlineId())
-                .stream().filter(value -> value.getStatus() != GroupStatus.DISBANDED).count();
-            for (GroupingRuleDTO rule : ruleValidationService.getClassRules(group.getSchoolClassId())) {
-                if (rule.status() && (rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS || rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS)) {
-                    boolean passed = rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS ? groupCount >= rule.value() : groupCount <= rule.value();
-                    evaluations.add(GroupRuleEvaluationDTO.builder().code(rule.code()).ruleName(rule.code().name())
-                        .targetValue(rule.value()).actualValue(groupCount).passed(passed).hardRule(false).build());
-                }
-            }
-            detail.setRuleEvaluations(evaluations);
-            detail.setAllRulesPassed(eligible);
+            boolean eligible = membershipValid && detail.isAllRulesPassed();
             return new GroupReviewDTO(detail,
                 schoolClass.getName(), submittedAt, deadlinePolicy.status(deadline, group.getSchoolClassId()).name(), eligible,
-                writable && group.getStatus() == GroupStatus.PENDING, writable && group.getStatus() == GroupStatus.ACCEPTED);
+                writable && membershipValid && group.getStatus() == GroupStatus.PENDING,
+                writable && group.getStatus() == GroupStatus.ACCEPTED);
         }).toList();
         return ResultPaginationDTO.builder().result(result).meta(ResultPaginationDTO.Meta.builder()
             .page(paging.getPageNumber() + 1).pageSize(paging.getPageSize()).total(page.getTotalElements()).pages(page.getTotalPages()).build()).build();
@@ -674,14 +664,15 @@ public class GroupService {
             throw new ConflictAlertException("Chỉ có thể phê duyệt nhóm đang ở trạng thái PENDING.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
-        requireCompleteGroup(group);
+        var evaluations = captureStaffReviewSnapshot(group);
         group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
         group.setStatus(GroupStatus.ACCEPTED);
         group.setRejectReason(null);
         groupRepository.save(group);
 
         String actor = getCurrentUserLogin();
-        saveStatusHistory(groupId, GroupStatus.PENDING, GroupStatus.ACCEPTED, actor, "Giảng viên chấp thuận cơ cấu thành viên nhóm");
+        saveStatusHistory(groupId, GroupStatus.PENDING, GroupStatus.ACCEPTED, actor,
+            reviewAuditReason("Giảng viên chấp thuận cơ cấu thành viên nhóm", evaluations));
 
         eventPublisher.publish("GROUP_ACCEPTED", groupId, deadlineId, classId, actor, null);
 
@@ -924,12 +915,21 @@ public class GroupService {
     }
 
     private List<GroupRuleEvaluationDTO> evaluateCompleteGroup(Group group) {
+        var evaluations = evaluateReviewGroup(group);
+        if (!ruleValidationService.areAllRulesPassed(evaluations)) {
+            throw new UnprocessableAlertException("Group rules must pass before student submission", "group", "ERR_HARD_RULE_VIOLATED");
+        }
+        return evaluations;
+    }
+
+    /** Staff may override numeric rules, but never invalid membership or leadership. */
+    private List<GroupRuleEvaluationDTO> evaluateReviewGroup(Group group) {
         List<StudentRow> rows = studentRepository.findStudentsBySchoolClassId(group.getSchoolClassId());
         Map<Long, StudentRow> students = rows.stream().collect(Collectors.toMap(StudentRow::userId, Function.identity()));
         List<GroupMember> storedMembers = groupMemberRepository.findByGroupId(group.getId());
         if (storedMembers.isEmpty() || storedMembers.stream().anyMatch(member -> !students.containsKey(member.getStudentId())
                     || !Objects.equals(member.getSchoolClassId(), group.getSchoolClassId())
-                    || !Objects.equals(member.getDeadlineId(), group.getDeadlineId()))
+                    || !Objects.equals(member.getDeadlineId(), group.getDeadlineId()) || member.getRole() == null)
                 || storedMembers.stream().map(GroupMember::getStudentId).distinct().count() != storedMembers.size()
                 || storedMembers.stream().filter(member -> member.getRole() == GroupMemberRole.LEADER).count() != 1
                 || storedMembers.stream().noneMatch(member -> member.getRole() == GroupMemberRole.LEADER && Objects.equals(member.getStudentId(), group.getLeaderId()))) {
@@ -937,16 +937,38 @@ public class GroupService {
         }
         List<GroupMemberDTO> members = storedMembers.stream()
             .map(member -> toMemberDTO(member, students.get(member.getStudentId()))).toList();
-        var evaluations = ruleValidationService.evaluateGroup(group.getSchoolClassId(), members);
-        if (!ruleValidationService.areAllRulesPassed(evaluations)) {
-            throw new UnprocessableAlertException("Group rules must pass before submission or approval", "group", "ERR_HARD_RULE_VIOLATED");
-        }
-        long groupCount = groupRepository.findBySchoolClassIdAndDeadlineId(group.getSchoolClassId(), group.getDeadlineId()).stream()
-            .filter(value -> value.getStatus() != GroupStatus.DISBANDED).count();
-        for (GroupingRuleDTO rule : ruleValidationService.getClassRules(group.getSchoolClassId())) {
-            if (rule.status() && ((rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS && groupCount < rule.value())
-                    || (rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS && groupCount > rule.value()))) {
-                throw new UnprocessableAlertException("Class group count violates active rules", "group", "ERR_HARD_RULE_VIOLATED");
+        return evaluateCurrentGroupRules(group.getSchoolClassId(), group.getDeadlineId(), members);
+    }
+
+    private List<GroupRuleEvaluationDTO> captureStaffReviewSnapshot(Group group) {
+        var evaluations = evaluateReviewGroup(group);
+        group.setRulesEvaluationSnapshot(ruleValidationService.serializeSnapshot(evaluations));
+        return evaluations;
+    }
+
+    private String reviewAuditReason(String reason, List<GroupRuleEvaluationDTO> evaluations) {
+        String warnings = evaluations.stream().filter(rule -> !rule.isPassed())
+            .map(rule -> rule.getCode().name()).collect(Collectors.joining(", "));
+        return warnings.isEmpty() ? reason : reason + "; Rule warnings: " + warnings;
+    }
+
+    private List<GroupRuleEvaluationDTO> evaluateCurrentGroupRules(Integer classId, Integer deadlineId, List<GroupMemberDTO> members) {
+        var rules = ruleValidationService.getClassRules(classId);
+        boolean hasCountRules = rules.stream().anyMatch(rule -> rule.status()
+            && (rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS || rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS));
+        long groupCount = hasCountRules ? groupRepository.findBySchoolClassIdAndDeadlineId(classId, deadlineId).stream()
+            .filter(group -> group.getStatus() != GroupStatus.DISBANDED).count() : 0;
+        return withClassGroupRules(ruleValidationService.evaluateGroup(classId, members), rules, groupCount);
+    }
+
+    private List<GroupRuleEvaluationDTO> withClassGroupRules(List<GroupRuleEvaluationDTO> composition,
+            List<GroupingRuleDTO> rules, long groupCount) {
+        var evaluations = new ArrayList<>(composition);
+        for (var rule : rules) {
+            if (rule.status() && (rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS || rule.code() == GroupingRuleCode.MAX_GROUPS_PER_CLASS)) {
+                boolean passed = rule.code() == GroupingRuleCode.MIN_GROUPS_PER_CLASS ? groupCount >= rule.value() : groupCount <= rule.value();
+                evaluations.add(GroupRuleEvaluationDTO.builder().code(rule.code()).ruleName(rule.code().name())
+                    .targetValue(rule.value()).actualValue((int) groupCount).passed(passed).hardRule(false).build());
             }
         }
         return evaluations;
@@ -956,13 +978,14 @@ public class GroupService {
         validateManagementDeadline(deadlineId, classId);
         Group group = findScopedGroupForUpdate(groupId, deadlineId, classId);
         requireStaffEditable(group);
-        requireCompleteGroup(group);
+        var evaluations = captureStaffReviewSnapshot(group);
         GroupStatus previous = group.getStatus();
         group.setStatus(GroupStatus.PENDING);
         group.setSubmittedRulesVersion(schoolClassRepository.findById(classId).orElseThrow().getRulesVersion());
         group.setRejectReason(null);
         groupRepository.save(group);
-        saveStatusHistory(groupId, previous, GroupStatus.PENDING, getCurrentUserLogin(), "Submitted for review by lecturer");
+        saveStatusHistory(groupId, previous, GroupStatus.PENDING, getCurrentUserLogin(),
+            reviewAuditReason("Submitted for review by lecturer", evaluations));
         eventPublisher.publish("GROUP_SUBMITTED", groupId, deadlineId, classId, getCurrentUserLogin(), null);
         return getGroupDetail(groupId, classId, deadlineId);
     }
@@ -1103,6 +1126,7 @@ public class GroupService {
         for (var group : existing) if (!kept.contains(group.getId())) lecturerDisbandGroup(deadlineId, classId, group.getId());
         List<Long> approved = new ArrayList<>();
         for (var proposed : plan) if (!proposed.protectedGroup()) {
+            requireCompleteGroup(byId.get(proposed.groupId()));
             lecturerSubmitGroup(deadlineId, classId, proposed.groupId());
             acceptGroup(deadlineId, classId, proposed.groupId());
             approved.add(proposed.groupId());
@@ -1223,7 +1247,7 @@ public class GroupService {
                 .thenComparing(GroupMemberDTO::getJoinedAt))
             .toList();
 
-        List<GroupRuleEvaluationDTO> evaluations = ruleValidationService.evaluateGroup(classId, memberDTOs);
+        List<GroupRuleEvaluationDTO> evaluations = evaluateCurrentGroupRules(classId, deadlineId, memberDTOs);
 
         String leaderName = studentMap.containsKey(g.getLeaderId())
             ? studentMap.get(g.getLeaderId()).fullName() : "N/A";

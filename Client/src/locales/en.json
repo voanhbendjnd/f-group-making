@@ -1961,7 +1961,12 @@
     "rejectConfirm": "Return “{{name}}” for completion without disbanding it? Lecturers may edit after the deadline; students may edit only while their class deadline is open.",
     "reopenConfirm": "Revoke approval for {{name}}? Lecturers may then edit even after the deadline. Students may edit only while their class deadline is open. The group must be submitted and approved again.",
     "awaitSubmit": "This group meets the rules but must be submitted before approval.",
-    "ineligible": "The group does not meet all current group/class rules or has inconsistent membership. Resolve these conditions before approval.",
+    "ineligible": "Check the group's membership, leader and grouping session before approval.",
+    "ruleWarning": "This group does not meet the following requirements:",
+    "ruleWarningTitle": "“{{name}}” does not meet all requirements",
+    "confirmApprove": "Confirm approval",
+    "confirmSubmit": "Confirm submission",
+    "submitConfirm": "Submit “{{name}}” for review anyway?",
     "statuses": {
       "OPEN": "Open",
       "PENDING": "Pending Review",

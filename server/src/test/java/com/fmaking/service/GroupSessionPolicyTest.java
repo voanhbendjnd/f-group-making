@@ -370,13 +370,20 @@ class GroupSessionPolicyTest {
         assertThat(service.lecturerSetLeader(deadline.getId(), schoolClass.getId(), group.getId(), group.getLeaderId()).getStatus()).isEqualTo(GroupStatus.REVOKED);
     }
 
-    @Test void intermediateDraftsCanBeCreatedAfterExpiryButMustPassCompositionBeforeReview() {
+    @Test void staffCanSubmitAndApproveAnIncompleteDraftAfterExpiryWithWarningSnapshot() {
         rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 2); expire(); GroupDTO group = draft(1);
         assertThat(group.getStatus()).isEqualTo(GroupStatus.OPEN);
-        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        for (int i = 0; i < 3; i++) service.lecturerAddMember(deadline.getId(), schoolClass.getId(), group.getId(), student(schoolClass, otherMajor).getId());
-        assertThat(service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.PENDING);
-        service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        GroupDTO pending = service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(pending.getStatus()).isEqualTo(GroupStatus.PENDING);
+        assertThat(pending.isAllRulesPassed()).isFalse();
+        GroupDTO accepted = service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(accepted.getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+        assertThat(accepted.isAllRulesPassed()).isFalse();
+        assertThat(groups.findById(group.getId()).orElseThrow().getRulesEvaluationSnapshot()).contains("MIN_MEMBERS_PER_GROUP", "MIN_MAJORS_PER_GROUP", "\"passed\":false");
+        assertThat(history.findByGroupIdOrderByCreatedAtDesc(group.getId())).allSatisfy(entry -> {
+            if (entry.getToStatus() == GroupStatus.PENDING || entry.getToStatus() == GroupStatus.ACCEPTED)
+                assertThat(entry.getReason()).contains("Rule warnings", "MIN_MEMBERS_PER_GROUP");
+        });
     }
 
     @Test void overflowMoveRollsBackSourceAndWrongClassAndDuplicateMembershipAreRejected() {
@@ -393,7 +400,8 @@ class GroupSessionPolicyTest {
         List<GroupDTO> values = new ArrayList<>(); for (int i = 0; i < 9; i++) values.add(draft(4));
         // Existing drafts may exceed a maximum configured later; retain them for deliberate consolidation.
         rule(GroupingRuleCode.MAX_GROUPS_PER_CLASS, 6); rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 2); expire();
-        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), values.getFirst().getId())).isInstanceOf(RuntimeException.class);
+        assertThat(service.getGroupDetail(values.getFirst().getId(), schoolClass.getId(), deadline.getId()).getRuleEvaluations())
+            .anySatisfy(rule -> { assertThat(rule.getCode()).isEqualTo(GroupingRuleCode.MAX_GROUPS_PER_CLASS); assertThat(rule.isPassed()).isFalse(); });
         int target = 0;
         for (int i = 6; i < 9; i++) for (GroupMemberDTO member : values.get(i).getMembers()) {
             service.lecturerMoveMember(deadline.getId(), schoolClass.getId(), values.get(i).getId(), values.get(target++ % 6).getId(), member.getStudentId());
@@ -497,16 +505,18 @@ class GroupSessionPolicyTest {
         });
     }
 
-    @Test void draftsCanBeIncompleteButSubmissionAndApprovalReevaluateMajorsAndSe() {
+    @Test void staffSubmissionAndApprovalReevaluateRulesWithoutRequiringThemToPass() {
         List<Long> ids = new ArrayList<>(); for (int i = 0; i < 4; i++) ids.add(student(schoolClass, se).getId());
         LecturerCreateGroupRequest request = new LecturerCreateGroupRequest(); request.setName("Single major draft"); request.setStudentIds(ids);
         GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
-        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        rule(GroupingRuleCode.MIN_MAJORS_PER_GROUP, 1);
-        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()).isAllRulesPassed()).isFalse();
         rule(GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP, 5);
-        assertThatThrownBy(() -> service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        assertThat(groups.findById(group.getId()).orElseThrow().getStatus()).isEqualTo(GroupStatus.PENDING);
+        var accepted = service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(accepted.getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+        assertThat(accepted.getRuleEvaluations()).anySatisfy(rule -> {
+            assertThat(rule.getCode()).isEqualTo(GroupingRuleCode.MIN_SE_MEMBERS_PER_GROUP);
+            assertThat(rule.isPassed()).isFalse(); assertThat(rule.getActualValue()).isEqualTo(4);
+        });
     }
 
     @Test void studentCreateJoinLeaveUsesCanonicalMembershipAndOnlyChecksDraftMaximums() {
@@ -571,13 +581,17 @@ class GroupSessionPolicyTest {
         assertThat(members.countByGroupId(group.getId())).isEqualTo(1);
     }
 
-    @Test void customMemberBoundsAndDisabledSeAreRespectedAtCompletion() {
+    @Test void customMemberMinimumBlocksStudentsButOnlyWarnsForStaffReview() {
         rule(GroupingRuleCode.MIN_MEMBERS_PER_GROUP, 5); rule(GroupingRuleCode.MAX_MEMBERS_PER_GROUP, 7);
         GroupDTO group = draft(4);
-        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
-        service.lecturerAddMember(deadline.getId(), schoolClass.getId(), group.getId(), student(schoolClass, otherMajor).getId());
-        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
-        assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+        login(users.findById(group.getLeaderId()).orElseThrow(), "ROLE_STUDENT");
+        assertThatThrownBy(() -> service.submitGroup(deadline.getId(), schoolClass.getId(), group.getId()))
+            .isInstanceOf(com.fmaking.web.rest.errors.UnprocessableAlertException.class);
+        login(teacher, "ROLE_LECTURE");
+        assertThat(service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId()).isAllRulesPassed()).isFalse();
+        var accepted = service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(accepted.getStatus()).isEqualTo(GroupStatus.ACCEPTED);
+        assertThat(accepted.isAllRulesPassed()).isFalse();
     }
 
     @Test void seMinimumIsACompletionCountAndCanBeDisabledExplicitly() {
@@ -588,9 +602,12 @@ class GroupSessionPolicyTest {
         request.setStudentIds(List.of(student(schoolClass, otherMajor).getId(), student(schoolClass, otherMajor).getId(),
             student(schoolClass, third).getId(), student(schoolClass, third).getId()));
         GroupDTO group = service.lecturerCreateGroup(deadline.getId(), schoolClass.getId(), request);
-        assertThatThrownBy(() -> service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId())).isInstanceOf(RuntimeException.class);
+        login(users.findById(group.getLeaderId()).orElseThrow(), "ROLE_STUDENT");
+        assertThatThrownBy(() -> service.submitGroup(deadline.getId(), schoolClass.getId(), group.getId()))
+            .isInstanceOf(com.fmaking.web.rest.errors.UnprocessableAlertException.class);
         seRule.setStatus(false); rules.saveAndFlush(seRule);
-        service.lecturerSubmitGroup(deadline.getId(), schoolClass.getId(), group.getId());
+        assertThat(service.submitGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.PENDING);
+        login(teacher, "ROLE_LECTURE");
         assertThat(service.acceptGroup(deadline.getId(), schoolClass.getId(), group.getId()).getStatus()).isEqualTo(GroupStatus.ACCEPTED);
     }
 
