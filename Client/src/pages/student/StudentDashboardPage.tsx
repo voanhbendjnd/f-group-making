@@ -4,13 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { PageHeader } from '@/components/common/PageHeader';
 import { StudentGroupWidget } from './components/StudentGroupWidget';
+import './StudentDashboardPage.css';
 
 export const StudentDashboardPage: React.FC = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
 
   return (
-    <div>
+    <div className="student-dashboard-container">
       <PageHeader
         title={t('studentDashboard.greeting', { name: user?.name || user?.email || 'Student' })}
         description={t('studentDashboard.welcome')}
@@ -20,52 +21,23 @@ export const StudentDashboardPage: React.FC = () => {
       <StudentGroupWidget />
 
       {/* Account Status Card */}
-      <div
-        className="card"
-        style={{
-          padding: '1.5rem',
-          backgroundColor: '#f0fdf4',
-          borderColor: '#bbf7d0',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1.25rem',
-          marginBottom: '2rem',
-        }}
-      >
-        <div
-          style={{
-            width: '54px',
-            height: '54px',
-            borderRadius: 'var(--radius-full)',
-            backgroundColor: '#dcfce7',
-            color: 'var(--color-success)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            flexShrink: 0,
-          }}
-        >
-          <CheckCircle2 size={30} />
+      <div className="card student-account-card">
+        <div className="student-account-icon-wrap">
+          <CheckCircle2 size={28} />
         </div>
 
-        <div>
-          <div style={{ fontWeight: 700, fontSize: '1.125rem', color: '#166534' }}>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div className="student-account-title">
             {t('studentDashboard.accountActive')}
           </div>
-          <div style={{ fontSize: '0.875rem', color: '#15803d', marginTop: '2px' }}>
+          <div className="student-account-desc">
             {t('studentDashboard.emailRegistered', { email: user?.email })}
           </div>
         </div>
       </div>
 
       {/* F-Group Making Information Cards */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '1.5rem',
-        }}
-      >
+      <div className="student-info-grid">
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <div
@@ -74,14 +46,17 @@ export const StudentDashboardPage: React.FC = () => {
                 borderRadius: 'var(--radius-md)',
                 backgroundColor: '#eff6ff',
                 color: 'var(--color-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <Users size={20} />
             </div>
-            <h3 style={{ fontSize: '1.125rem' }}>{t('studentDashboard.featureTitle')}</h3>
+            <h3 style={{ fontSize: '1.125rem', margin: 0 }}>{t('studentDashboard.featureTitle')}</h3>
           </div>
 
-          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '0.875rem', color: 'var(--color-text-muted)', lineHeight: 1.6, margin: 0 }}>
             {t('studentDashboard.featureDesc')}
           </p>
         </div>
@@ -94,11 +69,14 @@ export const StudentDashboardPage: React.FC = () => {
                 borderRadius: 'var(--radius-md)',
                 backgroundColor: '#fef3c7',
                 color: '#b45309',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
               <Calendar size={20} />
             </div>
-            <h3 style={{ fontSize: '1.125rem' }}>{t('studentDashboard.timelineTitle')}</h3>
+            <h3 style={{ fontSize: '1.125rem', margin: 0 }}>{t('studentDashboard.timelineTitle')}</h3>
           </div>
 
           <ul
@@ -109,6 +87,7 @@ export const StudentDashboardPage: React.FC = () => {
               display: 'flex',
               flexDirection: 'column',
               gap: '0.5rem',
+              margin: 0,
             }}
           >
             <li>{t('studentDashboard.week12')}</li>

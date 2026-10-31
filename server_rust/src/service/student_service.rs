@@ -525,7 +525,7 @@ impl StudentService {
                     }
                     None => {
                         let res = sqlx::query(
-                            "INSERT INTO school_classes (name, term_id, lecturer_id, created_date, last_modified_date) VALUES (?, ?, ?, NOW(), NOW())",
+                            "INSERT INTO school_classes (name, term_id, lecturer_id, rules_version, created_date, last_modified_date) VALUES (?, ?, ?, 0, NOW(), NOW())",
                         )
                         .bind(group_name)
                         .bind(effective_term_id)
@@ -553,11 +553,12 @@ impl StudentService {
                 .get(&row.group_name.trim().to_uppercase())
                 .copied();
 
+            let user_name: String = row.full_name.chars().take(50).collect();
             let user_res = sqlx::query(
                 "INSERT INTO users (email, name, activated, created_date, last_modified_date) VALUES (?, ?, 0, NOW(), NOW())",
             )
             .bind(&row.email)
-            .bind(&row.full_name)
+            .bind(&user_name)
             .execute(&mut *tx)
             .await
             .map_err(|e| AppError::Internal(format!("Failed to insert user for row {}: {e}", row.row_index)))?;
@@ -736,7 +737,7 @@ impl StudentService {
             }
 
             // Rule 4: fullName must not be empty
-            if row.full_name.is_empty() || row.full_name.len() > 50 {
+            if row.full_name.is_empty() || row.full_name.chars().count() > 50 {
                 errors.push(ImportRowErrorDTO {
                     row: row.row_index,
                     roll_number: Some(row.roll_number.clone()),

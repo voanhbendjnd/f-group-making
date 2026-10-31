@@ -1,0 +1,432 @@
+/* Student Dashboard Page & Group Widget Styles */
+
+.student-dashboard-container {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========================================================
+   Hero Group Formation Card
+   ======================================================== */
+.student-hero-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 22px;
+  color: #ffffff;
+  padding: 2rem 2.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  margin-bottom: 2rem;
+  transition: all var(--transition-base);
+}
+
+.student-hero-card.is-active {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 45%, #2563eb 100%);
+  box-shadow: 0 16px 36px -8px rgba(37, 99, 235, 0.35), 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+.student-hero-card.is-upcoming {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 60%, #475569 100%);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.student-hero-card.is-expired {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Top Header in Hero Card */
+.student-hero-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1.25rem;
+  margin-bottom: 1.5rem;
+}
+
+.student-hero-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-hero-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.student-badge-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.student-badge-status.is-active {
+  background-color: rgba(34, 197, 94, 0.2);
+  border: 1px solid rgba(74, 222, 128, 0.4);
+  color: #86efac;
+}
+
+.student-badge-status.is-upcoming {
+  background-color: rgba(234, 179, 8, 0.2);
+  border: 1px solid rgba(250, 204, 21, 0.4);
+  color: #fde047;
+}
+
+.student-badge-status.is-expired {
+  background-color: rgba(148, 163, 184, 0.2);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #cbd5e1;
+}
+
+.student-badge-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #22c55e;
+  box-shadow: 0 0 10px #4ade80;
+  display: inline-block;
+}
+
+.student-badge-class {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 20px;
+  background-color: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.student-hero-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  margin: 0 0 6px;
+  color: #ffffff;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+.student-hero-deadline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.85);
+  flex-wrap: wrap;
+}
+
+.student-hero-deadline strong {
+  color: #ffffff;
+}
+
+/* Countdown Box */
+.student-countdown-box {
+  background-color: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(12px);
+  padding: 12px 20px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.student-countdown-label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: #93c5fd;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.student-countdown-timer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.student-countdown-timer span.sec-highlight {
+  color: #60a5fa;
+}
+
+/* Membership Card inside Hero */
+.student-membership-card {
+  background-color: #ffffff;
+  border-radius: 16px;
+  padding: 1.25rem 1.5rem;
+  color: var(--color-text-main, #0f172a);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.25rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.student-membership-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.student-membership-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-membership-icon.is-unassigned {
+  background-color: #fff7ed;
+  color: #ea580c;
+}
+
+.student-membership-icon.is-assigned {
+  background-color: #eff6ff;
+  color: #2563eb;
+}
+
+.student-membership-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.student-membership-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+  line-height: 1.35;
+}
+
+.student-membership-title.is-unassigned {
+  color: #c2410c;
+}
+
+.student-membership-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.student-membership-actions {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.student-membership-btn {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3) !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+/* Other Activities */
+.student-other-activities {
+  margin-top: 1.5rem;
+}
+
+.student-other-activities-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin-bottom: 0.75rem;
+}
+
+.student-other-activities-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+/* ========================================================
+   Account Status Card
+   ======================================================== */
+.student-account-card {
+  padding: 1.25rem 1.5rem;
+  background-color: #f0fdf4;
+  border-color: #bbf7d0;
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  margin-bottom: 2rem;
+  border-radius: var(--radius-lg);
+}
+
+.student-account-icon-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: var(--radius-full);
+  background-color: #dcfce7;
+  color: var(--color-success);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.student-account-title {
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: #166534;
+}
+
+.student-account-desc {
+  font-size: 0.875rem;
+  color: #15803d;
+  margin-top: 2px;
+  word-break: break-all;
+}
+
+/* ========================================================
+   Information Cards Grid
+   ======================================================== */
+.student-info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+/* ========================================================
+   Mobile Responsive Adjustments
+   ======================================================== */
+@media (max-width: 640px) {
+  .student-hero-card {
+    padding: 1.25rem 1rem;
+    border-radius: 18px;
+    margin-bottom: 1.5rem;
+  }
+
+  .student-hero-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .student-hero-badges {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .student-badge-status,
+  .student-badge-class {
+    padding: 3px 10px;
+    font-size: 0.72rem;
+  }
+
+  .student-hero-title {
+    font-size: 1.35rem;
+    line-height: 1.25;
+  }
+
+  .student-hero-deadline {
+    font-size: 0.8125rem;
+  }
+
+  /* Full-width countdown on mobile */
+  .student-countdown-box {
+    width: 100%;
+    padding: 10px 14px;
+    margin-top: 0.25rem;
+  }
+
+  .student-countdown-timer {
+    font-size: 1.15rem;
+  }
+
+  /* Vertical clean stack inside membership card on mobile */
+  .student-membership-card {
+    padding: 1.125rem 1rem;
+    border-radius: 14px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .student-membership-content {
+    gap: 0.75rem;
+    align-items: flex-start;
+  }
+
+  .student-membership-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+  }
+
+  .student-membership-title {
+    font-size: 0.9375rem;
+  }
+
+  .student-membership-desc {
+    font-size: 0.8125rem;
+  }
+
+  /* Full width action button on mobile */
+  .student-membership-actions {
+    width: 100%;
+  }
+
+  .student-membership-btn {
+    width: 100% !important;
+    justify-content: center !important;
+    min-height: 44px !important;
+    font-size: 0.9375rem !important;
+  }
+
+  .student-account-card {
+    padding: 1rem;
+    gap: 0.875rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .student-account-icon-wrap {
+    width: 44px;
+    height: 44px;
+  }
+
+  .student-account-title {
+    font-size: 1rem;
+  }
+
+  .student-info-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .student-other-activities-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
