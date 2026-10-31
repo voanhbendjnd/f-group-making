@@ -19,6 +19,7 @@ import { DeadlineStateNotice } from '@/features/deadline/components/DeadlineStat
 import { DeadlineStatusBadge } from '@/features/deadline/components/DeadlineStatusBadge';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { Button } from '@/components/common/Button';
+import '../StudentDashboardPage.css';
 
 export const StudentGroupWidget: React.FC = () => {
   const { t, i18n } = useTranslation();
@@ -40,7 +41,8 @@ export const StudentGroupWidget: React.FC = () => {
 
   // Tìm đợt ưu tiên hiển thị: đợt ACTIVE trước, sau đó UPCOMING, hoặc đợt mới nhất
   const now = useDeadlineBoundary(rawActivities);
-  const activities = rawActivities.map(activity => ({ ...activity,
+  const activities = rawActivities.map(activity => ({
+    ...activity,
     status: effectiveDeadlineStatus(activity.status, activity.startTime, activity.endTime, now),
   }));
   const activeActivity =
@@ -221,14 +223,37 @@ export const StudentGroupWidget: React.FC = () => {
   }
 
   if (activeActivity.status === 'UNSCHEDULED' || activeActivity.status === 'CANCELLED' || activeActivity.status === 'EXPIRED') {
-    return <div style={{ marginBottom: '2rem' }}>
-      <DeadlineStateNotice status={activeActivity.status} />
-      {activities.map(activity => <div className="card" key={activity.deadlineId} style={{ padding: '1rem', marginTop: '0.75rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
-        <strong>{activity.deadlineName}</strong><DeadlineStatusBadge status={activity.status} />
-        <span>{activity.schoolClassName}</span>
-        {activity.hasGroup && <Button variant="secondary" onClick={() => handleNavigateToGroup(activity.deadlineId, activity.schoolClassId)}>{t('deadline.table.viewGroups')}</Button>}
-      </div>)}
-    </div>;
+    return (
+      <div style={{ marginBottom: '2rem' }}>
+        <DeadlineStateNotice status={activeActivity.status} />
+        {activities.map((activity) => (
+          <div
+            className="card"
+            key={activity.deadlineId}
+            style={{
+              padding: '1rem',
+              marginTop: '0.75rem',
+              display: 'flex',
+              gap: '1rem',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+            }}
+          >
+            <strong>{activity.deadlineName}</strong>
+            <DeadlineStatusBadge status={activity.status} />
+            <span>{activity.schoolClassName}</span>
+            {activity.hasGroup && (
+              <Button
+                variant="secondary"
+                onClick={() => handleNavigateToGroup(activity.deadlineId, activity.schoolClassId)}
+              >
+                {t('deadline.table.viewGroups')}
+              </Button>
+            )}
+          </div>
+        ))}
+      </div>
+    );
   }
 
   const isActive = activeActivity.status === 'ACTIVE' && !timeLeft.isOver;
@@ -236,25 +261,12 @@ export const StudentGroupWidget: React.FC = () => {
   const isExpired = timeLeft.isOver;
 
   return (
-    <div style={{ marginBottom: '2.5rem' }}>
+    <div style={{ marginBottom: '2rem' }}>
       {/* 1. HERO WIDGET CARD */}
       <div
-        style={{
-          position: 'relative',
-          overflow: 'hidden',
-          borderRadius: '22px',
-          background: isActive
-            ? 'linear-gradient(135deg, #0f172a 0%, #1e3a8a 45%, #2563eb 100%)'
-            : isUpcoming
-            ? 'linear-gradient(135deg, #1e293b 0%, #334155 60%, #475569 100%)'
-            : 'linear-gradient(135deg, #334155 0%, #475569 100%)',
-          color: '#ffffff',
-          boxShadow: isActive
-            ? '0 16px 36px -8px rgba(37, 99, 235, 0.35), 0 4px 12px rgba(15, 23, 42, 0.2)'
-            : '0 10px 25px -5px rgba(0, 0, 0, 0.1)',
-          padding: '2rem 2.25rem',
-          border: '1px solid rgba(255, 255, 255, 0.15)',
-        }}
+        className={`student-hero-card ${
+          isActive ? 'is-active' : isUpcoming ? 'is-upcoming' : 'is-expired'
+        }`}
       >
         {/* Subtle decorative background blur glow */}
         <div
@@ -265,234 +277,102 @@ export const StudentGroupWidget: React.FC = () => {
             width: '260px',
             height: '260px',
             borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(96, 165, 250, 0.35) 0%, rgba(37, 99, 235, 0) 70%)',
+            background:
+              'radial-gradient(circle, rgba(96, 165, 250, 0.35) 0%, rgba(37, 99, 235, 0) 70%)',
             pointerEvents: 'none',
           }}
         />
 
         {/* Top Header Row */}
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            flexWrap: 'wrap',
-            gap: '1rem',
-            marginBottom: '1.25rem',
-          }}
-        >
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '8px' }}>
+        <div className="student-hero-header">
+          <div className="student-hero-info">
+            <div className="student-hero-badges">
               {/* Status Badge with Live Pulse */}
               {isActive && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                    border: '1px solid rgba(74, 222, 128, 0.4)',
-                    color: '#86efac',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  <span
-                    style={{
-                      width: '8px',
-                      height: '8px',
-                      borderRadius: '50%',
-                      backgroundColor: '#22c55e',
-                      boxShadow: '0 0 10px #4ade80',
-                      display: 'inline-block',
-                    }}
-                  />
+                <div className="student-badge-status is-active">
+                  <span className="student-badge-pulse" />
                   {t('studentWidget.activeBadge', 'Đang Diễn Ra')}
                 </div>
               )}
 
               {isUpcoming && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    backgroundColor: 'rgba(234, 179, 8, 0.2)',
-                    border: '1px solid rgba(250, 204, 21, 0.4)',
-                    color: '#fde047',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                  }}
-                >
+                <div className="student-badge-status is-upcoming">
                   <Clock size={12} />
                   {t('studentWidget.upcomingBadge', 'Sắp Diễn Ra')}
                 </div>
               )}
 
               {isExpired && (
-                <div
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    backgroundColor: 'rgba(148, 163, 184, 0.2)',
-                    border: '1px solid rgba(148, 163, 184, 0.3)',
-                    color: '#cbd5e1',
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    letterSpacing: '0.04em',
-                    textTransform: 'uppercase',
-                  }}
-                >
+                <div className="student-badge-status is-expired">
                   {t('studentWidget.expiredBadge', 'Đã Kết Thúc')}
                 </div>
               )}
 
               {/* Class Name Badge */}
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '4px 12px',
-                  borderRadius: '20px',
-                  backgroundColor: 'rgba(255, 255, 255, 0.15)',
-                  backdropFilter: 'blur(8px)',
-                  color: '#ffffff',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                }}
-              >
+              <div className="student-badge-class">
                 <Users size={13} />
                 <span>{activeActivity.schoolClassName}</span>
               </div>
             </div>
 
-            <h2
-              style={{
-                fontSize: '1.75rem',
-                fontWeight: 800,
-                margin: '0 0 6px',
-                color: '#ffffff',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.25,
-              }}
-            >
+            <h2 className="student-hero-title">
               {activeActivity.deadlineName}
             </h2>
 
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                fontSize: '0.875rem',
-                color: 'rgba(255, 255, 255, 0.8)',
-              }}
-            >
+            <div className="student-hero-deadline">
               <Calendar size={14} />
               <span>
                 {t('studentWidget.deadlineLabel', 'Deadline')}:{' '}
-                <strong style={{ color: '#ffffff' }}>{formatDateTime(activeActivity.endTime)}</strong>
+                <strong>{formatDateTime(activeActivity.endTime)}</strong>
               </span>
             </div>
           </div>
 
           {/* Right Action / Countdown timer box */}
           {isActive && (
-            <div
-              style={{
-                backgroundColor: 'rgba(15, 23, 42, 0.45)',
-                backdropFilter: 'blur(12px)',
-                padding: '12px 18px',
-                borderRadius: '16px',
-                border: '1px solid rgba(255, 255, 255, 0.18)',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-              }}
-            >
-              <div
-                style={{
-                  fontSize: '0.6875rem',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.06em',
-                  fontWeight: 700,
-                  color: '#93c5fd',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
+            <div className="student-countdown-box">
+              <div className="student-countdown-label">
                 <Clock size={12} />
                 {t('studentWidget.timeRemaining', 'Thời gian còn lại')}
               </div>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  fontSize: '1.25rem',
-                  fontWeight: 800,
-                  color: '#ffffff',
-                  fontVariantNumeric: 'tabular-nums',
-                }}
-              >
+              <div className="student-countdown-timer">
                 <span>{timeLeft.days}d</span>:<span>{timeLeft.hours}h</span>:<span>{timeLeft.minutes}m</span>:
-                <span style={{ color: '#60a5fa' }}>{timeLeft.seconds}s</span>
+                <span className="sec-highlight">{timeLeft.seconds}s</span>
               </div>
             </div>
           )}
         </div>
 
         {/* 2. GROUP MEMBERSHIP STATUS CARD (INSIDE BANNER) */}
-        <div
-          style={{
-            backgroundColor: '#ffffff',
-            borderRadius: '16px',
-            padding: '1.25rem 1.5rem',
-            color: 'var(--color-text-main, #0f172a)',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '1.25rem',
-            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
-          }}
-        >
+        <div className="student-membership-card">
           {activeActivity.hasGroup ? (
             /* HAS GROUP STATE */
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 320px' }}>
-              <div
-                style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '14px',
-                  backgroundColor: '#eff6ff',
-                  color: '#2563eb',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                {activeActivity.isLeader ? <Crown size={26} color="#d97706" /> : <UserCheck size={26} />}
+            <div className="student-membership-content">
+              <div className="student-membership-icon is-assigned">
+                {activeActivity.isLeader ? (
+                  <Crown size={24} color="#d97706" />
+                ) : (
+                  <UserCheck size={24} />
+                )}
               </div>
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '2px' }}>
-                  <span style={{ fontSize: '1.125rem', fontWeight: 800, color: 'var(--color-text-main)' }}>
+              <div className="student-membership-details">
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    flexWrap: 'wrap',
+                    marginBottom: '4px',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: '1.0625rem',
+                      fontWeight: 800,
+                      color: 'var(--color-text-main)',
+                    }}
+                  >
                     {activeActivity.groupName}
                   </span>
 
@@ -573,53 +453,43 @@ export const StudentGroupWidget: React.FC = () => {
             </div>
           ) : (
             /* NO GROUP YET STATE */
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flex: '1 1 320px' }}>
-              <div
-                style={{
-                  width: '50px',
-                  height: '50px',
-                  borderRadius: '14px',
-                  backgroundColor: '#fff7ed',
-                  color: '#ea580c',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Sparkles size={24} />
+            <div className="student-membership-content">
+              <div className="student-membership-icon is-unassigned">
+                <Sparkles size={22} />
               </div>
 
-              <div>
-                <div style={{ fontSize: '1rem', fontWeight: 700, color: '#c2410c', marginBottom: '2px' }}>
+              <div className="student-membership-details">
+                <div className="student-membership-title is-unassigned">
                   {t('studentWidget.unassignedTitle', 'Bạn chưa tham gia nhóm nào')}
                 </div>
-                <div style={{ fontSize: '0.8125rem', color: 'var(--color-text-muted)' }}>
-                  {!isActive ? t('deadline.closed.UPCOMING.description') : t(
-                    'studentWidget.unassignedDesc',
-                    'Hãy vào không gian chọn nhóm ngay để tạo nhóm mới hoặc xin gia nhập nhóm của các bạn trong lớp!'
-                  )}
+                <div className="student-membership-desc">
+                  {!isActive
+                    ? t('deadline.closed.UPCOMING.description')
+                    : t(
+                        'studentWidget.unassignedDesc',
+                        'Hãy vào không gian chọn nhóm ngay để tạo nhóm mới hoặc xin gia nhập nhóm của các bạn trong lớp!'
+                      )}
                 </div>
               </div>
             </div>
           )}
 
           {/* Action Button */}
-          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <div className="student-membership-actions">
             <Button
               variant="primary"
               size="md"
+              className="student-membership-btn"
               icon={<ArrowRight size={16} />}
-              onClick={() => handleNavigateToGroup(activeActivity.deadlineId, activeActivity.schoolClassId)}
-              style={{
-                boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
-                fontWeight: 700,
-                whiteSpace: 'nowrap',
-              }}
+              onClick={() =>
+                handleNavigateToGroup(activeActivity.deadlineId, activeActivity.schoolClassId)
+              }
             >
               {activeActivity.hasGroup
                 ? t('studentWidget.enterWorkspaceBtn', 'Vào Không Gian Nhóm')
-                : !isActive ? t('deadline.table.viewGroups') : t('studentWidget.joinNowBtn', 'Tham Gia Chọn Nhóm Ngay')}
+                : !isActive
+                ? t('deadline.table.viewGroups')
+                : t('studentWidget.joinNowBtn', 'Tham Gia Chọn Nhóm Ngay')}
             </Button>
           </div>
         </div>
@@ -627,29 +497,13 @@ export const StudentGroupWidget: React.FC = () => {
 
       {/* 3. OTHER OR PAST ACTIVITIES (IF ANY) */}
       {otherActivities.length > 0 && (
-        <div style={{ marginTop: '1.25rem' }}>
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              fontSize: '0.875rem',
-              fontWeight: 700,
-              color: 'var(--color-text-muted)',
-              marginBottom: '0.75rem',
-            }}
-          >
+        <div className="student-other-activities">
+          <div className="student-other-activities-title">
             <Layers size={15} />
             <span>{t('studentWidget.otherActivitiesTitle', 'Các đợt chọn nhóm khác của lớp')}</span>
           </div>
 
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '0.75rem',
-            }}
-          >
+          <div className="student-other-activities-grid">
             {otherActivities.map((act) => (
               <div
                 key={act.deadlineId}
@@ -675,10 +529,22 @@ export const StudentGroupWidget: React.FC = () => {
                 }}
               >
                 <div>
-                  <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--color-text-main)' }}>
+                  <div
+                    style={{
+                      fontSize: '0.9375rem',
+                      fontWeight: 700,
+                      color: 'var(--color-text-main)',
+                    }}
+                  >
                     {act.deadlineName}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginTop: '2px' }}>
+                  <div
+                    style={{
+                      fontSize: '0.75rem',
+                      color: 'var(--color-text-muted)',
+                      marginTop: '2px',
+                    }}
+                  >
                     {t(`deadline.status.${act.status.toLowerCase()}`)}
                     {act.status !== 'CANCELLED' && <> • {formatDateTime(act.endTime)}</>}
                   </div>
