@@ -25,6 +25,7 @@ function loginPage(initial = '/login') {
     </Route>
     <Route path="/admin/dashboard" element={<h1>Admin destination</h1>} />
     <Route path="/lecturer/classes" element={<h1>Lecturer destination</h1>} />
+    <Route path="/lecturer/group-review" element={<h1>Lecturer destination</h1>} />
     <Route path="/student/dashboard" element={<h1>Student destination</h1>} />
     <Route path="/student/profile" element={<h1>Student profile destination</h1>} />
   </Routes></MemoryRouter></AuthProvider></ToastProvider>);

@@ -10,6 +10,8 @@ import { useAuth } from '@/app/providers/AuthContext';
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
 import { classApi } from '@/features/classes/api/classApi';
+import { ClassScopeFilter, useClassScope } from '@/features/classes/components/ClassScopeFilter';
+import { canManageClassRules } from '@/features/auth/utils/roleRouting';
 import { deadlineApi } from '@/features/deadline/api/deadlineApi';
 import { positiveId } from '@/features/group/navigation';
 import { useAllocationFlow } from '@/features/allocation/hooks/useAllocationFlow';
@@ -29,16 +31,18 @@ export function LecturerAllocationPage() {
 }
 function AllocationClassSelection() {
   const basePath = useLocation().pathname.startsWith('/admin') ? '/admin/automatic-allocation' : '/lecturer/automatic-allocation';
-  const { t } = useTranslation(); const { user, isAdmin } = useAuth(); const { selectedTermId, isLocked } = useTerm();
+  const { t } = useTranslation(); const { user } = useAuth(); const { selectedTermId, isLocked } = useTerm();
+  const { viewAll, classScope, setClassScope, scopeParams } = useClassScope();
   const [params] = useSearchParams(); const route = useParams(); const navigate = useNavigate();
   const [search, setSearch] = useState(''); const [page, setPage] = useState(1);
   const requestedClass = positiveId(route.classId ?? null);
-  const classes = useQuery({ queryKey: ['my-school-classes', user?.id, selectedTermId, 'allocation'], retry: false,
+  const classes = useQuery({ queryKey: [viewAll ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, 'allocation', classScope], retry: false,
     queryFn: async ({ signal }) => {
-      const first = await classApi.getMyClasses({ termId: selectedTermId!, size: 50 }, signal);
+      const fetchClasses = viewAll ? classApi.getClasses : classApi.getMyClasses;
+      const first = await fetchClasses({ termId: selectedTermId!, ...scopeParams, size: 50 }, signal);
       const result = [...first.result];
-      for (let page = 2; page <= first.meta.pages; page++) result.push(...(await classApi.getMyClasses({ termId: selectedTermId!, size: 50, page }, signal)).result);
-      return result.filter(value => value.termId === selectedTermId && (isAdmin || value.lecturerId === user?.id));
+      for (let page = 2; page <= first.meta.pages; page++) result.push(...(await fetchClasses({ termId: selectedTermId!, ...scopeParams, size: 50, page }, signal)).result);
+      return result.filter(value => value.termId === selectedTermId);
     } });
   const selected = classes.data?.find(value => value.id === requestedClass);
   const filtered = classes.data?.filter(value => value.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())) ?? [];
@@ -49,6 +53,7 @@ function AllocationClassSelection() {
   const backAction = <Button className="allocation-back" disabled={isLocked} icon={<ArrowLeft size={16} />} onClick={() => navigate(basePath)}>{t('allocation.backToClasses')}</Button>;
   const stepIcons = [UsersRound, Target, ClipboardList, CheckCircle2];
   return <div className="allocation-page">
+    {!route.classId && viewAll && <ClassScopeFilter value={classScope} disabled={isLocked} onChange={scope => { setClassScope(scope); setPage(1); }} />}
     {route.classId && (classes.isPending || classes.isError || !selected) && backAction}
     {!route.classId && <section className="allocation-welcome">
       <header className="allocation-hero allocation-list-hero">
@@ -69,17 +74,19 @@ function AllocationClassSelection() {
     </section>}
     {classes.isError && <AllocationError error={classes.error} retry={() => void classes.refetch()} />}
     {classes.isPending ? <Skeleton active /> : !classes.isError && (route.classId
-      ? selected ? <AllocationSession key={selected.id} classId={selected.id} termName={selected.termName} requestedDeadline={positiveId(params.get('deadlineId'))} backAction={backAction} /> : <Empty description={t('allocation.classUnavailable')} />
+      ? selected ? <AllocationSession key={selected.id} classId={selected.id} termName={selected.termName} canManage={canManageClassRules(user, selected.lecturerId)} requestedDeadline={positiveId(params.get('deadlineId'))} backAction={backAction} /> : <Empty description={t('allocation.classUnavailable')} />
       : filtered.length ? <><div className="allocation-class-grid">{filtered.slice((page - 1) * 9, page * 9).map(value => <article className="allocation-panel allocation-class-card" key={value.id}>
         <div className="allocation-class-card-heading"><span className="allocation-class-icon"><BookOpen size={21} aria-hidden="true" /></span><Tag className="allocation-term-chip">{value.termName || t('allocation.missing')}</Tag></div>
         <h3>{value.name}</h3>
+        {viewAll && <p>{value.lecturerName || value.lecturerCode || t('classVisibility.unassigned')}
+          {!canManageClassRules(user, value.lecturerId) && <Tag>{t('classVisibility.readOnly')}</Tag>}</p>}
         <div className="allocation-class-enrollment"><Users size={16} aria-hidden="true" /><strong>{value.studentCount}</strong><span>{t('allocation.totalStudents')}</span></div>
         <Button type="primary" block disabled={isLocked} icon={<ArrowRight size={16} />} onClick={() => navigate(`${basePath}/${value.id}`)}>{t('allocation.openClass')}</Button>
       </article>)}</div><div className="allocation-pagination"><Pagination current={page} pageSize={9} total={filtered.length} showSizeChanger={false} onChange={setPage} /></div></>
       : <Empty description={t('allocation.noClasses')} />)}
   </div>;
 }
-function AllocationSession({ classId, termName, backAction, requestedDeadline }: { classId: number; termName: string | null; backAction: ReactNode; requestedDeadline: number | null }) {
+function AllocationSession({ classId, termName, backAction, requestedDeadline, canManage }: { classId: number; termName: string | null; backAction: ReactNode; requestedDeadline: number | null; canManage: boolean }) {
   const { t } = useTranslation(); const { user } = useAuth(); const { selectedTermId } = useTerm();
   const session = useQuery({ queryKey: ['allocation-sessions', user?.id, classId, selectedTermId, requestedDeadline], retry: false, refetchInterval: 30000,
     queryFn: async ({ signal }) => {
@@ -89,7 +96,9 @@ function AllocationSession({ classId, termName, backAction, requestedDeadline }:
       const matches = values.filter(value => value.schoolClassIds.includes(classId) && (!requestedDeadline || value.id === requestedDeadline));
       if (matches.length > 1) throw { status: 409, message: '', errorKey: 'allocationMultipleSessions' };
       if (requestedDeadline && !matches.length) throw { status: 404, errorKey: 'invalidAllocationScope' };
-      return matches[0]?.id ?? (await classApi.ensureGroupingSession(classId, selectedTermId!, signal)).id;
+      if (matches.length) return matches[0]!.id;
+      if (!canManage) return (await classApi.getGroupingSession(classId, selectedTermId!, signal))?.id ?? null;
+      return (await classApi.ensureGroupingSession(classId, selectedTermId!, signal)).id;
     } });
   if (session.isPending) return <>{backAction}<Skeleton active /></>;
   if (session.isError) return <>{backAction}<AllocationError error={session.error} retry={() => void session.refetch()} /></>;
@@ -126,10 +135,11 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
   return <>
     <div className="allocation-detail-toolbar">{backAction}
         <div className="allocation-actions"><Button icon={<RefreshCw size={16} />} loading={flow.overview.isFetching} onClick={() => void flow.refresh()}>{t('allocation.refresh')}</Button>
-          <Tooltip title={actionHint} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={actionHint ? 0 : undefined}>
+          {flow.canManage && <Tooltip title={actionHint} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={actionHint ? 0 : undefined}>
             <Button type="primary" icon={<Sparkles size={16} />} disabled={flow.complete || !!flow.attempt || flow.applying} aria-describedby={flow.complete ? 'allocation-complete' : undefined} onClick={() => flow.start()}>{t('allocation.autoAllocate')}</Button>
-          </span></Tooltip></div>
+          </span></Tooltip>}</div>
     </div>
+    {!flow.canManage && <Alert type="info" showIcon title={t('classVisibility.readOnlyHint')} />}
     <header className="allocation-hero allocation-detail-header">
       <div className="allocation-class-identity"><div className="allocation-class-title"><span className="allocation-hero-icon"><BookOpen size={29} aria-hidden="true" /></span>
         <div><span className="allocation-eyebrow">{t('allocation.title')}</span><h1>{data.scope.className}</h1></div></div>
@@ -234,7 +244,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     </section>}
     <Tabs className="allocation-content-nav" activeKey={contentTab} onChange={setContentTab} items={[
       { key: 'current', label: <span className="allocation-tab-label"><UsersRound size={16} aria-hidden="true" />{t('allocation.currentData')}</span>, children: <section className="allocation-panel allocation-current-panel"><div className="allocation-heading"><div><h2>{t('allocation.currentData')}</h2><p>{t('allocation.scoreHint')}</p></div></div><AllocationGroups groups={data.groups} /></section> },
-      { key: 'history', label: <span className="allocation-tab-label"><History size={16} aria-hidden="true" />{t('allocation.randomHistory')}</span>, children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} snapshotFingerprint={data.snapshotFingerprint} disabled={flow.applying || !!flow.attempt}
+      { key: 'history', label: <span className="allocation-tab-label"><History size={16} aria-hidden="true" />{t('allocation.randomHistory')}</span>, children: <AllocationPlanHistory classId={classId} deadlineId={deadlineId} snapshotFingerprint={data.snapshotFingerprint} readOnly={!flow.canManage} disabled={flow.applying || (flow.canManage && !!flow.attempt)}
         onSelect={flow.restorePlan} onApply={detail => { flow.restorePlan(detail); setConfirming(true); }} /> },
       { key: 'audit', label: <span className="allocation-tab-label"><ClipboardCheck size={16} aria-hidden="true" />{t('allocation.applyAudit')}</span>, children: <AllocationApplyHistory classId={classId} deadlineId={deadlineId} /> },
     ]} />

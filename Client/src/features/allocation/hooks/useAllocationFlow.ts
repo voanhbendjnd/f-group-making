@@ -10,6 +10,7 @@ import { allocationApi } from '../api/allocationApi';
 import { allocationErrorKey, isAllocationComplete, newRequestKey, newSeed, persistAttempt, readAttempt, validTarget, type ApplyAttempt } from '../utils';
 import type { ApplyResult, PlanDetail, PlanPage, Preview } from '../types';
 import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { canManageClassRules } from '@/features/auth/utils/roleRouting';
 
 export function useAllocationFlow(classId: number, deadlineId: number) {
   const { user } = useAuth(); const { selectedTermId, lockTermSelection } = useTerm();
@@ -28,6 +29,7 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const [savedPlan, setSavedPlan] = useState<PlanDetail['summary'] | null>(null);
   const previous = useRef<{ seed?: number; fingerprint?: string }>({});
   const overview = useQuery({ queryKey: [...key, 'overview'], queryFn: ({ signal }) => allocationApi.overview(deadlineId, classId, signal), retry: false });
+  const canManage = !!overview.data && canManageClassRules(user, overview.data.scope.lecturerId);
   const complete = isAllocationComplete(overview.data);
   const acceptedWithUnassigned = !!overview.data && overview.data.groups.length > 0 && overview.data.summary.unassignedStudents > 0
     && overview.data.groups.every(group => group.status === 'ACCEPTED');
@@ -37,7 +39,7 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const target = rawTarget ?? (suggested?.status === 'FEASIBLE' && suggested.suggestedCount !== null ? String(suggested.suggestedCount) : '');
   const parsedTarget = validTarget(target, setup.data?.range);
   const generate = async () => {
-    if (complete || !configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
+    if (!canManage || complete || !configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
     const ticket = ++generation.current; const abort = new AbortController(); controller.current = abort;
     calculating.current = true; setConfirmedTarget(parsedTarget); setSavedPlan(null); setApplied(null);
     setPreview(null); setPreviewLoading(true); setPreviewError(null); setApplyError(null);
@@ -86,13 +88,13 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     void generate();
   };
   const stale = !!preview && !!overview.data && preview.snapshotFingerprint !== overview.data.snapshotFingerprint;
-  const canApply = !complete && preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
+  const canApply = canManage && !complete && preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
     && overview.isSuccess && !overview.isFetching && setup.isSuccess && !setup.isFetching
     && !previewLoading && !previewError && !applying && !attempt && !applied && (!savedPlan || savedPlan.canApply)
     && parsedTarget === preview.result.targetGroupCount && confirmedTarget === parsedTarget;
   const saveAttempt = (value: ApplyAttempt | null) => { attemptRef.current = value; setAttempt(value); persistAttempt(storageKey, value); };
   const confirmApply = async () => {
-    if (busy.current) return;
+    if (!canManage || busy.current) return;
     if (!attemptRef.current && (!canApply || !preview?.previewId)) return;
     const request = attemptRef.current ?? { previewId: preview!.previewId!, key: newRequestKey(), target: preview!.result.targetGroupCount };
     busy.current = true; setApplying(true); setConfiguring(false); setApplyError(null); saveAttempt(request);
@@ -120,13 +122,13 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   };
   const visiblePreview = savedPlan || preview?.result.targetGroupCount === parsedTarget ? preview : null;
   const restorePlan = (detail: PlanDetail) => {
-    if (busy.current || attemptRef.current || detail.preview.scope.classId !== classId || detail.preview.scope.deadlineId !== deadlineId) return;
+    if (!canManage || busy.current || attemptRef.current || detail.preview.scope.classId !== classId || detail.preview.scope.deadlineId !== deadlineId) return;
     resetPreview(); setApplied(null); setConfiguring(true); setRawTarget(String(detail.preview.result.targetGroupCount));
     setConfirmedTarget(detail.preview.result.targetGroupCount); setSavedPlan(detail.summary); setPreview(detail.preview);
     previous.current = { seed: detail.preview.result.seed, fingerprint: detail.preview.planFingerprint ?? undefined };
   };
   return { overview, setup, configuring, setConfiguring, target, changeTarget, parsedTarget, preview: visiblePreview, previewLoading, previewError,
-    applyError, applying, applied, attempt, complete, acceptedWithUnassigned, stale, canApply, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
-    start: () => { if (!complete && !attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
+    applyError, applying, applied, attempt, complete, acceptedWithUnassigned, stale, canApply, canManage, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
+    start: () => { if (canManage && !complete && !attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
     refresh: () => client.invalidateQueries({ queryKey: key }) };
 }

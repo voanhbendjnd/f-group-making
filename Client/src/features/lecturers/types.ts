@@ -4,6 +4,7 @@ export interface CreateLecturerValues {
 }
 
 export interface Lecturer {
+  authorities?: string[];
   userId: number;
   code: string;
   name: string;
@@ -15,6 +16,9 @@ export interface Lecturer {
   createdDate: string | null;
   lastModifiedDate: string | null;
 }
+
+export type LecturerRole = 'ROLE_LECTURE' | 'ROLE_LECTURE_MASTER';
+export type LecturerOption = Pick<Lecturer, 'userId' | 'code' | 'name'>;
 
 export interface LecturerFilterParams {
   termId?: number;

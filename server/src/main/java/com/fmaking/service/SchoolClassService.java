@@ -76,20 +76,27 @@ public class SchoolClassService {
      */
     @Transactional(readOnly = true)
     public ResultPaginationDTO getSchoolClasses(String search, Integer termId, Pageable pageable) {
-        return searchClasses(search, termId, null, pageable);
+        return getSchoolClasses(search, termId, pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getSchoolClasses(String search, Integer termId, Pageable pageable, ClassViewScope requested) {
+        ClassViewScope scope = accessService.resolveViewScope(requested);
+        return searchClasses(search, termId, scope == ClassViewScope.MINE ? accessService.currentLecturerId() : null,
+            scope == ClassViewScope.OTHERS ? accessService.currentLecturerId() : null, pageable);
     }
 
     @Transactional(readOnly = true)
     public ResultPaginationDTO getMySchoolClasses(String search, Integer termId, Pageable pageable) {
-        return searchClasses(search, termId, accessService.currentLecturerId(), pageable);
+        return searchClasses(search, termId, accessService.currentLecturerId(), null, pageable);
     }
 
-    private ResultPaginationDTO searchClasses(String search, Integer termId, Long lecturerId, Pageable pageable) {
+    private ResultPaginationDTO searchClasses(String search, Integer termId, Long lecturerId, Long excludedLecturerId, Pageable pageable) {
         termService.validateTerm(termId);
 
         String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
 
-        Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, lecturerId, pageable);
+        Page<SchoolClassDTO> page = schoolClassRepository.searchClasses(cleanSearch, termId, lecturerId, excludedLecturerId, pageable);
 
         ResultPaginationDTO.Meta meta = ResultPaginationDTO.Meta.builder()
                 .page(pageable.getPageNumber() + 1)

@@ -17,9 +17,10 @@ interface Props {
   onEdit?: (deadline: Deadline) => void;
   onCancel?: (deadline: Deadline) => void;
   canManage: boolean;
+  allowReadOnlyGroups?: boolean;
 }
 
-export function DeadlineDetailModal({ deadline, onClose, onEdit, onCancel, canManage }: Props) {
+export function DeadlineDetailModal({ deadline, onClose, onEdit, onCancel, canManage, allowReadOnlyGroups = false }: Props) {
   const { t, i18n } = useTranslation();
   const { pathname } = useLocation();
   const { data, isFetching, isError, refetch } = useQuery({
@@ -76,9 +77,9 @@ export function DeadlineDetailModal({ deadline, onClose, onEdit, onCancel, canMa
               <div><dt>{t('deadline.table.startTime')}</dt><dd>{formatDeadlineDate(window.startTime, locale)}</dd></div>
               <div><dt>{t('deadline.table.endTime')}</dt><dd>{formatDeadlineDate(window.endTime, locale)}</dd></div>
             </dl>
-            {canManage && window.canEdit && <Link className="btn btn-secondary btn-sm"
+            {canManage && (window.canEdit || allowReadOnlyGroups) && <Link className="btn btn-secondary btn-sm"
               to={advancedGroupPath(window.schoolClassId, new URLSearchParams(), data.id, pathname.startsWith('/admin') ? 'admin' : 'lecturer')} onClick={onClose}>
-              <Users size={14} />{t('deadline.table.manageGroups')}
+              <Users size={14} />{t(window.canEdit ? 'deadline.table.manageGroups' : 'classVisibility.viewGroups')}
             </Link>}
           </article>)}
         </div>

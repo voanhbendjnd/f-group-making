@@ -45,6 +45,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
             LEFT JOIN Student s ON s.schoolClassId = sc.id
             WHERE (:termId IS NULL OR sc.termId = :termId)
               AND (:lecturerId IS NULL OR sc.lecturerId = :lecturerId)
+              AND (:excludedLecturerId IS NULL OR sc.lecturerId IS NULL OR sc.lecturerId <> :excludedLecturerId)
               AND (
                   :search IS NULL OR :search = ''
                   OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -61,6 +62,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
             LEFT JOIN User u ON l.userId = u.id
             WHERE (:termId IS NULL OR sc.termId = :termId)
               AND (:lecturerId IS NULL OR sc.lecturerId = :lecturerId)
+              AND (:excludedLecturerId IS NULL OR sc.lecturerId IS NULL OR sc.lecturerId <> :excludedLecturerId)
               AND (
                   :search IS NULL OR :search = ''
                   OR LOWER(sc.name) LIKE LOWER(CONCAT('%', :search, '%'))
@@ -74,6 +76,7 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
         @Param("search") String search,
         @Param("termId") Integer termId,
         @Param("lecturerId") Long lecturerId,
+        @Param("excludedLecturerId") Long excludedLecturerId,
         Pageable pageable
     );
 

@@ -70,4 +70,24 @@ class RealtimeChannelInterceptorTest {
         assertThatCode(() -> send(subscription("/user/queue/deadlines", "ROLE_LECTURE"))).doesNotThrowAnyException();
         assertThatThrownBy(() -> send(subscription("/user/queue/deadlines", "ROLE_STUDENT"))).isInstanceOf(AccessDeniedException.class);
     }
+
+    @Test void globalStaffChannelIsOnlyVisibleToHeadsAndAdmins() {
+        assertThatCode(() -> send(subscription("/topic/staff/deadlines", "ROLE_LECTURE_MASTER"))).doesNotThrowAnyException();
+        assertThatCode(() -> send(subscription("/topic/staff/deadlines", "ROLE_ADMIN"))).doesNotThrowAnyException();
+        assertThatThrownBy(() -> send(subscription("/topic/staff/deadlines", "ROLE_LECTURE"))).isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test void revokedSessionsCannotSubscribeOrReceiveAlreadySubscribedMessages() {
+        var connect = StompHeaderAccessor.create(StompCommand.CONNECT);
+        connect.setSessionId("connected-session"); connect.setLeaveMutable(true);
+        connect.addNativeHeader("Authorization", "Bearer signed"); send(connect);
+        var headers = org.springframework.messaging.simp.SimpMessageHeaderAccessor.create(org.springframework.messaging.simp.SimpMessageType.MESSAGE);
+        headers.setSessionId("connected-session"); headers.setDestination("/topic/classes/1/deadlines");
+        var outbound = MessageBuilder.createMessage(new byte[0], headers.getMessageHeaders());
+        assertThat(interceptor.authorizeOutbound(outbound)).isSameAs(outbound);
+        when(converter.convert(jwt)).thenThrow(new org.springframework.security.authentication.BadCredentialsException("Revoked session"));
+        assertThat(interceptor.authorizeOutbound(outbound)).isNull();
+        assertThatThrownBy(() -> send(subscription("/topic/classes/1/deadlines", "ROLE_LECTURE_MASTER")))
+            .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+    }
 }

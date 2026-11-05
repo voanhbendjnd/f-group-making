@@ -62,6 +62,7 @@ public class DeadlineEventPublisher {
         var message = event.message();
         List<String> destinations = new ArrayList<>();
         destinations.add("/topic/admin/deadlines");
+        destinations.add("/topic/staff/deadlines");
         message.affectedClassIds().forEach(id -> destinations.add("/topic/classes/" + id + "/deadlines"));
         for (String destination : destinations) {
             try { messaging.convertAndSend(destination, message); }

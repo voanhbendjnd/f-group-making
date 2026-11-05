@@ -15,7 +15,7 @@ vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.
 vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => auth }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ lockTermSelection: () => () => {} }) }));
 vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getWorkspace: vi.fn(), lecturerCreateGroup: vi.fn(), lecturerRemoveMember: vi.fn(), lecturerDisbandGroup: vi.fn(), lecturerMoveMember: vi.fn(), lecturerAddMember: vi.fn(), lecturerSubmitGroup: vi.fn(), acceptGroup: vi.fn() } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn(), ensureGroupingSession: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getClasses: vi.fn(), getMyClasses: vi.fn(), getClassById: vi.fn(), getGroupingSession: vi.fn(), ensureGroupingSession: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 vi.mock('@/features/group/hooks/useGroupWebSocket', () => ({ useGroupWebSocket: () => ({ status: 'connected' }) }));
 vi.mock('@/features/group/components/LecturerGroupModal', () => ({ LecturerGroupModal: (props: { open: boolean; initialStudentIds: number[] }) => props.open ? <div role="dialog" aria-label="Create fixture">{props.initialStudentIds.join(',')}</div> : null }));
@@ -41,6 +41,15 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); });
 
 describe('lecturer group policy controls', () => {
+  it('does not initialize an unassigned class when a department head only visits its board', async () => {
+    auth.user = { id: 2, authorities: ['ROLE_LECTURE_MASTER'] };
+    vi.mocked(classApi.getGroupingSession).mockResolvedValue(null);
+    vi.mocked(classApi.getClassById).mockResolvedValue({ id: 1, lecturerId: 1 } as never);
+    mount('OPEN', 'UNSCHEDULED', 1, undefined, '/lecturer/group-review/advanced?classId=1&termId=8');
+    await screen.findByText(i18n.t('departmentOverview.teachingOnly'));
+    expect(classApi.ensureGroupingSession).not.toHaveBeenCalled();
+    expect(groupApi.getWorkspace).not.toHaveBeenCalled();
+  });
   it.each([['en', 'OPEN'], ['vi', 'REVOKED'], ['en', 'PENDING'], ['vi', 'PENDING']] as const)(
     'asks for confirmation only after clicking staff review with rule warnings in %s for %s', async (language, state) => {
       await i18n.changeLanguage(language);
@@ -261,7 +270,8 @@ describe('lecturer group policy controls', () => {
     expect(screen.queryByRole('button', { name: i18n.t('groupLifecycle.submit'), exact: true }) !== null).toBe(['OPEN', 'REVOKED'].includes(state));
   });
   it('hides unlock from an unassigned Lecturer Master', async () => {
-    auth.user = { id: 2, authorities: ['ROLE_LECTURE_MASTER'] }; mount('ACCEPTED'); await screen.findByText('Policy group');
+    auth.user = { id: 2, authorities: ['ROLE_LECTURE_MASTER'] }; mount('ACCEPTED'); await screen.findByText(i18n.t('departmentOverview.teachingOnly'));
+    expect(screen.queryByText('Policy group')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: i18n.t('groupLifecycle.unlock') })).not.toBeInTheDocument();
   });
   it.each(['ROLE_ADMIN', 'ROLE_LECTURE_MASTER'])('allows unlock for %s when authorized', async role => {

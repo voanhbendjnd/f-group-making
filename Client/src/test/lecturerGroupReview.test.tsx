@@ -9,13 +9,13 @@ import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTy
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import i18n from '@/locales/i18n';
 
-const context = vi.hoisted(() => ({ term: 8, subscribe: vi.fn(() => () => {}), unlock: vi.fn(), success: vi.fn() }));
+const context = vi.hoisted(() => ({ role: 'ROLE_LECTURE', term: 8, subscribe: vi.fn(() => () => {}), unlock: vi.fn(), success: vi.fn() }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId: context.term, lockTermSelection: () => context.unlock }) }));
-vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, authorities: ['ROLE_LECTURE'] } }) }));
+vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, authorities: [context.role] } }) }));
 vi.mock('@/app/providers/realtimeContext', () => ({ useRealtime: () => ({ subscribe: context.subscribe }) }));
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: context.success }) }));
 vi.mock('@/features/group/api/groupApi', () => ({ groupApi: { getReviews: vi.fn(), acceptGroup: vi.fn(), rejectGroup: vi.fn(), revokeGroup: vi.fn() } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), getClasses: vi.fn() } }));
 let client: QueryClient;
 function row(status: GroupStatus = 'PENDING'): GroupReviewRow {
   return { className: 'Class A', submittedAt: '2026-10-01T00:00:00Z', deadlineStatus: 'EXPIRED', eligible: true,
@@ -34,12 +34,21 @@ beforeEach(async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
   vi.stubGlobal('matchMedia', vi.fn((query: string) => ({ matches: false, media: query, onchange: null,
     addListener: vi.fn(), removeListener: vi.fn(), addEventListener: vi.fn(), removeEventListener: vi.fn(), dispatchEvent: vi.fn() })));
-  vi.clearAllMocks(); context.term = 8; await i18n.changeLanguage('en');
+  vi.clearAllMocks(); context.term = 8; context.role = 'ROLE_LECTURE'; await i18n.changeLanguage('en');
   vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [{ id: 2, name: 'Class A', termId: 8, lecturerId: 1, studentCount: 4 }], meta: { total: 1, page: 1, pageSize: 50, pages: 1 } });
 });
 afterEach(() => { cleanup(); client?.clear(); vi.unstubAllGlobals(); });
 
 describe('group review', () => {
+  it('keeps head teaching reviews scoped to assigned classes', async () => {
+    context.role = 'ROLE_LECTURE_MASTER';
+    mount(); await screen.findByText('Review fixture');
+    expect(classApi.getMyClasses).toHaveBeenCalled();
+    expect(classApi.getClasses).not.toHaveBeenCalled();
+    expect(groupApi.getReviews).toHaveBeenCalledWith(expect.objectContaining({ termId: 8, classScope: 'MINE' }), expect.any(AbortSignal));
+    expect(screen.getByRole('button', { name: i18n.t('groupReview.approve'), exact: true })).toBeEnabled();
+    expect(screen.queryByLabelText(i18n.t('classVisibility.scope'))).not.toBeInTheDocument();
+  });
   it.each(['en', 'vi'])('allows approval with rule warnings in %s and lists failures before confirmation', async language => {
     await i18n.changeLanguage(language);
     const warning = row();

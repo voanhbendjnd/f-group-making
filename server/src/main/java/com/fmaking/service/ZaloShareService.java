@@ -147,7 +147,8 @@ public class ZaloShareService {
     private Target classTarget(Integer classId, Integer termId, boolean lock) {
         requireManager();
         var schoolClass = (lock ? classes.findByIdForUpdate(classId) : classes.findById(classId)).orElseThrow(ZaloShareService::missing);
-        access.requireWriteAccess(schoolClass);
+        if (lock) access.requireWriteAccess(schoolClass);
+        else access.requireReadAccess(schoolClass);
         var term = requireTerm(termId);
         if (!Objects.equals(schoolClass.getTermId(), termId)) throw ZaloShareValidation.invalid("zaloInvalidScope");
         var teacher = schoolClass.getLecturerId() == null ? null : users.findById(schoolClass.getLecturerId()).orElse(null);
@@ -156,7 +157,7 @@ public class ZaloShareService {
 
     private Target lecturerTarget(Long lecturerId, Integer termId, boolean lock) {
         requireManager();
-        if (lecturerId == null || (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+        if (lecturerId == null || (!(lock ? SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN) : access.canViewAllClasses())
             && !Objects.equals(lecturerId, access.currentLecturerId()))) throw denied();
         var lecturer = (lock ? lecturers.findByIdForUpdate(lecturerId) : lecturers.findById(lecturerId)).orElseThrow(ZaloShareService::missing);
         var teacher = users.findById(lecturer.getUserId()).orElseThrow(ZaloShareService::missing);

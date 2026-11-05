@@ -38,6 +38,7 @@ class LecturerClassRulesTest {
     @Autowired TermRepository terms;
     @Autowired StudentRepository students;
     @Autowired MajorRepository majors;
+    @Autowired DeadlineRepository deadlines;
 
     SchoolClass ownClass;
     SchoolClass anotherOwnClass;
@@ -235,6 +236,41 @@ class LecturerClassRulesTest {
         mvc.perform(put(rulePath(ownClass)).contentType(MediaType.APPLICATION_JSON).content(payload(0, 4, 6)))
                 .andExpect(status().isOk());
         assertThat(rules.findBySchoolClassId(otherClass.getId())).isEmpty();
+    }
+
+    @Test
+    @WithMockUser(username = "assigned@example.com", authorities = "ROLE_LECTURE_MASTER")
+    void headFiltersAssignmentBeforePaginationAndIncludesUnassignedClasses() throws Exception {
+        saveClass("Rules Class Unassigned", null, term.getId());
+        mvc.perform(get("/api/school-classes").param("termId", term.getId().toString()).param("classScope", "MINE").param("size", "1"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.meta.total").value(2))
+            .andExpect(jsonPath("$.data.result.length()").value(1));
+        mvc.perform(get("/api/school-classes").param("termId", term.getId().toString()).param("classScope", "OTHERS").param("size", "1"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.meta.total").value(2))
+            .andExpect(jsonPath("$.data.meta.pages").value(2));
+    }
+
+    @Test
+    @WithMockUser(username = "assigned@example.com", authorities = "ROLE_LECTURE_MASTER")
+    void headReadsForeignDeadlinesAndEmptySessionWithoutCreatingData() throws Exception {
+        long before = deadlines.count();
+        mvc.perform(get("/api/school-classes/{id}/grouping-session", otherClass.getId()).param("termId", term.getId().toString()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data").isEmpty());
+        assertThat(deadlines.count()).isEqualTo(before);
+        Deadline session = new Deadline(); session.setName("Foreign session"); session.setStatus("UNSCHEDULED");
+        session.getSchoolClasses().add(otherClass); session = deadlines.saveAndFlush(session);
+        mvc.perform(get("/api/deadlines").param("termId", term.getId().toString()).param("classScope", "ALL"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1))
+            .andExpect(jsonPath("$.data.content[0].canEdit").value(false)).andExpect(jsonPath("$.data.content[0].canClose").value(false));
+        mvc.perform(get("/api/deadlines").param("termId", term.getId().toString()).param("classScope", "MINE"))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(0));
+        mvc.perform(get("/api/deadlines/{id}", session.getId())).andExpect(status().isOk());
+        mvc.perform(get("/api/school-classes/{id}/grouping-session", otherClass.getId()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value(session.getId()));
+        mvc.perform(put("/api/school-classes/{id}/grouping-session", otherClass.getId())).andExpect(status().isForbidden());
+        mvc.perform(post("/api/deadlines/{id}/close", session.getId())).andExpect(status().isForbidden());
+        mvc.perform(get("/api/deadlines/{id}/classes/{classId}/groups/workspace", session.getId(), otherClass.getId()))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.canManageGroups").value(false));
     }
 
     @Test

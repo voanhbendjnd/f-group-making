@@ -20,7 +20,7 @@ vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: context.success }) }));
 vi.mock('@/app/providers/realtimeContext', () => ({ useRealtime: () => ({ subscribe: context.subscribe }) }));
 vi.mock('@/features/allocation/api/allocationApi', () => ({ allocationApi: { overview: vi.fn(), setup: vi.fn(), preview: vi.fn(), apply: vi.fn(), history: vi.fn(), historyDetail: vi.fn(), plans: vi.fn(), plan: vi.fn(), recommendation: vi.fn() } }));
-vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), ensureGroupingSession: vi.fn() } }));
+vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), getClasses: vi.fn(), getGroupingSession: vi.fn(), ensureGroupingSession: vi.fn() } }));
 vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: { getDeadlines: vi.fn() } }));
 let client: QueryClient;
 function wrapper({ children }: { children: React.ReactNode }) { return <QueryClientProvider client={client}>{children}</QueryClientProvider>; }
@@ -344,7 +344,8 @@ describe('automatic allocation workflow', () => {
   });
   it.each(['PROVEN_INFEASIBLE', 'SEARCH_LIMIT_REACHED'] as const)('does not allow Apply for %s', async status => {
     vi.mocked(allocationApi.preview).mockImplementation(async () => ({ ...previewFixture(), result: { ...previewFixture().result, status }, previewId: null, report: null, groups: [] }));
-    const value = hook(); act(() => value.result.current.start());
+    const value = hook(); await waitFor(() => expect(value.result.current.overview.isSuccess).toBe(true));
+    act(() => value.result.current.start());
     await waitFor(() => expect(value.result.current.setup.isSuccess).toBe(true));
     await act(async () => value.result.current.confirmTarget());
     await waitFor(() => expect(value.result.current.preview?.result.status).toBe(status)); expect(value.result.current.canApply).toBe(false);
@@ -365,7 +366,8 @@ describe('automatic allocation workflow', () => {
   });
   it('does not choose an unverified suggestion', async () => {
     vi.mocked(allocationApi.setup).mockResolvedValue({ ...setupFixture, suggestion: { ...setupFixture.suggestion, status: 'SEARCH_LIMIT_REACHED', suggestedCount: null } });
-    const value = hook(); act(() => value.result.current.start());
+    const value = hook(); await waitFor(() => expect(value.result.current.overview.isSuccess).toBe(true));
+    act(() => value.result.current.start());
     await waitFor(() => expect(value.result.current.setup.isSuccess).toBe(true));
     expect(value.result.current.target).toBe(''); expect(allocationApi.preview).not.toHaveBeenCalled();
   });
@@ -399,11 +401,19 @@ describe('automatic allocation workflow', () => {
     await act(async () => value.result.current.confirmApply());
     expect(value.result.current.preview).toBeNull(); expect(value.result.current.canApply).toBe(false); expect(context.success).not.toHaveBeenCalled();
   });
-  it('only shows assigned classes to a Master and does not load another class from the URL', async () => {
+  it('keeps foreign classes out of a head automatic allocation feature', async () => {
     context.role = 'ROLE_LECTURE_MASTER';
-    vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [{ id: 5, name: 'Other class', termId: 8, lecturerId: 99, studentCount: 8 }], meta: { total: 1, page: 1, pages: 1, pageSize: 50 } } as Awaited<ReturnType<typeof classApi.getMyClasses>>);
     render(pageTree('/lecturer/automatic-allocation/5'));
-    await screen.findByText(i18n.t('allocation.classUnavailable')); expect(allocationApi.overview).not.toHaveBeenCalled(); expect(deadlineApi.getDeadlines).not.toHaveBeenCalled();
+    await screen.findByText(i18n.t('allocation.classUnavailable'));
+    expect(classApi.getMyClasses).toHaveBeenCalled(); expect(classApi.getClasses).not.toHaveBeenCalled();
+    expect(allocationApi.overview).not.toHaveBeenCalled(); expect(deadlineApi.getDeadlines).not.toHaveBeenCalled();
+    expect(classApi.ensureGroupingSession).not.toHaveBeenCalled();
+  });
+  it('retains automatic allocation actions for the head assigned class', async () => {
+    context.role = 'ROLE_LECTURE_MASTER';
+    render(pageTree()); await screen.findByText('Fixture group 1');
+    expect(screen.getByRole('button', { name: i18n.t('allocation.autoAllocate'), exact: true })).toBeEnabled();
+    expect(classApi.getClasses).not.toHaveBeenCalled();
   });
   it('resets the class scope when the selected term changes', async () => {
     const tree = () => pageTree();

@@ -61,6 +61,8 @@ export function translateErrorMessage(error: any): string {
     case 'error.classAccessDenied':
     case 'classAccessDenied':
       return i18n.t('rules.errors.classAccessDenied');
+    case 'teachingClassOnly':
+      return i18n.t('departmentOverview.teachingOnly');
     case 'error.classNotFound':
     case 'classNotFound':
       return i18n.t('lecturer.classNotFound');

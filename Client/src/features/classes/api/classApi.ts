@@ -5,6 +5,9 @@ import type { Deadline } from '@/features/deadline/types';
 import { parseClassPage, parseSchoolClass } from './classContract';
 
 export const classApi = {
+  async getGroupingSession(classId: number, termId?: number, signal?: AbortSignal): Promise<Deadline | null> {
+    return apiClient.get<unknown, Deadline | null>(`/api/school-classes/${classId}/grouping-session`, { params: { termId }, signal });
+  },
   async ensureGroupingSession(classId: number, termId?: number, signal?: AbortSignal): Promise<Deadline> {
     return apiClient.put<unknown, Deadline>(`/api/school-classes/${classId}/grouping-session`, null, { params: { termId }, signal });
   },
@@ -35,6 +38,7 @@ export const classApi = {
   },
   async getClasses(params: SchoolClassFilterParams = {}, signal?: AbortSignal): Promise<PaginatedSchoolClasses> {
     const queryParams: Record<string, any> = {};
+    if (params.classScope) queryParams.classScope = params.classScope;
 
     if (params.search && params.search.trim()) {
       queryParams.search = params.search.trim();

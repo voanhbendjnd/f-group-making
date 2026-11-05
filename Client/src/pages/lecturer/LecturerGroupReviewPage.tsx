@@ -15,6 +15,8 @@ import { Button } from '@/components/common/Button';
 import { ErrorState } from '@/components/common/ErrorState';
 import { Pagination } from '@/components/common/Pagination';
 import { classApi } from '@/features/classes/api/classApi';
+import { ClassScopeFilter, useClassScope } from '@/features/classes/components/ClassScopeFilter';
+import { canManageClassRules } from '@/features/auth/utils/roleRouting';
 import { groupApi } from '@/features/group/api/groupApi';
 import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
@@ -40,6 +42,7 @@ function ReviewContent() {
   const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
   const { selectedTermId, selectedTerm, lockTermSelection } = useTerm();
   const { user } = useAuth();
+  const { viewAll, classScope, setClassScope, scopeParams } = useClassScope();
   const toast = useToast();
   const client = useQueryClient();
   const { subscribe } = useRealtime();
@@ -65,18 +68,19 @@ function ReviewContent() {
   const [actionError, setActionError] = useState<unknown>(null);
   const [reasonRequired, setReasonRequired] = useState(false);
   const busy = useRef(false);
-  const classes = useQuery({ queryKey: ['my-school-classes', user?.id, selectedTermId, 'review'],
+  const classes = useQuery({ queryKey: [viewAll ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, 'review', classScope],
     queryFn: async ({ signal }) => {
-      const first = await classApi.getMyClasses({ termId: selectedTermId!, size: 50 }, signal);
+      const fetchClasses = viewAll ? classApi.getClasses : classApi.getMyClasses;
+      const first = await fetchClasses({ termId: selectedTermId!, ...scopeParams, size: 50 }, signal);
       const result = [...first.result];
       for (let page = 2; page <= first.meta.pages; page++) {
-        const next = await classApi.getMyClasses({ termId: selectedTermId!, size: 50, page }, signal);
+        const next = await fetchClasses({ termId: selectedTermId!, ...scopeParams, size: 50, page }, signal);
         result.push(...next.result);
       }
       return { ...first, result };
     } });
-  const reviews = useQuery({ queryKey: ['group-reviews', user?.id, selectedTermId, filters],
-    queryFn: ({ signal }) => groupApi.getReviews({ ...filters, termId: selectedTermId! }, signal),
+  const reviews = useQuery({ queryKey: ['group-reviews', user?.id, selectedTermId, filters, classScope],
+    queryFn: ({ signal }) => groupApi.getReviews({ ...filters, ...scopeParams, termId: selectedTermId! }, signal),
     retry: (count, error) => count < 1 && ![400, 401, 403].includes(getApiError(error).status) });
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
@@ -167,7 +171,8 @@ function ReviewContent() {
   const columns = [
     { title: t('groupExport.colGroupCode'), key: 'groupCode', render: (_: unknown, row: GroupReviewRow) => row.group.groupCode || '—' },
     { title: t('groupReview.group'), key: 'group', render: (_: unknown, row: GroupReviewRow) => <strong>{row.group.name}</strong> },
-    { title: t('groupReview.class'), dataIndex: 'className', key: 'class' },
+    { title: t('groupReview.class'), key: 'class', render: (_: unknown, row: GroupReviewRow) => <>{row.className}
+      {row.readOnly && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}</> },
     { title: t('groupReview.leader'), key: 'leader', render: (_: unknown, row: GroupReviewRow) => row.group.leaderName && row.group.leaderName !== 'N/A' ? row.group.leaderName : t('groupReview.missing') },
     { title: t('groupReview.members'), key: 'members', render: (_: unknown, row: GroupReviewRow) => row.group.memberCount },
     { title: t('groupReview.rules'), key: 'rules', render: (_: unknown, row: GroupReviewRow) => eligibility(row) },
@@ -184,13 +189,16 @@ function ReviewContent() {
   ];
   return <div className="group-review-page">
     <PageHeader title={t('groupReview.title')} description={t('groupReview.description')} />
-    {area === 'lecturer' && <section className="card review-classes-card" aria-label={t('groupReview.myClassesTitle')}>
+    {viewAll && <ClassScopeFilter value={classScope} onChange={scope => {
+      setClassScope(scope); setFilters(old => ({ ...old, classId: undefined, page: 1 })); setViewId(null);
+    }} />}
+    {area === 'lecturer' && <section className="card review-classes-card" aria-label={t(viewAll ? 'classVisibility.classes' : 'groupReview.myClassesTitle')}>
       <div className="review-classes-header">
         <div className="review-classes-title-group">
           <div className="review-classes-icon" aria-hidden="true"><GraduationCap size={22} /></div>
           <div>
-            <h2 className="review-classes-title">{t('groupReview.myClassesTitle')}</h2>
-            <p className="review-classes-subtitle">{t('groupReview.selectClassHint')}</p>
+            <h2 className="review-classes-title">{t(viewAll ? 'classVisibility.classes' : 'groupReview.myClassesTitle')}</h2>
+            <p className="review-classes-subtitle">{t(viewAll ? 'classVisibility.chooseClass' : 'groupReview.selectClassHint')}</p>
           </div>
         </div>
         {classes.data && <span className="badge badge-info review-classes-count">{t('groupReview.classesCount', { count: classes.data.result.length })}</span>}
@@ -198,7 +206,7 @@ function ReviewContent() {
       {classes.isPending ? (
         <div className="review-classes-loading"><RefreshCw size={18} className="spin" aria-hidden="true" /><span>{t('groupReview.refresh')}…</span></div>
       ) : classes.data?.result.length === 0 ? (
-        <p className="review-classes-empty">{t('groupReview.noAssignedClasses')}</p>
+        <p className="review-classes-empty">{t(viewAll ? 'classVisibility.emptyScope' : 'groupReview.noAssignedClasses')}</p>
       ) : (
         <div className="review-classes-grid">
           <button type="button" className={`review-class-item ${!filters.classId ? 'is-active' : ''}`}
@@ -221,6 +229,8 @@ function ReviewContent() {
                 {isSelected && <span className="review-active-pill"><CheckCircle2 size={12} aria-hidden="true" />{t('groupReview.activePill')}</span>}
               </div>
               <div className="review-class-item-name">{cls.name}</div>
+              {viewAll && <div className="review-class-item-meta">{cls.lecturerName || cls.lecturerCode || t('classVisibility.unassigned')}
+                {!canManageClassRules(user, cls.lecturerId) && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}</div>}
               <div className="review-class-item-meta"><Users size={14} aria-hidden="true" /><span>{t('groupReview.studentCount', { count: cls.studentCount })}</span></div>
             </button>;
           })}
@@ -233,7 +243,7 @@ function ReviewContent() {
           <div className="selected-class-info">
             <div className="selected-class-icon" aria-hidden="true"><Sparkles size={24} /></div>
             <div className="selected-class-details">
-              <div className="selected-class-pretitle">{t('groupReview.managingClass')}</div>
+              <div className="selected-class-pretitle">{t(canManageClassRules(user, selectedClass.lecturerId) ? 'groupReview.managingClass' : 'classVisibility.readOnly')}</div>
               <h3 className="selected-class-title">{selectedClass.name}</h3>
               <div className="selected-class-badges">
                 <span className="badge badge-neutral"><Users size={13} aria-hidden="true" />{t('groupReview.studentCount', { count: selectedClass.studentCount })}</span>
@@ -306,7 +316,8 @@ function ReviewContent() {
           <Target className="review-overview-art" size={76} strokeWidth={1.25} aria-hidden="true" />
         </div>
         {view.group.status === 'OPEN' && view.eligible && <p className="review-header-notice review-header-info"><ClipboardCheck size={16} aria-hidden="true" /><span>{t('groupReview.awaitSubmit')}</span></p>}
-        {view.group.status === 'PENDING' && !view.canReview && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.ineligible')}</span></p>}
+        {view.readOnly && <p className="alert alert-info">{t('classVisibility.readOnlyHint')}</p>}
+        {view.group.status === 'PENDING' && !view.canReview && !view.readOnly && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.ineligible')}</span></p>}
         {view.group.rejectReason && <p className="review-header-notice"><AlertTriangle size={16} aria-hidden="true" /><span>{t('groupReview.reason')}: {view.group.rejectReason}</span></p>}
         <section aria-label={t('groupReview.members')}>
           <div className="review-detail-section-heading"><h3><Users size={22} aria-hidden="true" />{t('groupReview.members')}</h3><span className="badge badge-neutral">{view.group.memberCount}</span></div>

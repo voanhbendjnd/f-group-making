@@ -15,6 +15,12 @@ public class ClassGroupingSessionResource {
 
     public ClassGroupingSessionResource(DeadlineService deadlines) { this.deadlines = deadlines; }
 
+    @GetMapping
+    public ResponseEntity<DeadlineDTO> find(@PathVariable("classId") Integer classId,
+            @RequestParam(value = "termId", required = false) Integer termId) {
+        return ResponseEntity.ok(deadlines.findGroupingSession(classId, termId));
+    }
+
     @PutMapping
     @ApiMessage("Class grouping workspace ready")
     public ResponseEntity<DeadlineDTO> ensure(@PathVariable("classId") Integer classId,

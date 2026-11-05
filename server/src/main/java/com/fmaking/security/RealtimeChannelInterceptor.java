@@ -23,6 +23,7 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     private final StudentRepository students;
     private final SchoolClassRepository classes;
     private final DeadlineRepository deadlines;
+    private final java.util.concurrent.ConcurrentMap<String, JwtAuthenticationToken> sessions = new java.util.concurrent.ConcurrentHashMap<>();
 
     public RealtimeChannelInterceptor(JwtDecoder decoder, CustomJwtAuthenticationConverter converter,
             UserRepository users, StudentRepository students, SchoolClassRepository classes, DeadlineRepository deadlines) {
@@ -45,16 +46,21 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
             var jwt = decoder.decode(authorization.substring(7));
             var user = users.findOneByEmail(jwt.getSubject()).orElseThrow(RealtimeChannelInterceptor::denied);
             if (!Boolean.TRUE.equals(user.getActivated())) throw denied();
-            headers.setUser(new JwtAuthenticationToken(jwt, converter.convert(jwt), jwt.getSubject()));
+            var authentication = new JwtAuthenticationToken(jwt, converter.convert(jwt), jwt.getSubject());
+            headers.setUser(authentication);
+            if (headers.getSessionId() != null) sessions.put(headers.getSessionId(), authentication);
         } else if (headers.getCommand() == StompCommand.SUBSCRIBE) {
             if (!(headers.getUser() instanceof JwtAuthenticationToken authentication)) throw denied();
             if (authentication.getToken().getExpiresAt() == null || !authentication.getToken().getExpiresAt().isAfter(java.time.Instant.now())) throw denied();
+            converter.convert(authentication.getToken()); // Recheck sessions invalidated by a role change.
             String destination = headers.getDestination();
             boolean admin = has(authentication, AuthoritiesConstants.ADMIN);
             boolean master = has(authentication, AuthoritiesConstants.LECTURE_MASTER);
             boolean lecturer = has(authentication, AuthoritiesConstants.LECTURE);
             if ("/topic/admin/deadlines".equals(destination)) {
                 if (!admin) throw denied();
+            } else if ("/topic/staff/deadlines".equals(destination)) {
+                if (!admin && !master) throw denied();
             } else if ("/user/queue/deadlines".equals(destination)) {
                 if (!admin && !master && !lecturer) throw denied();
             } else {
@@ -71,11 +77,31 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 }
                 if (match.group(2) != null && deadlines.countByDeadlineIdAndClassId(Integer.valueOf(match.group(2)), classId) == 0) throw denied();
             }
+        } else if (headers.getCommand() == StompCommand.DISCONNECT) {
+            if (headers.getSessionId() != null) sessions.remove(headers.getSessionId());
         } else if (headers.getCommand() == StompCommand.SEND) {
             // Domain writes use REST. Clients cannot publish forged broker notifications.
             throw denied();
         }
         return message;
+    }
+
+    /** Stop delivering messages to already subscribed sockets after an admin changes their role. */
+    @Transactional(readOnly = true)
+    public Message<?> authorizeOutbound(Message<?> message) {
+        if (org.springframework.messaging.simp.SimpMessageHeaderAccessor.getMessageType(message.getHeaders())
+                != org.springframework.messaging.simp.SimpMessageType.MESSAGE) return message;
+        String sessionId = org.springframework.messaging.simp.SimpMessageHeaderAccessor.getSessionId(message.getHeaders());
+        var authentication = sessionId == null ? null : sessions.get(sessionId);
+        if (authentication == null) return null;
+        try {
+            var expiry = authentication.getToken().getExpiresAt();
+            if (expiry == null || !expiry.isAfter(java.time.Instant.now())) return null;
+            converter.convert(authentication.getToken());
+            return message;
+        } catch (RuntimeException exception) {
+            return null;
+        }
     }
 
     private static boolean has(JwtAuthenticationToken user, String role) {

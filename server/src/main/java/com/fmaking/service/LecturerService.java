@@ -113,6 +113,43 @@ public class LecturerService {
         return saveLecturers(List.of(row)).getFirst();
     }
 
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public LecturerDTO updateRole(Long userId, UpdateLecturerRoleDTO request) {
+        var user = userRepository.findByIdForUpdate(userId).orElseThrow(() ->
+            new com.fmaking.web.rest.errors.NotFoundAlertException("Lecturer not found", "lecturer", "lecturerNotFound"));
+        var lecturer = lecturerRepository.findById(userId).orElseThrow(() ->
+            new com.fmaking.web.rest.errors.NotFoundAlertException("Lecturer not found", "lecturer", "lecturerNotFound"));
+        Set<String> roles = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+        if (roles.contains(AuthoritiesConstants.ADMIN) || roles.contains(AuthoritiesConstants.STUDENT)) {
+            throw new com.fmaking.web.rest.errors.ForbiddenAlertException("Only lecturer accounts can change faculty role", "lecturer", "lecturerRoleNotEditable");
+        }
+        if (!Set.of(AuthoritiesConstants.LECTURE, AuthoritiesConstants.LECTURE_MASTER).contains(request.role())) {
+            throw new com.fmaking.web.rest.errors.BadRequestAlertException("Invalid lecturer role", "lecturer", "invalidLecturerRole");
+        }
+        String currentRole = roles.contains(AuthoritiesConstants.LECTURE_MASTER) ? AuthoritiesConstants.LECTURE_MASTER : AuthoritiesConstants.LECTURE;
+        if (!Objects.equals(currentRole, request.expectedRole())) {
+            throw new com.fmaking.web.rest.errors.ConflictAlertException("Lecturer role changed. Reload and try again.", "lecturer", "lecturerRoleChanged");
+        }
+        if (!Objects.equals(currentRole, request.role())) {
+            Authority authority = authorityRepository.findById(request.role()).orElseThrow();
+            user.getAuthorities().removeIf(value -> Set.of(AuthoritiesConstants.LECTURE, AuthoritiesConstants.LECTURE_MASTER).contains(value.getName()));
+            user.getAuthorities().add(authority);
+            user.setSessionId(UUID.randomUUID().toString());
+            user.setRefreshToken(null);
+            userRepository.saveAndFlush(user);
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                new org.springframework.transaction.support.TransactionSynchronization() {
+                    @Override public void afterCommit() { clearUserCaches(user); }
+                });
+            log.info("Faculty role changed for user {} from {} to {} by {}", userId, currentRole, request.role(),
+                com.fmaking.security.SecurityUtils.getCurrentUserLogin().orElse("unknown"));
+        }
+        LecturerDTO dto = toDTO(new LecturerRow(user.getId(), lecturer.getCode(), user.getName(), user.getEmail(), user.getActivated(),
+            user.getActivationKey(), user.getActivationKeyExpiresAt(), user.getCreatedDate(), user.getLastModifiedDate()));
+        dto.setAuthorities(user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet()));
+        return dto;
+    }
+
     // Called only after the failed create transaction has rolled back, so a fresh
     // transaction can see the winning request instead of querying a failed session.
     @Transactional(readOnly = true)
@@ -162,6 +199,7 @@ public class LecturerService {
 
         return savedUsers.stream().map(user -> LecturerDTO.builder()
                 .userId(user.getId()).code(user.getName()).name(user.getName()).email(user.getEmail())
+                .authorities(Set.of(AuthoritiesConstants.LECTURE))
                 .activated(false).hasActivationKey(false).isKeyExpired(false)
                 .createdDate(user.getCreatedDate()).lastModifiedDate(user.getLastModifiedDate()).build()).toList();
     }
@@ -184,6 +222,9 @@ public class LecturerService {
         List<LecturerDTO> dtoList = page.getContent().stream()
                 .map(this::toDTO)
                 .toList();
+        Map<Long, Set<String>> roles = userRepository.findWithAuthoritiesByIdIn(dtoList.stream().map(LecturerDTO::getUserId).toList())
+            .stream().collect(Collectors.toMap(User::getId, user -> user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet())));
+        dtoList.forEach(dto -> dto.setAuthorities(roles.getOrDefault(dto.getUserId(), Set.of())));
 
         ResultPaginationDTO.Meta meta = ResultPaginationDTO.Meta.builder()
                 .page(pageable.getPageNumber() + 1)

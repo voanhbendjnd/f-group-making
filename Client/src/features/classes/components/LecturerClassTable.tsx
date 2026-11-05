@@ -1,18 +1,25 @@
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { SchoolClass } from '../types';
+import { useAuth } from '@/app/providers/AuthContext';
+import { canManageClassRules, canViewAllClasses } from '@/features/auth/utils/roleRouting';
 
 export function LecturerClassTable({ classes }: { classes: SchoolClass[] }) {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const viewAll = canViewAllClasses(user?.authorities ?? []);
   return <div className="table-container" tabIndex={0} role="region" aria-label={t('lecturer.myClasses')}>
     <table className="table lecturer-class-table">
       <thead><tr>
         <th scope="col">{t('lecturer.className')}</th><th scope="col">{t('lecturer.term')}</th>
+        {viewAll && <th scope="col">{t('classVisibility.lecturer')}</th>}
         <th scope="col">{t('lecturer.studentCount')}</th><th scope="col">{t('lecturer.actions')}</th>
       </tr></thead>
       <tbody>{classes.map(schoolClass => <tr key={schoolClass.id}>
         <th scope="row"><Link to={`/lecturer/classes/${schoolClass.id}`}>{schoolClass.name}</Link></th>
         <td>{schoolClass.termName || t('lecturer.noTerm')}</td>
+        {viewAll && <td>{schoolClass.lecturerName || schoolClass.lecturerCode || t('classVisibility.unassigned')}
+          {!canManageClassRules(user, schoolClass.lecturerId) && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}</td>}
         <td>{t('lecturer.students', { count: schoolClass.studentCount })}</td>
         <td><Link className="btn btn-sm btn-secondary" to={`/lecturer/classes/${schoolClass.id}`} aria-label={t('lecturer.openClassLabel', { name: schoolClass.name })}>
           {t('lecturer.openClass')}

@@ -38,7 +38,7 @@ public class AllocationHistoryService {
     }
     private void authorize(Integer deadlineId, Integer classId) {
         var schoolClass = classes.findById(classId).orElseThrow(AllocationHistoryService::notFound);
-        access.requireWriteAccess(schoolClass);
+        access.requireReadAccess(schoolClass);
         if (deadlines.countByDeadlineIdAndClassId(deadlineId, classId) != 1) throw notFound();
     }
     private static NotFoundAlertException notFound() { return new NotFoundAlertException("Allocation history not found", "allocation", "allocationHistoryNotFound"); }

@@ -8,6 +8,9 @@ import com.fmaking.security.SecurityUtils;
 import com.fmaking.web.rest.errors.ForbiddenAlertException;
 
 import java.util.Objects;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
 
 @Service
 public class SchoolClassAccessService {
@@ -31,8 +34,7 @@ public class SchoolClassAccessService {
     }
 
     public void requireReadAccess(SchoolClass schoolClass) {
-        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
-                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
+        if (!canViewAllClasses()) {
             requireAssignedLecturer(schoolClass);
         }
     }
@@ -41,6 +43,34 @@ public class SchoolClassAccessService {
         if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
             requireAssignedLecturer(schoolClass);
         }
+    }
+
+    public boolean canViewAllClasses() {
+        return SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+            || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER);
+    }
+
+    public boolean canWrite(SchoolClass schoolClass) {
+        return canWrite(schoolClass.getLecturerId());
+    }
+
+    public boolean canWrite(Long lecturerId) {
+        return SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+            || Objects.equals(lecturerId, currentLecturerId());
+    }
+
+    public ClassViewScope resolveViewScope(ClassViewScope requested) {
+        ClassViewScope scope = requested == null ? (canViewAllClasses() ? ClassViewScope.ALL : ClassViewScope.MINE) : requested;
+        if (scope != ClassViewScope.MINE && !canViewAllClasses()) throw denied();
+        return scope;
+    }
+
+    public Predicate assignmentPredicate(Path<Long> lecturerId, ClassViewScope requested, CriteriaBuilder cb) {
+        return switch (resolveViewScope(requested)) {
+            case ALL -> cb.conjunction();
+            case MINE -> cb.equal(lecturerId, currentLecturerId());
+            case OTHERS -> cb.or(cb.isNull(lecturerId), cb.notEqual(lecturerId, currentLecturerId()));
+        };
     }
 
     public void requireAssignedLecturer(SchoolClass schoolClass) {

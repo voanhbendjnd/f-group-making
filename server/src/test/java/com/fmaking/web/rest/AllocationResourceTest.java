@@ -176,10 +176,10 @@ class AllocationResourceTest {
     }
 
     @ParameterizedTest @ValueSource(strings = {"LECTURE", "LECTURE_MASTER"})
-    void recommendationDoesNotExposeAnotherLecturersClass(String role) throws Exception {
+    void recommendationAllowsMasterReadWithoutOrdinaryLecturerAccess(String role) throws Exception {
         var otherTeacher = users.findById(other.getLecturerId()).orElseThrow();
         mvc.perform(get(path("plans/recommendation")).with(user(otherTeacher.getEmail()).roles(role)))
-            .andExpect(status().isForbidden());
+            .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
     }
 
     @Test void recommendationDeniesStudentsAndUnauthenticatedAccess() throws Exception {
@@ -209,7 +209,7 @@ class AllocationResourceTest {
         assertThat(data.path("snapshotFingerprint").asText()).matches("[0-9a-f]{64}");
     }
 
-    @Test void assignedLecturerMasterAndAdminCanReadButOthersCannot() throws Exception {
+    @Test void masterCanReadOtherClassesButOnlyAssignedLecturerAndAdminCanGenerate() throws Exception {
         for (String role : List.of("LECTURE", "LECTURE_MASTER", "ADMIN")) {
             mvc.perform(get(path("overview")).with(user(teacher.getEmail()).roles(role))).andExpect(status().isOk());
         }
@@ -217,9 +217,9 @@ class AllocationResourceTest {
         mvc.perform(get(path("overview")).with(user(teacher.getEmail()).roles("STUDENT"))).andExpect(status().isForbidden());
         for (String role : List.of("LECTURE", "LECTURE_MASTER")) {
             mvc.perform(get(path("overview")).with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles(role)))
-                .andExpect(status().isForbidden());
+                .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
             mvc.perform(get(path("setup")).with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles(role)))
-                .andExpect(status().isForbidden());
+                .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
             mvc.perform(post(path("preview")).contentType(MediaType.APPLICATION_JSON).content("{\"targetGroupCount\":2}")
                 .with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles(role))).andExpect(status().isForbidden());
         }
@@ -278,14 +278,14 @@ class AllocationResourceTest {
         verifyNoInteractions(events, notifications, mail);
     }
 
-    @Test void randomHistoryShowsStalePlansAndRefusesOtherClassAccess() throws Exception {
+    @Test void randomHistoryAllowsMasterReadWithoutApply() throws Exception {
         var saved = preview("{\"targetGroupCount\":2,\"seed\":42}");
         own.setRulesVersion(own.getRulesVersion() + 1); classes.saveAndFlush(own);
         mvc.perform(get(path("plans/" + saved.path("previewId").asText())).with(user(teacher.getEmail()).roles("LECTURE")))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.summary.status").value("INVALID"))
             .andExpect(jsonPath("$.data.summary.canApply").value(false));
         mvc.perform(get(path("plans")).with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles("LECTURE_MASTER")))
-            .andExpect(status().isForbidden());
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.result[0].canApply").value(false));
     }
 
     @Test void brokenLiveMembershipDoesNotHideTheSavedPlanButDisablesApply() throws Exception {

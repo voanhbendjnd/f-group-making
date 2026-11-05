@@ -227,12 +227,20 @@ public class GroupService {
     @Transactional(readOnly = true)
     public ResultPaginationDTO getMyGroupReviews(Integer termId, Integer classId, GroupStatus status, String search,
                                                  Pageable pageable) {
-        Long lecturerId = accessService.currentLecturerId();
+        return getMyGroupReviews(termId, classId, status, search, pageable, null);
+    }
+
+    @Transactional(readOnly = true)
+    public ResultPaginationDTO getMyGroupReviews(Integer termId, Integer classId, GroupStatus status, String search,
+                                                 Pageable pageable, ClassViewScope requestedScope) {
+        ClassViewScope scopeFilter = accessService.resolveViewScope(requestedScope == null
+            && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN) ? ClassViewScope.MINE : requestedScope);
         termService.validateTerm(termId);
         if (classId != null) {
             SchoolClass schoolClass = schoolClassRepository.findById(classId)
                 .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
-            accessService.requireAssignedLecturer(schoolClass);
+            if (scopeFilter == ClassViewScope.MINE) accessService.requireAssignedLecturer(schoolClass);
+            else accessService.requireReadAccess(schoolClass);
             if (!Objects.equals(schoolClass.getTermId(), termId)) {
                 throw new BadRequestAlertException("Class does not belong to selected term", "schoolClass", "classNotInTerm");
             }
@@ -241,7 +249,7 @@ public class GroupService {
         Specification<Group> specification = (root, query, cb) -> {
             var scope = query.subquery(Integer.class);
             var schoolClass = scope.from(SchoolClass.class);
-            scope.select(schoolClass.get("id")).where(cb.equal(schoolClass.get("lecturerId"), lecturerId), cb.equal(schoolClass.get("termId"), termId));
+            scope.select(schoolClass.get("id")).where(accessService.assignmentPredicate(schoolClass.get("lecturerId"), scopeFilter, cb), cb.equal(schoolClass.get("termId"), termId));
             var predicates = new ArrayList<Predicate>();
             predicates.add(root.get("schoolClassId").in(scope));
             predicates.add(cb.notEqual(root.get("status"), GroupStatus.DISBANDED));
@@ -264,7 +272,8 @@ public class GroupService {
             boolean membershipValid;
             try { evaluateReviewGroup(group); membershipValid = true; }
             catch (ConflictAlertException exception) { membershipValid = false; }
-            boolean writable = deadlineRepository.findAllBySchoolClassId(schoolClass.getId()).size() == 1;
+            boolean canManage = accessService.canWrite(schoolClass);
+            boolean writable = canManage && deadlineRepository.findAllBySchoolClassId(schoolClass.getId()).size() == 1;
             var submittedAt = groupStatusHistoryRepository.findByGroupIdOrderByCreatedAtDesc(group.getId()).stream()
                 .filter(history -> history.getToStatus() == GroupStatus.PENDING).map(GroupStatusHistory::getCreatedAt).findFirst().orElse(null);
             GroupDTO detail = getGroupDetail(group.getId(), group.getSchoolClassId(), group.getDeadlineId());
@@ -272,7 +281,7 @@ public class GroupService {
             return new GroupReviewDTO(detail,
                 schoolClass.getName(), submittedAt, deadlinePolicy.status(deadline, group.getSchoolClassId()).name(), eligible,
                 writable && membershipValid && group.getStatus() == GroupStatus.PENDING,
-                writable && group.getStatus() == GroupStatus.ACCEPTED);
+                writable && group.getStatus() == GroupStatus.ACCEPTED, !canManage);
         }).toList();
         return ResultPaginationDTO.builder().result(result).meta(ResultPaginationDTO.Meta.builder()
             .page(paging.getPageNumber() + 1).pageSize(paging.getPageSize()).total(page.getTotalElements()).pages(page.getTotalPages()).build()).build();

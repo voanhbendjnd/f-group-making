@@ -15,6 +15,9 @@ vi.mock('@/features/deadline/api/deadlineApi', () => ({ deadlineApi: {
 } }));
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn() } }));
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }));
+const auth = vi.hoisted(() => ({ role: 'ROLE_LECTURE' }));
+vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 10, authorities: [auth.role] } }) }));
+vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId: 8, lockTermSelection: () => () => {} }) }));
 const deadline: Deadline = {
   id: 8, version: 2, name: 'EXE101 deadline', description: 'Instructions shown in details only.',
   status: 'EXPIRED', startTime: '2020-01-01T00:00:00Z', endTime: '2020-02-01T00:00:00Z',
@@ -36,7 +39,7 @@ function openDetails() {
   return screen.getByRole('dialog');
 }
 beforeEach(async () => {
-  vi.clearAllMocks(); await i18n.changeLanguage('en');
+  vi.clearAllMocks(); auth.role = 'ROLE_LECTURE'; await i18n.changeLanguage('en');
   vi.mocked(deadlineApi.getDeadlineById).mockResolvedValue(deadline);
   vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({ result: [deadline], meta: { page: 1, pageSize: 10, pages: 1, total: 1 } });
   vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [], meta: { page: 1, pageSize: 10, pages: 0, total: 0 } });
@@ -44,6 +47,14 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); client?.clear(); });
 
 describe('compact deadline list and detail view', () => {
+  it('loads only assigned deadlines for a department head teaching feature', async () => {
+    auth.role = 'ROLE_LECTURE_MASTER';
+    client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={client}><MemoryRouter><LecturerDeadlinePage /></MemoryRouter></QueryClientProvider>);
+    await screen.findByText(deadline.name);
+    expect(deadlineApi.getDeadlines).toHaveBeenCalledWith(expect.objectContaining({ termId: 8, classScope: 'MINE' }), expect.any(AbortSignal));
+    expect(screen.queryByLabelText(i18n.t('classVisibility.scope'))).not.toBeInTheDocument();
+  });
   it('keeps the fresh detail version when the real page still has an older list response', async () => {
     const fresh = { ...deadline, version: 5 };
     vi.mocked(deadlineApi.getDeadlineById).mockResolvedValue(fresh);

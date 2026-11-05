@@ -2,6 +2,7 @@ package com.fmaking.web.rest;
 
 import com.fmaking.security.AuthoritiesConstants;
 import com.fmaking.service.DeadlineService;
+import com.fmaking.service.ClassViewScope;
 import com.fmaking.service.dto.CreateDeadlineDTO;
 import com.fmaking.service.dto.DeadlineDTO;
 import com.fmaking.service.dto.DeadlineValidateDTO;
@@ -57,9 +58,10 @@ public class DeadlineResource {
     @GetMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<DeadlineDTO>> getDeadlines(Pageable pageable,
-            @RequestParam(name = "termId", required = false) Integer termId) {
+            @RequestParam(name = "termId", required = false) Integer termId,
+            @RequestParam(name = "classScope", required = false) ClassViewScope classScope) {
         log.debug("REST request to get a page of Deadlines");
-        Page<DeadlineDTO> page = deadlineService.getDeadlines(pageable, termId);
+        Page<DeadlineDTO> page = deadlineService.getDeadlines(pageable, termId, classScope);
         return ResponseEntity.ok(page);
     }
 

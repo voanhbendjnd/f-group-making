@@ -95,11 +95,13 @@ class GroupReviewResourceTest {
                 .with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(jsonPath("$.data.meta.total").value(0));
     }
 
-    @Test void rejectsUnauthorizedScopesEvenForMasterAndHandlesEmptyOrInvalidTerm() throws Exception {
+    @Test void allowsMasterReadButRejectsOrdinaryLecturerForeignScopesAndInvalidTerms() throws Exception {
         mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString())).andExpect(status().isUnauthorized());
         mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).with(user(teacher.getEmail()).roles("STUDENT"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("classId", other.getId().toString())
             .with(user(teacher.getEmail()).roles("LECTURE_MASTER"))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("classId", other.getId().toString())
+            .with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isForbidden());
         mvc.perform(get("/api/me/group-reviews").param("termId", "2147483647").with(user(teacher.getEmail()).roles("LECTURE"))).andExpect(status().isBadRequest());
         Term empty = new Term(); empty.setName("E" + UUID.randomUUID().toString().substring(0, 6)); empty = terms.saveAndFlush(empty);
         mvc.perform(get("/api/me/group-reviews").param("termId", empty.getId().toString()).with(user(teacher.getEmail()).roles("LECTURE")))
@@ -183,18 +185,29 @@ class GroupReviewResourceTest {
         rule.setValue(value); rule.setStatus(true); rules.saveAndFlush(rule);
     }
 
-    @Test void paginationAndMasterListNeverIncludeAnotherLecturersGroups() throws Exception {
+    @Test void masterCanFilterAllOwnAndForeignGroupsWithoutForeignWritePermissions() throws Exception {
         Group second = new Group(); second.setName("Second own draft"); second.setSchoolClassId(own.getId());
         second.setDeadlineId(deadline.getId()); second.setLeaderId(group.getLeaderId()); groups.saveAndFlush(second);
         Group foreign = new Group(); foreign.setName("Foreign group"); foreign.setSchoolClassId(other.getId());
+        deadline.getSchoolClasses().add(other); deadlines.saveAndFlush(deadline);
         foreign.setDeadlineId(deadline.getId()); foreign.setLeaderId(group.getLeaderId()); groups.saveAndFlush(foreign);
         for (int page = 1; page <= 2; page++) {
             mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("page", String.valueOf(page)).param("size", "1")
+                .param("classScope", "MINE")
                 .with(user(teacher.getEmail()).roles("LECTURE_MASTER"))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.meta.total").value(2)).andExpect(jsonPath("$.data.meta.pages").value(2))
                 .andExpect(jsonPath("$.data.result.length()").value(1))
                 .andExpect(jsonPath("$.data.result[0].group.schoolClassId").value(own.getId()));
         }
+        mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("classScope", "ALL")
+            .with(user(teacher.getEmail()).roles("LECTURE_MASTER"))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.meta.total").value(3));
+        mvc.perform(get("/api/me/group-reviews").param("termId", term.getId().toString()).param("classScope", "OTHERS")
+            .with(user(teacher.getEmail()).roles("LECTURE_MASTER"))).andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.meta.total").value(1))
+            .andExpect(jsonPath("$.data.result[0].readOnly").value(true))
+            .andExpect(jsonPath("$.data.result[0].canReview").value(false))
+            .andExpect(jsonPath("$.data.result[0].canReopen").value(false));
         mvc.perform(post(action("/accept")).with(user(users.findById(other.getLecturerId()).orElseThrow().getEmail()).roles("LECTURE_MASTER")))
             .andExpect(status().isForbidden());
     }

@@ -137,13 +137,16 @@ class ZaloShareResourceTest {
         assertThat(shares.findByScopeKey("LECTURER:"+teacher.getId()+":TERM:"+oldTerm.getId())).isPresent();
     }
     @ParameterizedTest @ValueSource(strings={"LECTURE","LECTURE_MASTER"})
-    void otherLecturerCannotReadEditDeleteOrDownloadAnotherLecturersCommonShare(String role)throws Exception{
+    void masterCanReadForeignSharesButCannotEditOrDelete(String role)throws Exception{
         var share=create("LECTURER",true);
-        mvc.perform(get(scoped(commonPath(),term)).with(user(outsider.getEmail()).roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get(scoped(commonPath(),term)).with(user(outsider.getEmail()).roles(role)))
+            .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
         mvc.perform(putData(commonPath(),term,data("LECTURER",share.getVersion())).with(user(outsider.getEmail()).roles(role))).andExpect(status().isForbidden());
         mvc.perform(delete(scoped(commonPath()+"/"+share.getId(),term)).param("version",share.getVersion().toString()).with(user(outsider.getEmail()).roles(role))).andExpect(status().isForbidden());
-        mvc.perform(get("/api/zalo-shares/"+share.getId()+"/qr").with(user(outsider.getEmail()).roles(role))).andExpect(status().isForbidden());
-        mvc.perform(get(scoped(classPath(),term)).with(user(outsider.getEmail()).roles(role))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/zalo-shares/"+share.getId()+"/qr").with(user(outsider.getEmail()).roles(role)))
+            .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
+        mvc.perform(get(scoped(classPath(),term)).with(user(outsider.getEmail()).roles(role)))
+            .andExpect(role.equals("LECTURE_MASTER") ? status().isOk() : status().isForbidden());
     }
     @Test void adminCanManageOtherLecturersButStudentAndUnauthenticatedCannot()throws Exception{
         mvc.perform(putData(commonPath(),term,data("LECTURER",null)).with(user(outsider.getEmail()).roles("ADMIN"))).andExpect(status().isOk());

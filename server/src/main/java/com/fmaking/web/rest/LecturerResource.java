@@ -6,6 +6,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import com.fmaking.service.dto.CreateLecturerDTO;
 import com.fmaking.service.dto.LecturerDTO;
+import com.fmaking.service.dto.UpdateLecturerRoleDTO;
 import org.zalando.problem.Status;
 import org.zalando.problem.violations.ConstraintViolationProblem;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +53,14 @@ public class LecturerResource {
         }
     }
 
+    @PutMapping("/{userId}/role")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @ApiMessage("Lecturer role updated successfully")
+    public ResponseEntity<LecturerDTO> updateRole(@PathVariable("userId") Long userId,
+            @Valid @RequestBody UpdateLecturerRoleDTO request) {
+        return ResponseEntity.ok(lecturerService.updateRole(userId, request));
+    }
+
     /**
      * GET /api/lecturers : Get paginated, searched, and filtered lecturer list.
      *
@@ -72,6 +81,21 @@ public class LecturerResource {
         ResultPaginationDTO result = lecturerService.getLecturers(search, activated, hasActivationKey, pageable, termId);
         return ResponseEntity.ok(result);
     }
+
+    /** Minimal faculty identities for staff read-only selectors; account management remains admin-only. */
+    @GetMapping("/options")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_LECTURE_MASTER')")
+    public ResponseEntity<ResultPaginationDTO> getLecturerOptions(
+            @RequestParam(name = "search", required = false) String search,
+            @PageableDefault(size = 50, sort = "userId") Pageable pageable) {
+        var page = lecturerService.getLecturers(search, null, null, pageable);
+        @SuppressWarnings("unchecked")
+        var lecturers = (java.util.List<LecturerDTO>) page.getResult();
+        var options = lecturers.stream().map(dto -> new LecturerOption(dto.getUserId(), dto.getCode(), dto.getName())).toList();
+        return ResponseEntity.ok(new ResultPaginationDTO(page.getMeta(), options));
+    }
+
+    public record LecturerOption(Long userId, String code, String name) {}
 
     /**
      * POST /api/lecturers/import : Import lecturer list from Excel file (.xlsx).

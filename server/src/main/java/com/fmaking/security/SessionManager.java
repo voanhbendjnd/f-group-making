@@ -28,7 +28,8 @@ public class SessionManager {
     public boolean isValidSessionIdByEmail(String email, String sessionId){
         if(sessionId == null || email == null) return false;
         String normalizedEmail = email.trim().toLowerCase(Locale.ENGLISH);
-       User userAuthorities = userRepository.findOneWithAuthoritiesByEmail(normalizedEmail)
+       // Session IDs change on login and role updates; the cached authority snapshot can be stale.
+       User userAuthorities = userRepository.findOneByEmail(normalizedEmail)
                .orElseThrow(NotAuthorizedException::new);
        if(userAuthorities.getSessionId() == null){
            return true;

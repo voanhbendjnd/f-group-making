@@ -11,7 +11,7 @@ import { isZaloAccessError, zaloError } from '../api/zaloErrors';
 import { zaloApi, isZaloInvite, type ZaloShare, type ZaloWrite, type ZaloTarget } from '../api/zaloApi';
 import { ZaloShareCard, ZaloQr, ZaloEmpty } from './ZaloShareCard';
 
-export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
+export function ZaloManagementPanel({ target, canManage = true }: { target: ZaloTarget; canManage?: boolean }) {
   const { t } = useTranslation();
   const { user } = useAuth();
   const toast = useToast();
@@ -38,7 +38,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
   };
 
   const remove = async () => {
-    if (!share || busy.current) return;
+    if (!canManage || !share || busy.current) return;
     busy.current = true;
     setDeleting(true);
     setError(null);
@@ -92,6 +92,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
         icon={<Info size={18} />}
         title={t(isClass ? 'zalo.classVisibility' : 'zalo.lecturerVisibility')}
       />
+      {!canManage && <Alert type="info" showIcon title={t('classVisibility.readOnlyHint')} />}
 
       {query.isPending ? (
         <Skeleton active paragraph={{ rows: 5 }} />
@@ -107,7 +108,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
           {query.isError && <Alert type="error" showIcon title={zaloError(query.error, t)}
             action={<Button onClick={() => void query.refetch({ cancelRefetch: false })}>{t('zalo.retry')}</Button>} />}
           {error != null && <Alert type="error" showIcon title={zaloError(error, t)} />}
-          {editing ? (
+          {editing && canManage ? (
             <ZaloEditor
               target={target}
               share={share}
@@ -120,7 +121,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
           ) : (
             <>
               {share ? <ZaloShareCard share={share} preview /> : <ZaloEmpty scope={target.scope} />}
-              <div className="zalo-actions">
+              {canManage && <div className="zalo-actions">
                 <Button
                   type="primary"
                   className="zalo-btn-primary"
@@ -149,7 +150,7 @@ export function ZaloManagementPanel({ target }: { target: ZaloTarget }) {
                     {t('zalo.delete')}
                   </Button>
                 )}
-              </div>
+              </div>}
             </>
           )}
         </>
