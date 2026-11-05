@@ -2,8 +2,15 @@ import { apiClient } from '@/services/api/client';
 import type { PaginatedLecturers, LecturerFilterParams, CreateLecturerValues, Lecturer } from '../types';
 import type { ImportResult } from '@/features/import/types';
 import type { BatchActivationResult } from '@/features/students/types';
+import type { LecturerOption, LecturerRole, PaginationMeta } from '../types';
 
 export const lecturerApi = {
+  async updateRole(userId: number, role: LecturerRole, expectedRole: LecturerRole): Promise<Lecturer> {
+    return apiClient.put<unknown, Lecturer>(`/api/lecturers/${userId}/role`, { role, expectedRole });
+  },
+  async getOptions(params: { search?: string; page?: number; size?: number } = {}): Promise<{ meta: PaginationMeta; result: LecturerOption[] }> {
+    return apiClient.get<unknown, { meta: PaginationMeta; result: LecturerOption[] }>('/api/lecturers/options', { params });
+  },
   async createLecturer(values: CreateLecturerValues): Promise<Lecturer> {
     return apiClient.post<unknown, Lecturer>('/api/lecturers', values);
   },

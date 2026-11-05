@@ -1,6 +1,8 @@
 import { LecturerGroupReviewPage } from '@/pages/lecturer/LecturerGroupReviewPage';
 import { LecturerAllocationPage } from '@/pages/lecturer/LecturerAllocationPage';
 import { LecturerZaloPage } from '@/pages/lecturer/LecturerZaloPage';
+import { DepartmentOverviewPage } from '@/pages/lecturer/DepartmentOverviewPage';
+import { DepartmentClassDetailPage } from '@/pages/lecturer/DepartmentClassDetailPage';
 import React from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AuthLayout } from '@/components/layout/AuthLayout';
@@ -176,6 +178,8 @@ export const router = createBrowserRouter([
       { path: 'automatic-allocation/:classId', element: <LecturerAllocationPage /> },
       { path: 'group-review/advanced', element: <LecturerGroupWorkspacePage /> },
       { path: 'classes/:classId/deadlines/:deadlineId/groups', element: <LecturerGroupWorkspacePage /> },
+      { path: 'department-overview', element: <DepartmentOverviewPage /> },
+      { path: 'department-overview/classes/:id', element: <DepartmentClassDetailPage /> },
     ],
   },
 

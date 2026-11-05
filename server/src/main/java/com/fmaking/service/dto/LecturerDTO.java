@@ -3,6 +3,7 @@ package com.fmaking.service.dto;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -11,6 +12,8 @@ import java.time.Instant;
 @AllArgsConstructor
 public class LecturerDTO {
     private Long userId;
+    @Builder.Default
+    private Set<String> authorities = Set.of();
     private String code;
     private String name;
     private String email;

@@ -1,3 +1,5 @@
+export type ClassViewScope = 'ALL' | 'MINE' | 'OTHERS';
+
 export interface SchoolClass {
   id: number;
   name: string;
@@ -12,6 +14,7 @@ export interface SchoolClass {
 }
 
 export interface SchoolClassFilterParams {
+  classScope?: ClassViewScope;
   search?: string;
   termId?: number;
   page?: number;

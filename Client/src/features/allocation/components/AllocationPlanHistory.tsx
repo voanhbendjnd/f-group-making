@@ -12,8 +12,8 @@ import { RecommendedPlanBadge } from './RecommendedPlanBadge';
 import { allocationErrorKey } from '../utils';
 import type { PlanDetail, PlanSummary } from '../types';
 
-export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint, disabled, onSelect, onApply }: {
-  classId: number; deadlineId: number; snapshotFingerprint: string; disabled: boolean; onSelect: (detail: PlanDetail) => void; onApply: (detail: PlanDetail) => void;
+export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint, disabled, readOnly = false, onSelect, onApply }: {
+  classId: number; deadlineId: number; snapshotFingerprint: string; disabled: boolean; readOnly?: boolean; onSelect: (detail: PlanDetail) => void; onApply: (detail: PlanDetail) => void;
 }) {
   const { t, i18n } = useTranslation(); const { user } = useAuth(); const { selectedTermId } = useTerm();
   const client = useQueryClient(); const [page, setPage] = useState(1); const [planId, setPlanId] = useState<string | null>(null);
@@ -28,11 +28,11 @@ export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint
   const detail = useQuery({ queryKey: detailKey(planId), enabled: planId !== null,
     queryFn: ({ signal }) => allocationApi.plan(deadlineId, classId, planId!, signal), retry: false });
   const actor = (row: PlanSummary) => row.actorName || (row.actorId === user?.id ? user.name || user.email : t('allocation.actorReference', { id: row.actorId }));
-  const applyHint = (row: PlanSummary) => disabled || loadingPlan !== null ? t('allocation.actionsLocked') : row.canApply ? undefined
+  const applyHint = (row: PlanSummary) => readOnly ? t('classVisibility.readOnly') : disabled || loadingPlan !== null ? t('allocation.actionsLocked') : row.canApply ? undefined
     : row.invalidReason ? t(`allocation.errors.${row.invalidReason}`, { defaultValue: t('allocation.errors.other') })
       : row.status === 'UNAPPLIED' ? t('allocation.planOwnerOnly') : t(`allocation.planStatuses.${row.status}`);
   const applySaved = async (id: string) => {
-    if (disabled || loadingPlan) return;
+    if (readOnly || disabled || loadingPlan) return;
     setLoadingPlan(id); setError(null);
     try {
       const saved = await client.fetchQuery({ queryKey: detailKey(id), staleTime: 0, queryFn: ({ signal }) => allocationApi.plan(deadlineId, classId, id, signal) });
@@ -69,7 +69,7 @@ export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint
           </div> },
           { title: t('allocation.details'), width: 310, className: 'allocation-history-action-cell', render: (_, row) => <div className="allocation-table-actions">
             <Tooltip title={!row.available ? t('allocation.errors.allocationPlanUnavailable') : undefined} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={!row.available ? 0 : undefined}><Button size="small" icon={<Eye size={15} aria-hidden="true" />} disabled={!row.available} onClick={() => setPlanId(row.planId)}>{t('allocation.viewPlan')}</Button></span></Tooltip>
-            <Tooltip title={applyHint(row)} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={applyHint(row) ? 0 : undefined}><Button size="small" type="primary" ghost icon={<CheckCircle2 size={15} aria-hidden="true" />} disabled={disabled || !row.canApply || loadingPlan !== null} loading={loadingPlan === row.planId} onClick={() => void applySaved(row.planId)}>{t(row.status === 'APPLIED' ? 'allocation.planStatuses.APPLIED' : 'allocation.applyPlan')}</Button></span></Tooltip>
+            <Tooltip title={applyHint(row)} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={applyHint(row) ? 0 : undefined}><Button size="small" type="primary" ghost icon={<CheckCircle2 size={15} aria-hidden="true" />} disabled={readOnly || disabled || !row.canApply || loadingPlan !== null} loading={loadingPlan === row.planId} onClick={() => void applySaved(row.planId)}>{t(row.status === 'APPLIED' ? 'allocation.planStatuses.APPLIED' : 'allocation.applyPlan')}</Button></span></Tooltip>
           </div> },
         ]} />}
     </section>
@@ -79,8 +79,8 @@ export function AllocationPlanHistory({ classId, deadlineId, snapshotFingerprint
           <p>{actor(detail.data.summary)} · {new Date(detail.data.summary.createdAt).toLocaleString(i18n.language)}</p><span>{t('allocation.savedPlanHint')}</span></div>
         {detail.data.summary.invalidReason && <Alert type="warning" showIcon title={t(`allocation.errors.${detail.data.summary.invalidReason}`, { defaultValue: t('allocation.errors.other') })} />}
         <div className="allocation-actions allocation-history-actions">
-          <Tooltip title={disabled ? t('allocation.actionsLocked') : undefined} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={disabled ? 0 : undefined}><Button disabled={disabled} onClick={() => { onSelect(detail.data!); setPlanId(null); }}>{t('allocation.openPlan')}</Button></span></Tooltip>
-          <Tooltip title={applyHint(detail.data.summary)} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={applyHint(detail.data.summary) ? 0 : undefined}><Button type="primary" icon={<CheckCircle2 size={15} aria-hidden="true" />} disabled={disabled || !detail.data.summary.canApply || loadingPlan !== null} loading={loadingPlan === planId} onClick={() => void applySaved(planId!)}>{t('allocation.applyPlan')}</Button></span></Tooltip>
+          <Tooltip title={readOnly ? t('classVisibility.readOnly') : disabled ? t('allocation.actionsLocked') : undefined} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={disabled || readOnly ? 0 : undefined}><Button disabled={disabled || readOnly} onClick={() => { onSelect(detail.data!); setPlanId(null); }}>{t('allocation.openPlan')}</Button></span></Tooltip>
+          <Tooltip title={applyHint(detail.data.summary)} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={applyHint(detail.data.summary) ? 0 : undefined}><Button type="primary" icon={<CheckCircle2 size={15} aria-hidden="true" />} disabled={readOnly || disabled || !detail.data.summary.canApply || loadingPlan !== null} loading={loadingPlan === planId} onClick={() => void applySaved(planId!)}>{t('allocation.applyPlan')}</Button></span></Tooltip>
         </div>
         <AllocationGroups groups={detail.data.preview.groups} />
         {detail.data.preview.report && <AllocationReport report={detail.data.preview.report} />}

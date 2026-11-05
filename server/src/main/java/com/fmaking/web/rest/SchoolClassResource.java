@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.fmaking.service.SchoolClassService;
+import com.fmaking.service.ClassViewScope;
 import com.fmaking.service.dto.AssignClassLecturerDTO;
 import com.fmaking.service.dto.ResultPaginationDTO;
 import com.fmaking.service.dto.SchoolClassDTO;
@@ -42,10 +43,11 @@ public class SchoolClassResource {
     public ResponseEntity<ResultPaginationDTO> getAllSchoolClasses(
             @RequestParam(name = "search", required = false) String search,
             @RequestParam(name = "termId", required = false) Integer termId,
+            @RequestParam(name = "classScope", required = false) ClassViewScope classScope,
             @PageableDefault(size = 20, sort = "createdDate", direction = Sort.Direction.DESC) Pageable pageable) {
 
         log.debug("REST request to get school classes: search={}, termId={}, pageable={}", search, termId, pageable);
-        ResultPaginationDTO result = schoolClassService.getSchoolClasses(search, termId, pageable);
+        ResultPaginationDTO result = schoolClassService.getSchoolClasses(search, termId, pageable, classScope);
         return ResponseEntity.ok(result);
     }
 

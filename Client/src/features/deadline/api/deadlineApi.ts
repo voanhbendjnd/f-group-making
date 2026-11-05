@@ -19,7 +19,7 @@ export const deadlineApi = {
       page += 1;
     }
   },
-  async getDeadlines(params?: { page?: number; size?: number; termId?: number }, signal?: AbortSignal): Promise<PaginatedDeadlines> {
+  async getDeadlines(params?: { page?: number; size?: number; termId?: number; classScope?: import('@/features/classes/types').ClassViewScope }, signal?: AbortSignal): Promise<PaginatedDeadlines> {
     const data = await apiClient.get<unknown, any>('/api/deadlines', {
       params,
       signal,

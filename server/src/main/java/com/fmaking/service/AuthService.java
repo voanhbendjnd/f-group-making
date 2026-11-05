@@ -1,7 +1,6 @@
 package com.fmaking.service;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import com.fmaking.domain.Authority;
 import com.fmaking.domain.User;
 import com.fmaking.repository.UserRepository;
 import com.fmaking.security.SecurityUtils;
@@ -10,7 +9,6 @@ import com.fmaking.service.dto.ResLoginDTO;
 import com.fmaking.service.errors.DataResourceNotFoundException;
 
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
@@ -24,12 +22,15 @@ public class AuthService {
     }
     @Transactional
     public ResLoginDTO generateResLoginDTO(User user){
+        // Serialize token issuance with role changes and reload authorities instead of trusting a cached login snapshot.
+        user = userRepository.findByIdForUpdate(user.getId()).orElseThrow(() ->
+            new DataResourceNotFoundException("User not found", "userManagement", "idnotfound"));
         ResLoginDTO res = new ResLoginDTO();
         var userLogin = new ResLoginDTO.UserLogin();
         userLogin.setEmail(user.getEmail());
         userLogin.setId(user.getId());
         userLogin.setName(user.getName());
-        Set<String> authorityName = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+        Set<String> authorityName = userRepository.findAuthorityNamesById(user.getId());
         userLogin.setAuthorities(authorityName);
         String sessionId = sessionManager.initSessionId(user.getId());
         String newAccessToken = securityUtils.createAccessToken(userLogin, sessionId, authorityName);

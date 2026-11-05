@@ -101,6 +101,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         },
       ];
 
+  if (isLecturer && isMaster) navItems.push({ to: '/lecturer/department-overview', label: t('departmentOverview.title'), icon: <LayoutDashboard size={18} /> });
   if (isStudentArea) navItems.push({ to: '/student/profile', label: t('studentProfile.title'), icon: <UserCheck size={18} /> });
 
   return (

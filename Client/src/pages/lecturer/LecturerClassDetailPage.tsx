@@ -1,6 +1,6 @@
 import { useTerm } from '@/app/providers/TermContext';
 import { TermScope } from '@/features/terms/components/TermScope';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Users } from 'lucide-react';
@@ -57,6 +57,8 @@ function LecturerClassDetailPageContent() {
     <p role="alert">{t('terms.classOutsideTerm')}</p>{back}
   </div>;
   const readOnly = !canManageClassRules(user, schoolClass.lecturerId);
+  if (readOnly && user?.authorities.includes('ROLE_LECTURE_MASTER'))
+    return <Navigate replace to={`/lecturer/department-overview/classes/${classId}`} />;
   return <div className="space-y-6 lecturer-page">
     <PageHeader title={t('lecturer.classTitle', { name: schoolClass.name })}
       description={t(readOnly ? 'lecturer.readOnlyDetailDescription' : 'lecturer.detailDescription')} action={actionButtons} />

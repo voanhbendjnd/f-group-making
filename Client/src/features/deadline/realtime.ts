@@ -20,6 +20,7 @@ const keys = new Set([
   'student-deadline-activities', 'validate-deadline', 'group-workspace', 'deadline-detail', 'student-profile', 'group-reviews',
   'allocation', 'allocation-sessions',
   'class-allocation-preview',
+  'department-overview', 'department-class-overview',
   ...recommendationKeys,
 ]);
 export const isRealtimeQuery = (key: QueryKey) => keys.has(String(key[0]));

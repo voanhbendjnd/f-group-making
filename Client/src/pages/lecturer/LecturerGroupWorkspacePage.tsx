@@ -16,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { useGroupBoard, AmbiguousGroupSessionError } from '@/features/group/hooks/useGroupBoard';
+import { useGroupBoard, AmbiguousGroupSessionError, NoGroupSessionError } from '@/features/group/hooks/useGroupBoard';
 import { useBoardAutoScroll } from '@/features/group/hooks/useBoardAutoScroll';
 import { groupApi } from '@/features/group/api/groupApi';
 import type { GroupDTO, GroupMemberDTO } from '@/features/group/types/groupTypes';
@@ -114,7 +114,7 @@ function LecturerGroupWorkspaceContent({
 }) {
   const { t } = useTranslation();
   const area = useLocation().pathname.startsWith('/admin') ? 'admin' : 'lecturer';
-  const { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup } =
+  const { workspace, session, deadlineId, connection, canManage, canUnlock, teachingScopeDenied, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup } =
     useGroupBoard(classId, requestedDeadline, positiveId(params.get('termId')));
   const { boardRef, startAutoScroll, stopAutoScroll } = useBoardAutoScroll();
 
@@ -611,14 +611,15 @@ function LecturerGroupWorkspaceContent({
   }
 
   const workspaceAccessLost = workspace.isError && [401, 403, 404].includes(getApiError(workspace.error).status);
-  if (session.isError || workspaceAccessLost || !data) {
+  if (session.isError || workspaceAccessLost || teachingScopeDenied || !data) {
     return (
       <div>
         {breadcrumb}
         <div className="card board-message">
           <p>
-            {session.error instanceof AmbiguousGroupSessionError
+            {teachingScopeDenied ? t('departmentOverview.teachingOnly') : session.error instanceof AmbiguousGroupSessionError
               ? t('groupBoard.multipleSessions')
+              : session.error instanceof NoGroupSessionError ? t('classVisibility.noSession')
               : translateErrorMessage(session.error ?? workspace.error)}
           </p>
           <Link className="btn btn-secondary" to={back}>

@@ -11,16 +11,16 @@ import { LecturerZaloPage } from '@/pages/lecturer/LecturerZaloPage';
 import { classApi } from '@/features/classes/api/classApi';
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
 
-const mocks = vi.hoisted(() => ({ admin: false, termId: 8, success: vi.fn(), error: vi.fn(), unlock: vi.fn() }));
+const mocks = vi.hoisted(() => ({ admin: false, master: false, termId: 8, success: vi.fn(), error: vi.fn(), unlock: vi.fn() }));
 vi.mock('@/features/zalo/api/zaloApi', async original => ({ ...await original<typeof import('@/features/zalo/api/zaloApi')>(),
   zaloApi: { management: vi.fn(), mine: vi.fn(), qr: vi.fn(), save: vi.fn(), remove: vi.fn() } }));
-vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1 }, isAdmin: mocks.admin }) }));
+vi.mock('@/app/providers/AuthContext', () => ({ useAuth: () => ({ user: { id: 1, authorities: [mocks.admin ? 'ROLE_ADMIN' : mocks.master ? 'ROLE_LECTURE_MASTER' : 'ROLE_LECTURE'] }, isAdmin: mocks.admin }) }));
 vi.mock('@/app/providers/ToastContext', () => ({ useToast: () => ({ success: mocks.success, error: mocks.error }) }));
 vi.mock('@/app/providers/TermContext', () => ({ useTerm: () => ({ selectedTermId: mocks.termId, isLoading: false, isError: false, isLocked: false, lockTermSelection: () => mocks.unlock }) }));
 
 const classTarget = { scope: 'CLASS' as const, classId: 2, termId: 8 };
 vi.mock('@/features/classes/api/classApi', () => ({ classApi: { getMyClasses: vi.fn(), getClasses: vi.fn(), getClassById: vi.fn() } }));
-vi.mock('@/features/lecturers/api/lecturerApi', () => ({ lecturerApi: { getLecturers: vi.fn() } }));
+vi.mock('@/features/lecturers/api/lecturerApi', () => ({ lecturerApi: { getLecturers: vi.fn(), getOptions: vi.fn() } }));
 const base: ZaloShare = { id: 1, classId: 2, className: 'EXE101_G201', lecturerId: 1, lecturerName: 'Lecturer', termId: 8, termName: 'FALL26', scope: 'CLASS', title: 'EXE101 G201', inviteUrl: 'https://zalo.me/g/abc123',
   description: 'Joining instructions', hasQr: false, version: 0, updatedAt: null };
 const clients: QueryClient[] = [];
@@ -30,7 +30,7 @@ function mount(element: React.ReactNode) {
 }
 beforeEach(async () => {
   vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
-  vi.clearAllMocks(); mocks.admin = false; mocks.termId = 8; await i18n.changeLanguage('vi');
+  vi.clearAllMocks(); mocks.admin = false; mocks.master = false; mocks.termId = 8; await i18n.changeLanguage('vi');
   vi.mocked(zaloApi.management).mockResolvedValue(null);
   vi.mocked(zaloApi.mine).mockResolvedValue([]); vi.mocked(zaloApi.save).mockResolvedValue(base);
   vi.mocked(zaloApi.qr).mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
@@ -41,6 +41,22 @@ beforeEach(async () => {
 afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear()); vi.unstubAllGlobals(); });
 
 describe('Zalo sharing workflow', () => {
+  it('does not show a foreign class Zalo inside the head teaching feature', async () => {
+    mocks.master = true;
+    const schoolClass = { id: 2, name: 'Foreign class', termId: 8, lecturerId: 99, termName: 'FALL26', lecturerCode: 'GV99', lecturerName: 'Other lecturer', lecturerEmail: null, studentCount: 4, createdDate: '' };
+    vi.mocked(classApi.getMyClasses).mockResolvedValue({ result: [], meta: { page: 1, pageSize: 50, pages: 0, total: 0 } });
+    vi.mocked(classApi.getClassById).mockResolvedValue(schoolClass);
+    mount(<MemoryRouter initialEntries={['/?scope=CLASS&classId=2']}><LecturerZaloPage /></MemoryRouter>);
+    await screen.findByText(i18n.t('zalo.errors.zaloInvalidScope'));
+    expect(classApi.getClasses).not.toHaveBeenCalled(); expect(zaloApi.management).not.toHaveBeenCalled();
+  });
+  it('keeps the reused Zalo panel read only when opened from an overview', async () => {
+    vi.mocked(zaloApi.management).mockResolvedValue(base);
+    mount(<ZaloManagementPanel target={classTarget} canManage={false} />);
+    await screen.findByText(i18n.t('classVisibility.readOnlyHint'));
+    expect(screen.queryByRole('button', { name: i18n.t('zalo.edit') })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: i18n.t('zalo.delete') })).not.toBeInTheDocument();
+  });
   it('accepts only canonical safe Zalo group URLs', () => {
     expect(isZaloInvite(' https://zalo.me/g/abc123 ')).toBe(true);
     for (const value of ['javascript:alert(1)', 'https://zalo.me.evil.test/g/abc', 'http://zalo.me/g/abc', 'https://zalo.me/g/abc?x=y']) expect(isZaloInvite(value)).toBe(false);

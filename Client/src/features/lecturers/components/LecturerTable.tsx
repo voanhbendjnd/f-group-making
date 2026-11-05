@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { Mail, CheckCircle2, Clock, Trash2, Shield } from 'lucide-react';
 import type { Lecturer } from '../types';
 import { useTranslation } from 'react-i18next';
 
@@ -10,6 +10,7 @@ export interface LecturerTableProps {
   onToggleSelectAll: () => void;
   onSendActivation: (lecturer: Lecturer) => void;
   onDelete: (lecturer: Lecturer) => void;
+  onEditRole?: (lecturer: Lecturer) => void;
   isSendingActivation?: boolean;
   getCooldown?: (userId: number) => number;
 }
@@ -21,6 +22,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
   onToggleSelectAll,
   onSendActivation,
   onDelete,
+  onEditRole,
   isSendingActivation,
   getCooldown,
 }) => {
@@ -48,6 +50,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
             <th>{t('addLecturer.code')}</th>
             <th>{t('addLecturer.email')}</th>
             <th>{t('students.colFullName')}</th>
+            <th>{t('facultyRole.label')}</th>
             <th>{t('students.colAccountStatus')}</th>
             <th style={{ textAlign: 'right' }}>{t('students.colActions')}</th>
           </tr>
@@ -55,7 +58,7 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
         <tbody>
           {lecturers.length === 0 ? (
             <tr>
-              <td colSpan={7} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--color-text-muted)' }}>
+              <td colSpan={8} style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--color-text-muted)' }}>
                 {t('adminUx.noLecturers')}
               </td>
             </tr>
@@ -76,6 +79,9 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                   <td style={{ fontWeight: 600, color: 'var(--color-text-main)' }}>{lecturer.code}</td>
                   <td>{lecturer.email}</td>
                   <td>{lecturer.name || '-'}</td>
+                  <td><span className={`badge ${lecturer.authorities?.includes('ROLE_LECTURE_MASTER') ? 'badge-info' : 'badge-neutral'}`}>
+                    {t(lecturer.authorities?.includes('ROLE_LECTURE_MASTER') ? 'lecturer.masterRole' : 'lecturer.role')}
+                  </span></td>
                   <td>
                     {lecturer.activated ? (
                       <span
@@ -97,6 +103,11 @@ export const LecturerTable: React.FC<LecturerTableProps> = ({
                   </td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}>
+                      {onEditRole && !lecturer.authorities?.some(role => role === 'ROLE_ADMIN' || role === 'ROLE_STUDENT') && <button
+                        type="button" className="btn btn-secondary btn-sm" disabled={isSendingActivation}
+                        aria-label={`${t('facultyRole.edit')}: ${lecturer.code}`} onClick={() => onEditRole(lecturer)}>
+                        <Shield size={14} /> {t('facultyRole.edit')}
+                      </button>}
                       {!lecturer.activated && (() => {
                         const cooldown = getCooldown ? getCooldown(lecturer.userId) : 0;
                         if (cooldown > 0) {

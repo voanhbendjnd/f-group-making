@@ -69,6 +69,22 @@ public class DeadlineService {
         this.termService = termService;
     }
 
+    @Transactional(readOnly = true)
+    public DeadlineDTO findGroupingSession(Integer classId, Integer termId) {
+        SchoolClass schoolClass = schoolClassRepository.findById(classId)
+            .orElseThrow(() -> new DataResourceNotFoundException("Class not found", "schoolClass", "classNotFound"));
+        schoolClassAccessService.requireReadAccess(schoolClass);
+        termService.validateTerm(termId);
+        if (termId != null && !Objects.equals(schoolClass.getTermId(), termId)) {
+            throw new BadRequestResourceException("Class does not belong to selected term", "schoolClass", "classNotInTerm");
+        }
+        List<Deadline> sessions = deadlineRepository.findAllBySchoolClassId(classId);
+        if (sessions.size() > 1) {
+            throw new com.fmaking.web.rest.errors.ConflictAlertException("Select a specific grouping session", "group", "allocationMultipleSessions");
+        }
+        return sessions.isEmpty() ? null : toDTO(sessions.getFirst());
+    }
+
     public DeadlineDTO ensureGroupingSession(Integer classId, Integer termId) {
         SchoolClass schoolClass = schoolClassRepository.findByIdForUpdate(classId)
             .orElseThrow(() -> new DataResourceNotFoundException("Class not found", "schoolClass", "classNotFound"));
@@ -270,6 +286,11 @@ public class DeadlineService {
 
     @Transactional(readOnly = true)
     public Page<DeadlineDTO> getDeadlines(Pageable pageable, Integer termId) {
+        return getDeadlines(pageable, termId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DeadlineDTO> getDeadlines(Pageable pageable, Integer termId, ClassViewScope requestedScope) {
         termService.validateTerm(termId);
         org.springframework.data.jpa.domain.Specification<Deadline> scope = (root, query, cb) -> {
             if (termId == null) return cb.conjunction();
@@ -280,14 +301,17 @@ public class DeadlineService {
             classes.select(schoolClass.get("id")).where(cb.equal(schoolClass.get("id"), appliedClass.get("id")), cb.equal(schoolClass.get("termId"), termId));
             return cb.exists(classes);
         };
-        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
-            return deadlineRepository.findAll(scope, pageable).map(this::toDTO);
-        } else if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+                || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
                 || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
-            Long currentLecturerId = schoolClassAccessService.currentLecturerId();
+            ClassViewScope viewScope = schoolClassAccessService.resolveViewScope(requestedScope == null
+                && !SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN) ? ClassViewScope.MINE : requestedScope);
+            if (viewScope == ClassViewScope.ALL) return deadlineRepository.findAll(scope, pageable).map(this::toDTO);
             return deadlineRepository.findAll(scope.and((root, query, cb) -> {
                 query.distinct(true);
-                return cb.equal(root.join("schoolClasses").get("lecturerId"), currentLecturerId);
+                var schoolClass = root.join("schoolClasses");
+                return cb.and(schoolClassAccessService.assignmentPredicate(schoolClass.get("lecturerId"), viewScope, cb),
+                    termId == null ? cb.conjunction() : cb.equal(schoolClass.get("termId"), termId));
             }), pageable).map(this::toDTO);
         } else if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.STUDENT)) {
             Long currentUserId = getCurrentUserId();
@@ -312,7 +336,7 @@ public class DeadlineService {
         Deadline deadline = deadlineRepository.findByIdWithClasses(id)
                 .orElseThrow(() -> new DataResourceNotFoundException("Deadline not found", "deadline", "notFound"));
 
-        if (!SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)) {
+        if (!schoolClassAccessService.canViewAllClasses()) {
             if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)
                     || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
                 Long currentLecturerId = schoolClassAccessService.currentLecturerId();

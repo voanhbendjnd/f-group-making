@@ -14,9 +14,10 @@ interface DeadlineTableProps {
   onEdit?: (deadline: Deadline) => void;
   onCancel?: (deadline: Deadline) => void;
   canManage?: boolean;
+  allowReadOnlyGroups?: boolean;
 }
 
-export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true }: DeadlineTableProps) {
+export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true, allowReadOnlyGroups = false }: DeadlineTableProps) {
   const { t, i18n } = useTranslation();
   const now = useDeadlineBoundary(deadlines);
   const locale = i18n.language === 'en' ? 'en-US' : 'vi-VN';
@@ -34,7 +35,9 @@ export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true }:
         <tbody>{deadlines.map(deadline => {
           const view = deadlinePresentation(deadline, now);
           return <tr key={deadline.id}>
-            <td className="deadline-list-name">{deadline.name}</td>
+            <td className="deadline-list-name">{deadline.name}
+              {canManage && deadline.canEdit === false && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}
+            </td>
             <td data-label={t('deadline.table.status')}>
               {view.mixedStatus ? <span className="badge badge-neutral">{t('deadlineScope.mixed')}</span>
                 : <DeadlineStatusBadge status={view.status} />}
@@ -57,6 +60,6 @@ export function DeadlineTable({ deadlines, onEdit, onCancel, canManage = true }:
       </table>
     </div>
     {selected && <DeadlineDetailModal key={selected.id} deadline={selected} onClose={() => setSelected(null)}
-      onEdit={onEdit} onCancel={onCancel} canManage={canManage} />}
+      onEdit={onEdit} onCancel={onCancel} canManage={canManage} allowReadOnlyGroups={allowReadOnlyGroups} />}
   </>;
 }

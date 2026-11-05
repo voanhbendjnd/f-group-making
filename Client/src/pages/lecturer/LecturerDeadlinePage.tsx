@@ -17,9 +17,21 @@ import { CreateDeadlineModal } from '@/features/deadline/components/CreateDeadli
 import { ExtendDeadlineModal } from '@/features/deadline/components/ExtendDeadlineModal';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import type { Deadline } from '@/features/deadline/types';
+import { useAuth } from '@/app/providers/AuthContext';
+import { useTerm } from '@/app/providers/TermContext';
+import { TermScope } from '@/features/terms/components/TermScope';
+import { ClassScopeFilter, useClassScope } from '@/features/classes/components/ClassScopeFilter';
 
 export const LecturerDeadlinePage: React.FC = () => {
+  const { selectedTermId } = useTerm();
+  return <TermScope><LecturerDeadlineContent key={selectedTermId} /></TermScope>;
+};
+
+function LecturerDeadlineContent() {
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { selectedTermId } = useTerm();
+  const { viewAll, classScope, setClassScope, scopeParams } = useClassScope();
   const toast = useToast();
   const queries = useQueryClient();
   const [page, setPage] = useState(1);
@@ -36,14 +48,19 @@ export const LecturerDeadlinePage: React.FC = () => {
     error,
     refetch,
   } = useQuery({
-    queryKey: ['lecturer-deadlines', page, pageSize],
-    queryFn: ({ signal }) => deadlineApi.getDeadlines({ page, size: pageSize }, signal),
+    queryKey: ['lecturer-deadlines', user?.id, selectedTermId, classScope, page, pageSize],
+    queryFn: ({ signal }) => deadlineApi.getDeadlines({ page, size: pageSize, termId: selectedTermId!, ...scopeParams }, signal),
   });
 
   // Fetch lecturer's assigned classes
   const { data: myClassesData } = useQuery({
-    queryKey: ['lecturer-my-classes-for-deadline'],
-    queryFn: () => classApi.getMyClasses({ page: 1, size: 100 }),
+    queryKey: ['lecturer-my-classes-for-deadline', user?.id, selectedTermId],
+    queryFn: async ({ signal }) => {
+      const first = await classApi.getMyClasses({ page: 1, size: 100, termId: selectedTermId! }, signal);
+      const result = [...first.result];
+      for (let page = 2; page <= first.meta.pages; page++) result.push(...(await classApi.getMyClasses({ page, size: 100, termId: selectedTermId! }, signal)).result);
+      return { ...first, result };
+    },
   });
 
   const availableClasses = (myClassesData?.result || []).map((c) => ({
@@ -106,6 +123,8 @@ export const LecturerDeadlinePage: React.FC = () => {
         }
       />
 
+      {viewAll && <ClassScopeFilter value={classScope} onChange={scope => { setClassScope(scope); setPage(1); }} />}
+
       <div className="card lecturer-card">
         {isLoading ? (
           <div style={{ padding: '3rem', textAlign: 'center' }}>
@@ -136,6 +155,7 @@ export const LecturerDeadlinePage: React.FC = () => {
               onEdit={(d) => setEditingDeadline(d)}
               onCancel={handleCancel}
               canManage={true}
+              allowReadOnlyGroups={viewAll}
             />
             {meta.pages > 1 && (
               <div style={{ padding: '1rem', borderTop: '1px solid var(--color-border)' }}>
@@ -168,4 +188,4 @@ export const LecturerDeadlinePage: React.FC = () => {
       />
     </div>
   );
-};
+}

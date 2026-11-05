@@ -12,10 +12,13 @@ import { groupApi } from '../api/groupApi';
 import type { GroupDTO, GroupMemberDTO, LecturerCreateGroupRequest, WorkspaceDTO } from '../types/groupTypes';
 import { useGroupWebSocket } from './useGroupWebSocket';
 import { useUnsavedChanges } from '@/app/providers/NavigationGuard';
+import { canManageClassRules, canViewAllClasses } from '@/features/auth/utils/roleRouting';
 
 export class AmbiguousGroupSessionError extends Error {
   constructor() { super('Multiple grouping sessions'); }
 }
+
+export class NoGroupSessionError extends Error {}
 
 export function useGroupBoard(classId: number | null, requestedDeadline: number | null, termId: number | null) {
   const { t } = useTranslation();
@@ -39,6 +42,13 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
         matches.push(...next.result.filter(d => d.schoolClassIds.includes(classId!)));
       }
       if (matches.length > 1) throw new AmbiguousGroupSessionError();
+      if (!matches.length && canViewAllClasses(user?.authorities ?? []) && !user?.authorities.includes('ROLE_ADMIN')) {
+        // Recheck the individual class without creating a session on a read-only visit.
+        const existing = await classApi.getGroupingSession(classId!, termId ?? undefined, signal);
+        if (existing) return existing.id;
+        const schoolClass = await classApi.getClassById(classId!, signal);
+        if (!canManageClassRules(user, schoolClass.lecturerId)) throw { status: 403, message: t('departmentOverview.teachingOnly'), errorKey: 'teachingClassOnly' };
+      }
       return matches[0]?.id ?? (await classApi.ensureGroupingSession(classId!, termId ?? undefined, signal)).id;
     }, retry: false,
   });
@@ -91,7 +101,12 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
 
   const workspace = useQuery({
     queryKey,
-    queryFn: ({ signal }) => groupApi.getWorkspace(deadlineId!, classId!, signal),
+    queryFn: async ({ signal }) => {
+      const data = await groupApi.getWorkspace(deadlineId!, classId!, signal);
+      if (user?.authorities.includes('ROLE_LECTURE_MASTER') && !user.authorities.includes('ROLE_ADMIN') && data.lecturerId !== user.id)
+        throw { status: 403, message: t('departmentOverview.teachingOnly'), errorKey: 'teachingClassOnly' };
+      return data;
+    },
     enabled: !!classId && !!deadlineId,
     retry: false,
     // RealtimeProvider handles events, reconnects and offline fallback polling.
@@ -101,7 +116,9 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     refetchOnReconnect: false,
   });
 
-  const canManage = !!workspace.data?.canManageGroups;
+  const teachingScopeDenied = !!workspace.data && !!user?.authorities?.includes('ROLE_LECTURE_MASTER')
+    && !user.authorities.includes('ROLE_ADMIN') && workspace.data.lecturerId !== user.id;
+  const canManage = !teachingScopeDenied && !!workspace.data?.canManageGroups;
   const canUnlock = canManage && (user?.authorities.includes('ROLE_ADMIN') || user?.id === workspace.data?.lecturerId);
   const editable = useCallback(
     (group: GroupDTO) => canManage && ['OPEN', 'REVOKED'].includes(group.status),
@@ -226,5 +243,5 @@ export function useGroupBoard(classId: number | null, requestedDeadline: number 
     );
   }, [client, editable, run]);
 
-  return { workspace, session, deadlineId, connection, canManage, canUnlock, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup };
+  return { workspace, session, deadlineId, connection, canManage, canUnlock, teachingScopeDenied, editable, pending, isBusy, beginDrag, endDrag, run, move, createGroup };
 }

@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/app/providers/AuthContext';
 
 export interface RoleRouteProps {
-  requiredRole: 'ROLE_ADMIN' | 'ROLE_STUDENT' | 'ROLE_LECTURE';
+  requiredRole: 'ROLE_ADMIN' | 'ROLE_STUDENT' | 'ROLE_LECTURE' | 'ROLE_LECTURE_MASTER';
   children: React.ReactElement;
 }
 
@@ -28,6 +28,10 @@ export const RoleRoute: React.FC<RoleRouteProps> = ({ requiredRole, children }) 
   }
 
   if (requiredRole === 'ROLE_LECTURE' && !isLecturer && !isAdmin) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (requiredRole === 'ROLE_LECTURE_MASTER' && !isAdmin && !user.authorities?.includes('ROLE_LECTURE_MASTER')) {
     return <Navigate to="/unauthorized" replace />;
   }
 

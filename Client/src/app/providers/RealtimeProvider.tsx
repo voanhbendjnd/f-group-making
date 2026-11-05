@@ -12,6 +12,7 @@ type Entry = { listeners: Set<Listener>; subscription?: StompSubscription };
 
 export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isAdmin, isLecturer, isStudent } = useAuth();
+  const isDepartmentHead = user?.authorities?.includes('ROLE_LECTURE_MASTER') ?? false;
   const accountId = user?.id;
   const clientQueries = useQueryClient();
   const profile = useStudentProfile(isStudent && !isAdmin && !isLecturer);
@@ -105,9 +106,10 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (!accountId) return;
     if (isAdmin) return subscribe('/topic/admin/deadlines');
+    if (isDepartmentHead) return subscribe('/topic/staff/deadlines');
     if (isLecturer) return subscribe('/user/queue/deadlines');
     if (classId) return subscribe(`/topic/classes/${classId}/deadlines`);
-  }, [accountId, isAdmin, isLecturer, classId, subscribe]);
+  }, [accountId, isAdmin, isLecturer, isDepartmentHead, classId, subscribe]);
 
   useEffect(() => {
     if (!accountId) return;

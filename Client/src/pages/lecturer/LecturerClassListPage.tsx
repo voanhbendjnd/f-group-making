@@ -15,7 +15,7 @@ import { classApi } from '@/features/classes/api/classApi';
 import { LecturerClassTable } from '@/features/classes/components/LecturerClassTable';
 import { getApiError } from '@/services/api/types';
 import { useAuth } from '@/app/providers/AuthContext';
-import { canViewAllClasses } from '@/features/auth/utils/roleRouting';
+import { ClassScopeFilter, useClassScope } from '@/features/classes/components/ClassScopeFilter';
 
 export function LecturerClassListPage() {
   return <TermScope><LecturerClassListPageContent /></TermScope>;
@@ -25,12 +25,12 @@ function LecturerClassListPageContent() {
   const { selectedTermId } = useTerm();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const allClasses = canViewAllClasses(user?.authorities || []);
+  const { viewAll: allClasses, classScope, setClassScope, scopeParams } = useClassScope();
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({ page: 1, size: 10, search: '' });
   const query = useQuery({
-    queryKey: [allClasses ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, filters],
-    queryFn: ({ signal }) => allClasses ? classApi.getClasses({ ...filters, termId: selectedTermId! }, signal) : classApi.getMyClasses({ ...filters, termId: selectedTermId! }, signal),
+    queryKey: [allClasses ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, filters, classScope],
+    queryFn: ({ signal }) => allClasses ? classApi.getClasses({ ...filters, ...scopeParams, termId: selectedTermId! }, signal) : classApi.getMyClasses({ ...filters, termId: selectedTermId! }, signal),
     retry: (count, error) => count < 1 && ![401, 403].includes(getApiError(error).status),
   });
   const error = getApiError(query.error);
@@ -38,6 +38,9 @@ function LecturerClassListPageContent() {
   return <div className="space-y-6 lecturer-page">
     <PageHeader title={t('lecturer.classesAndRules')}
       description={t(allClasses ? 'lecturer.allListDescription' : 'lecturer.listDescription')} />
+    {allClasses && <ClassScopeFilter value={classScope} onChange={scope => {
+      setClassScope(scope); setFilters(previous => ({ ...previous, page: 1 }));
+    }} />}
     <form className="card lecturer-card lecturer-search" onSubmit={event => {
       event.preventDefault(); setFilters(previous => ({ ...previous, search: searchInput.trim(), page: 1 }));
     }}>

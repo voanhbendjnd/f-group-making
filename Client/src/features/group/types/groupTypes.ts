@@ -137,9 +137,9 @@ export interface GroupRealtimeEvent {
 
 export interface GroupReviewRow {
   group: GroupDTO; className: string; submittedAt: string | null; deadlineStatus: string;
-  eligible: boolean; canReview: boolean; canReopen: boolean;
+  eligible: boolean; canReview: boolean; canReopen: boolean; readOnly?: boolean;
 }
-export interface GroupReviewParams { termId: number; classId?: number; status?: GroupStatus; search?: string; page: number; size: number; }
+export interface GroupReviewParams { termId: number; classId?: number; classScope?: import('@/features/classes/types').ClassViewScope; status?: GroupStatus; search?: string; page: number; size: number; }
 export interface GroupReviewPage { result: GroupReviewRow[]; meta: { page: number; pageSize: number; pages: number; total: number }; }
 
 export type GroupInvitationStatus = 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CANCELLED';

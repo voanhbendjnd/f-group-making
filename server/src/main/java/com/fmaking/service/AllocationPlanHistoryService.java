@@ -74,7 +74,8 @@ public class AllocationPlanHistoryService {
         Status status = row.getAppliedAt() != null ? Status.APPLIED : reason != null ? Status.INVALID : Status.UNAPPLIED;
         return new Summary(row.getId(), row.getOwnerId(), actor == null ? null : actor.getName(), row.getCreatedAt(), row.getAppliedAt(),
             row.getTargetCount(), row.getSeed(), saved == null ? null : saved.report().studentsAfter(), status, saved != null,
-            status == Status.UNAPPLIED && Objects.equals(row.getOwnerId(), access.currentLecturerId()), status == Status.INVALID ? reason : null);
+            status == Status.UNAPPLIED && current != null && access.canWrite(current.scope().lecturerId())
+                && Objects.equals(row.getOwnerId(), access.currentLecturerId()), status == Status.INVALID ? reason : null);
     }
 
     private AllocationPreviewDTO.Overview currentOverview(Integer deadlineId, Integer classId) {

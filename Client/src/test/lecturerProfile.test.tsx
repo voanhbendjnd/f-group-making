@@ -68,11 +68,12 @@ describe('Lecturer Profile', () => {
     expect(screen.getByText(i18n.t('lecturerProfile.incomplete'))).toBeInTheDocument();
   });
 
-  it('prioritizes group review, puts classes last and hides the lecturer profile menu', async () => {
+  it('prioritizes group review, includes Zalo and opens the lecturer profile from the footer', async () => {
     const closed = vi.fn();
     mount(<><Sidebar area="lecturer" onClose={closed} /><Routes><Route path="/lecturer/profile" element={<LecturerProfilePage />} /></Routes></>);
     expect(screen.getAllByRole('link').map(link => link.textContent)).toEqual([
       i18n.t('groupReview.title'), i18n.t('nav.lecturerDeadlines'), i18n.t('allocation.title'), i18n.t('lecturer.classesAndRules'),
+      i18n.t('zalo.title'),
     ]);
     expect(screen.queryByRole('link', { name: i18n.t('studentProfile.title') })).not.toBeInTheDocument();
     const footer = screen.getByRole('button', { name: i18n.t('studentProfile.open') }); footer.focus(); expect(footer).toHaveFocus();

@@ -15,6 +15,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { LecturerFilterBar } from '@/features/lecturers/components/LecturerFilterBar';
 import { LecturerTable } from '@/features/lecturers/components/LecturerTable';
 import { CreateLecturerModal } from '@/features/lecturers/components/CreateLecturerModal';
+import { EditLecturerRoleModal } from '@/features/lecturers/components/EditLecturerRoleModal';
 import { lecturerApi } from '@/features/lecturers/api/lecturerApi';
 import { getApiError } from '@/services/api/types';
 import { useToast } from '@/app/providers/ToastContext';
@@ -56,6 +57,8 @@ function LecturerListContent({ global, scope }: { global: boolean; scope: ReactN
   const client = useQueryClient();
   const [filters, setFilters] = useListFilters<LecturerFilterParams>({ page: 1, size: 10, search: '' }, termId);
   const [selected, setSelected] = useState<Record<number, Lecturer>>({});
+  const [editingRole, setEditingRole] = useState<Lecturer | null>(null);
+  const { success } = useToast();
   const [targets, setTargets] = useState<{ kind: 'activate' | 'delete'; records: Lecturer[] } | null>(null);
   const [pending, setPending] = useState(false);
   const busy = useRef(false);
@@ -131,10 +134,17 @@ function LecturerListContent({ global, scope }: { global: boolean; scope: ReactN
         actionText={t('students.clearFilters')} onAction={() => { setFilters({ page: 1, size: 10, search: '' }); setSelected({}); }} />
       : <section className="card"><LecturerTable lecturers={lecturers} selectedUserIds={records.map(item => item.userId)}
         onToggleSelect={toggle} onToggleSelectAll={selectPage} onSendActivation={item => open('activate', [item])}
-        onDelete={item => open('delete', [item])} isSendingActivation={pending} getCooldown={cooldown} />
+        onDelete={item => open('delete', [item])} onEditRole={setEditingRole} isSendingActivation={pending} getCooldown={cooldown} />
         <Pagination meta={meta} currentPage={filters.page} showingKey="adminUx.showingLecturers" onPageChange={page => setFilters(previous => ({ ...previous, page }))}
           onPageSizeChange={size => { setFilters(previous => ({ ...previous, size, page: 1 })); setSelected({}); }} />
       </section>}
+    {editingRole && <EditLecturerRoleModal key={editingRole.userId} lecturer={editingRole} onClose={() => {
+      setEditingRole(null); void client.invalidateQueries({ queryKey: ['lecturers'] });
+    }} onSaved={() => {
+      setEditingRole(null); setSelected({}); success(t('facultyRole.saved'));
+      void client.invalidateQueries({ queryKey: ['lecturers'] });
+      void client.invalidateQueries({ queryKey: ['zalo-lecturer-options'] });
+    }} />}
     {targets && <ConfirmDialog open isDanger={targets.kind === 'delete'} isLoading={pending}
       confirmDisabled={unknown || (targets.kind === 'activate' && !eligible(targets.records).length)}
       title={t(targets.kind === 'delete' ? 'adminUx.deleteAccount' : 'adminUx.confirmLecturerActivation')}

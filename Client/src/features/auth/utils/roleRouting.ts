@@ -19,6 +19,7 @@ export function getHomeRoute(authorities: string[]): string {
 }
 
 export function canAccessPath(path: string, authorities: string[]): boolean {
+  if (path.startsWith('/lecturer/department-overview')) return canViewAllClasses(authorities);
   if (path.startsWith('/admin/')) return authorities.includes('ROLE_ADMIN');
   if (path.startsWith('/lecturer/')) return canViewAllClasses(authorities) || authorities.includes('ROLE_LECTURE');
   if (path.startsWith('/student/')) {

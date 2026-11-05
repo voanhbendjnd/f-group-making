@@ -52,6 +52,8 @@ describe('Lecturer navigation and guards', () => {
   });
 
   it('keeps role precedence and rejects unknown roles', () => {
+    expect(canAccessPath('/lecturer/department-overview', ['ROLE_LECTURE'])).toBe(false);
+    expect(canAccessPath('/lecturer/department-overview/classes/12', ['ROLE_LECTURE_MASTER'])).toBe(true);
     expect(getHomeRoute(['ROLE_ADMIN', 'ROLE_LECTURE'])).toBe('/admin/dashboard');
     expect(getHomeRoute(['ROLE_LECTURE'])).toBe('/lecturer/group-review');
     expect(getHomeRoute(['ROLE_STUDENT'])).toBe('/student/dashboard');
@@ -61,5 +63,16 @@ describe('Lecturer navigation and guards', () => {
     expect(canAccessPath('/lecturer/classes/12', ['ROLE_LECTURE_MASTER'])).toBe(true);
     expect(canAccessPath('/lecturer/classes/12', ['ROLE_ADMIN'])).toBe(true);
     expect(canAccessPath('/admin/classes', ['ROLE_LECTURE_MASTER'])).toBe(false);
+  });
+
+  it('only admits heads and admins to the new overview route', () => {
+    render(<MemoryRouter initialEntries={['/overview']}><Routes>
+      <Route path="/overview" element={<RoleRoute requiredRole="ROLE_LECTURE_MASTER"><p>Overview</p></RoleRoute>} />
+      <Route path="/unauthorized" element={<p>Access denied</p>} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByText('Access denied')).toBeInTheDocument(); cleanup();
+    state.user.authorities = ['ROLE_LECTURE_MASTER'];
+    render(<MemoryRouter><RoleRoute requiredRole="ROLE_LECTURE_MASTER"><p>Overview</p></RoleRoute></MemoryRouter>);
+    expect(screen.getByText('Overview')).toBeInTheDocument();
   });
 });

@@ -51,6 +51,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     List<User> findByIdIn(List<Long> userIds);
 
+    @EntityGraph(attributePaths = {"authorities"})
+    List<User> findWithAuthoritiesByIdIn(List<Long> userIds);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id = :userId")
+    Optional<User> findByIdForUpdate(@Param("userId") Long userId);
+
+    @Query("select a.name from User u join u.authorities a where u.id = :userId")
+    java.util.Set<String> findAuthorityNamesById(@Param("userId") Long userId);
+
     List<User> findByEmailIn(List<String> emails);
 
     @Query("select u from User u where lower(u.email) in :emails")

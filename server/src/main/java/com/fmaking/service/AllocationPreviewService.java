@@ -79,6 +79,7 @@ public class AllocationPreviewService {
         if (request == null || request.targetGroupCount() == null || request.targetGroupCount() < 1)
             throw new BadRequestAlertException("Positive target required", "allocation", "invalidAllocationTarget");
         Loaded loaded = load(deadlineId, classId);
+        access.requireWriteAccess(classes.findById(classId).orElseThrow());
         long seed = seed(request.seed());
         Overview before = overview(loaded);
         requireAllocationNeeded(before);
@@ -140,8 +141,7 @@ public class AllocationPreviewService {
             throw new BadRequestAlertException("Invalid class/session", "allocation", "invalidAllocationScope");
         SchoolClass schoolClass = classes.findById(classId)
             .orElseThrow(() -> new NotFoundAlertException("Class not found", "schoolClass", "classNotFound"));
-        // Allocation is a management tool: Master has no additional access to another lecturer's class.
-        access.requireWriteAccess(schoolClass);
+        access.requireReadAccess(schoolClass);
         Deadline deadline = deadlines.findById(deadlineId)
             .orElseThrow(() -> new NotFoundAlertException("Deadline not found", "deadline", "ERR_DEADLINE_NOT_FOUND"));
         if (deadlines.countByDeadlineIdAndClassId(deadlineId, classId) != 1)

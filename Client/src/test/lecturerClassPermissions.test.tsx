@@ -39,6 +39,7 @@ function renderPage(detail = false) {
     <TermProvider><TermSelect compact /><Routes>
       <Route path="/lecturer/classes" element={<LecturerClassListPage />} />
       <Route path="/lecturer/classes/:id" element={<LecturerClassDetailPage />} />
+      <Route path="/lecturer/department-overview/classes/:id" element={<h1>Department class overview</h1>} />
     </Routes></TermProvider>
   </MemoryRouter></QueryClientProvider>);
 }
@@ -62,7 +63,7 @@ afterEach(() => { cleanup(); clients.splice(0).forEach(client => client.clear())
 describe('Class permissions in lecturer pages', () => {
   it.each(['ROLE_LECTURE', 'ROLE_LECTURE_MASTER'])('changes term and resets pagination without stale classes for %s', async role => {
     auth.user.authorities = [role];
-    const api = role === 'ROLE_LECTURE' ? classApi.getMyClasses : classApi.getClasses;
+    const api = classApi.getMyClasses;
     vi.mocked(api).mockImplementation(async params => ({
       result: params?.termId === 2 ? [] : [ownClass],
       meta: { page: params?.page || 1, pageSize: 10, pages: 2, total: params?.termId === 2 ? 0 : 12 },
@@ -70,7 +71,7 @@ describe('Class permissions in lecturer pages', () => {
     renderPage(); await screen.findByText('Owned class');
     fireEvent.click(screen.getByRole('button', { name: '2', exact: true }));
     await waitFor(() => expect(api).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 1, page: 2 }), expect.any(AbortSignal)));
-    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByRole('combobox', { name: i18n.t('terms.label') }));
     fireEvent.click(screen.getByRole('option', { name: 'SP26' }));
     await waitFor(() => expect(api).toHaveBeenLastCalledWith(expect.objectContaining({ termId: 2, page: 1 }), expect.any(AbortSignal)));
     expect(screen.queryByText('Owned class')).not.toBeInTheDocument();
@@ -80,7 +81,7 @@ describe('Class permissions in lecturer pages', () => {
   it('does not load students or rules for a class outside the selected term', async () => {
     renderPage(true); await screen.findByRole('heading', { name: i18n.t('lecturer.classTitle', { name: 'Other class' }) });
     await waitFor(() => expect(classApi.getClassStudents).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('combobox'));
+    fireEvent.click(screen.getByRole('combobox', { name: i18n.t('terms.label') }));
     fireEvent.click(screen.getByRole('option', { name: 'SP26' }));
     await screen.findByText(i18n.t('terms.classOutsideTerm'));
     expect(screen.queryByText('Other class')).not.toBeInTheDocument();
@@ -96,23 +97,28 @@ describe('Class permissions in lecturer pages', () => {
     expect(classApi.getClasses).not.toHaveBeenCalled();
   });
 
-  it.each(['ROLE_LECTURE_MASTER', 'ROLE_ADMIN'])('loads all classes for %s', async role => {
-    auth.user.authorities = [role];
-    renderPage();
-    await screen.findByText('Other class');
-    expect(screen.getByRole('heading', { name: i18n.t('lecturer.classesAndRules') })).toBeInTheDocument();
+  it('keeps a department head teaching class list assigned only', async () => {
+    auth.user.authorities = ['ROLE_LECTURE_MASTER'];
+    renderPage(); await screen.findByText('Owned class');
+    expect(screen.queryByText('Other class')).not.toBeInTheDocument();
+    expect(classApi.getMyClasses).toHaveBeenCalledTimes(1);
+    expect(classApi.getClasses).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(i18n.t('classVisibility.scope'))).not.toBeInTheDocument();
+  });
+
+  it('continues to load all classes for an administrator', async () => {
+    auth.user.authorities = ['ROLE_ADMIN'];
+    renderPage(); await screen.findByText('Other class');
     expect(classApi.getClasses).toHaveBeenCalledTimes(1);
     expect(classApi.getMyClasses).not.toHaveBeenCalled();
   });
 
-  it('gives a department head read-only access to another lecturer’s class', async () => {
+  it('redirects a head foreign class bookmark to the separate overview', async () => {
     auth.user.authorities = ['ROLE_LECTURE_MASTER'];
     renderPage(true);
-    fireEvent.click(await screen.findByRole('button', { name: 'Xem quy định nhóm' }));
-    await screen.findByText(/Bạn có quyền xem lớp này/);
-    expect(screen.queryByRole('button', { name: 'Lưu quy định' })).not.toBeInTheDocument();
-    screen.getAllByRole('spinbutton').forEach(input => expect(input).toHaveAttribute('readonly'));
-    expect(ruleApi.saveRules).not.toHaveBeenCalled();
+    await screen.findByRole('heading', { name: 'Department class overview' });
+    expect(ruleApi.getRules).not.toHaveBeenCalled();
+    expect(classApi.getClassStudents).not.toHaveBeenCalled();
   });
 
   it('allows a department head to manage a class assigned to them', async () => {
