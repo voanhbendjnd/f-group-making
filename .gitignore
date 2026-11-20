@@ -38,3 +38,6 @@ target/
 **/*.rs.bk
 *.pdb
 **/*.pdb
+
+# Deliverables and video production assets
+deliverables/
