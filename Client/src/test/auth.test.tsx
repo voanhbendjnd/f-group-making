@@ -11,6 +11,8 @@ import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
 import { ActivateAccountPage } from '../pages/activation/ActivateAccountPage';
 import { authApi } from '../features/auth/api/authApi';
 import { activationApi } from '../features/activation/api/activationApi';
+import { apiClient } from '../services/api/client';
+import { storage } from '../utils/storage';
 import i18n from '../locales/i18n';
 
 beforeEach(async () => { localStorage.clear(); sessionStorage.clear(); await i18n.changeLanguage('vi'); });
@@ -161,5 +163,116 @@ describe('redesigned login integration', () => {
     cleanup(); loginPage('/activate');
     expect(await screen.findByText(i18n.t('activation.missingKeyError'))).toBeInTheDocument();
     expect(document.querySelector('.login-page')).toBeNull();
+  });
+  it('notifies user that account was logged in on another device and logs out when concurrent login occurs', async () => {
+    localStorage.setItem('f_group_auth_token', 'device-a-token');
+    localStorage.setItem('f_group_user', JSON.stringify({ id: 1, email: 'student@example.test', authorities: ['ROLE_STUDENT'] }));
+    loginPage('/student/dashboard');
+
+    expect(await screen.findByRole('heading', { name: 'Student destination' })).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent('app:unauthorized', {
+          detail: {
+            code: 'SESSION_TERMINATED_CONCURRENT_LOGIN',
+            message: i18n.t('auth.sessionConcurrentLogin'),
+          },
+        })
+      );
+    });
+
+    expect(await screen.findByText(i18n.t('auth.sessionConcurrentLogin'))).toBeInTheDocument();
+    expect(screen.queryByText(/Email hoặc Password không đúng/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Email hoặc mật khẩu không chính xác/i)).not.toBeInTheDocument();
+    expect(localStorage.getItem('f_group_auth_token')).toBeNull();
+  });
+
+  it('strips authorization header on /login request even when stale token is in storage', async () => {
+    storage.setToken('stale-device-a-token');
+    const interceptor = (apiClient.interceptors.request as any).handlers[0]?.fulfilled;
+    const config = await interceptor({
+      url: '/api/login',
+      headers: { Authorization: 'Bearer stale-device-a-token' },
+    });
+
+    expect(config.headers.Authorization).toBeUndefined();
+  });
+
+  it('does not invalidate new session when a stale in-flight request returns 401', async () => {
+    storage.setToken('new-active-token');
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+
+    const responseErrInterceptor = (apiClient.interceptors.response as any).handlers[0]?.rejected;
+    const stale401Error = {
+      response: {
+        status: 401,
+        data: {
+          code: 'SESSION_TERMINATED_CONCURRENT_LOGIN',
+          errorKey: 'sessionConcurrentLogin',
+          message: 'Tài khoản đã được đăng nhập trên thiết bị khác',
+        },
+      },
+      config: {
+        url: '/api/terms',
+        headers: {
+          Authorization: 'Bearer old-stale-token',
+        },
+      },
+    };
+
+    try {
+      await responseErrInterceptor(stale401Error);
+    } catch {
+      // Expected rejection
+    }
+
+    // New active token should NOT be wiped
+    expect(storage.getToken()).toBe('new-active-token');
+    // app:unauthorized should NOT be dispatched for the stale session
+    expect(dispatchSpy).not.toHaveBeenCalled();
+  });
+
+  it('correctly extracts sessionId from JWT token via parseJwtSessionId', async () => {
+    const { parseJwtSessionId } = await import('../utils/jwt');
+    const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+    const payload = btoa(JSON.stringify({ sub: 'user@example.test', sessionId: 'sess-abc-123' }));
+    const dummyJwt = `${header}.${payload}.dummy-signature`;
+
+    expect(parseJwtSessionId(dummyJwt)).toBe('sess-abc-123');
+    expect(parseJwtSessionId(null)).toBeNull();
+    expect(parseJwtSessionId('invalid-token')).toBeNull();
+  });
+
+  it('clears user session when token is removed in another tab via storage event', async () => {
+    const { useAuth } = await import('../app/providers/AuthContext');
+    const TestConsumer = () => {
+      const { user, isAuthenticated } = useAuth();
+      return <div>{isAuthenticated ? `Logged in as ${user?.email}` : 'Logged out'}</div>;
+    };
+
+    storage.setToken('valid-token');
+    storage.setUser({ id: 1, email: 'student@example.test', name: 'Student', authorities: ['ROLE_STUDENT'] });
+
+    render(
+      <ToastProvider>
+        <AuthProvider>
+          <TestConsumer />
+        </AuthProvider>
+      </ToastProvider>
+    );
+    expect(screen.getByText('Logged in as student@example.test')).toBeInTheDocument();
+
+    await act(async () => {
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: 'f_group_auth_token',
+          oldValue: 'valid-token',
+          newValue: null,
+        })
+      );
+    });
+
+    expect(screen.getByText('Logged out')).toBeInTheDocument();
   });
 });

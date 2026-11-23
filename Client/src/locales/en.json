@@ -698,6 +698,7 @@
     "emailInvalid": "Invalid email address format",
     "passwordRequired": "Please enter your password",
     "passwordMinLength": "Password must be at least 4 characters",
+    "sessionConcurrentLogin": "Your account has been logged in on another device.",
     "loginFailed": "Login failed. Please verify your email and password."
   },
   "forgotPassword": {
@@ -1047,6 +1048,7 @@
     "excelOnlyXlsx": "Only .xlsx files are supported.",
     "fileEmpty": "The selected file must not be empty.",
     "unauthorized": "Invalid credentials or session has expired.",
+    "sessionConcurrentLogin": "Your account has been logged in on another device.",
     "accessDenied": "You do not have permission to perform this action.",
     "badCredentials": "Incorrect email or password. Please try again.",
     "userExists": "This email is already in use by another account.",

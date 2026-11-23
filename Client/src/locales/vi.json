@@ -698,6 +698,7 @@
     "emailInvalid": "Địa chỉ email không đúng định dạng",
     "passwordRequired": "Vui lòng nhập mật khẩu",
     "passwordMinLength": "Mật khẩu tối thiểu 4 ký tự",
+    "sessionConcurrentLogin": "Tài khoản đã được đăng nhập trên thiết bị khác.",
     "loginFailed": "Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu."
   },
   "forgotPassword": {
@@ -1047,6 +1048,7 @@
     "excelOnlyXlsx": "Hệ thống chỉ hỗ trợ định dạng tệp Excel .xlsx.",
     "fileEmpty": "Tệp Excel đã chọn bị rỗng.",
     "unauthorized": "Thông tin đăng nhập không chính xác hoặc phiên làm việc đã hết hạn.",
+    "sessionConcurrentLogin": "Tài khoản đã được đăng nhập trên thiết bị khác.",
     "accessDenied": "Bạn không có quyền thực hiện thao tác này.",
     "badCredentials": "Email hoặc mật khẩu không chính xác. Vui lòng kiểm tra lại.",
     "userExists": "Email này đã được sử dụng cho một tài khoản khác.",

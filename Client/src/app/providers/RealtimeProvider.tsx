@@ -6,6 +6,8 @@ import { useAuth } from './AuthContext';
 import { storage } from '@/utils/storage';
 import { useStudentProfile } from '@/features/students/hooks/useStudentProfile';
 import { syncDeadlineQueries, type RealtimeEvent } from '@/features/deadline/realtime';
+import { parseJwtSessionId } from '@/utils/jwt';
+import i18n from '@/locales/i18n';
 import { RealtimeContext, type WebSocketStatus, type RealtimeListener as Listener } from './realtimeContext';
 
 type Entry = { listeners: Set<Listener>; subscription?: StompSubscription };
@@ -26,7 +28,33 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const attach = useCallback((topic: string, entry: Entry, client: Client) => {
     entry.subscription = client.subscribe(topic, frame => {
       try {
-        const event: RealtimeEvent = JSON.parse(frame.body);
+        const event: any = JSON.parse(frame.body);
+
+        // Realtime session invalidation check
+        if (
+          event?.eventType === 'SESSION_TERMINATED_CONCURRENT_LOGIN' ||
+          event?.code === 'SESSION_TERMINATED_CONCURRENT_LOGIN' ||
+          event?.errorKey === 'sessionConcurrentLogin'
+        ) {
+          const currentToken = storage.getToken();
+          const currentSessionId = parseJwtSessionId(currentToken);
+          if (event.activeSessionId && currentSessionId && currentSessionId === event.activeSessionId) {
+            return; // Ignore on the newly active session/device
+          }
+          storage.clearAll();
+          window.dispatchEvent(
+            new CustomEvent('app:unauthorized', {
+              detail: {
+                code: 'SESSION_TERMINATED_CONCURRENT_LOGIN',
+                errorKey: 'sessionConcurrentLogin',
+                message: event.message || i18n.t('auth.sessionConcurrentLogin', 'Tài khoản đã được đăng nhập trên thiết bị khác.'),
+              },
+            })
+          );
+          for (const value of entries.current.values()) value.listeners.forEach(listener => listener(event));
+          return;
+        }
+
         const classShareChanged = event.eventType === 'ZALO_SHARE_UPDATED'
           && Number.isSafeInteger(event.schoolClassId) && Number(event.schoolClassId) > 0;
         if (!event.eventType || (!event.deadlineId && !classShareChanged)) return;
@@ -105,10 +133,17 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     if (!accountId) return;
-    if (isAdmin) return subscribe('/topic/admin/deadlines');
-    if (isDepartmentHead) return subscribe('/topic/staff/deadlines');
-    if (isLecturer) return subscribe('/user/queue/deadlines');
-    if (classId) return subscribe(`/topic/classes/${classId}/deadlines`);
+    const sessionUnsub = subscribe('/user/queue/session');
+    let roleUnsub: (() => void) | undefined;
+    if (isAdmin) roleUnsub = subscribe('/topic/admin/deadlines');
+    else if (isDepartmentHead) roleUnsub = subscribe('/topic/staff/deadlines');
+    else if (isLecturer) roleUnsub = subscribe('/user/queue/deadlines');
+    else if (classId) roleUnsub = subscribe(`/topic/classes/${classId}/deadlines`);
+
+    return () => {
+      sessionUnsub?.();
+      roleUnsub?.();
+    };
   }, [accountId, isAdmin, isLecturer, isDepartmentHead, classId, subscribe]);
 
   useEffect(() => {

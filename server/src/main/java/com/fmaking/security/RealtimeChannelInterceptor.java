@@ -63,6 +63,8 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
                 if (!admin && !master) throw denied();
             } else if ("/user/queue/deadlines".equals(destination)) {
                 if (!admin && !master && !lecturer) throw denied();
+            } else if ("/user/queue/session".equals(destination)) {
+                // Any authenticated user can subscribe to their session invalidation queue
             } else {
                 var match = CLASS_TOPIC.matcher(destination == null ? "" : destination);
                 if (!match.matches()) throw denied();
@@ -91,6 +93,10 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
     public Message<?> authorizeOutbound(Message<?> message) {
         if (org.springframework.messaging.simp.SimpMessageHeaderAccessor.getMessageType(message.getHeaders())
                 != org.springframework.messaging.simp.SimpMessageType.MESSAGE) return message;
+        String destination = org.springframework.messaging.simp.SimpMessageHeaderAccessor.getDestination(message.getHeaders());
+        if (destination != null && (destination.contains("/queue/session") || destination.contains("/user/queue/session"))) {
+            return message;
+        }
         String sessionId = org.springframework.messaging.simp.SimpMessageHeaderAccessor.getSessionId(message.getHeaders());
         var authentication = sessionId == null ? null : sessions.get(sessionId);
         if (authentication == null) return null;

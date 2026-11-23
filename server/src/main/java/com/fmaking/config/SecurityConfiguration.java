@@ -64,6 +64,28 @@ public class SecurityConfiguration {
     }
 
 
+    public static final List<String> PUBLIC_ENDPOINTS = List.of(
+            "/api/register",
+            "/api/login",
+            "/api/account/activate",
+            "/api/account/activate/verify",
+            "/api/account/activate/request",
+            "/refresh",
+            "/account/activate/**",
+            "/api/account/reset-password/init",
+            "/api/account/reset-password/finish",
+            "/api/account/reset-password/verify",
+            "/account/reset-password/**",
+            "/files/**",
+            "/error",
+            "/storage/**",
+            "/api/v1/search/**",
+            "/ws/**",
+            "/api/v1/files/**",
+            "/api/v1/payments/vnpay-ipn",
+            "/api/v1/payments/vnpay-return"
+    );
+
     @Bean
     public SecurityFilterChain filterChain(
             HttpSecurity http,
@@ -82,20 +104,6 @@ public class SecurityConfiguration {
                 "/api/v1/payments/vnpay-ipn",
                 "/api/v1/payments/vnpay-return"
         };
-        // handle for case api public but request including token wrong or expire
-        List<String> publicEndpoints = List.of(
-                "/api/register",
-                "/api/login",
-                "/api/account/activate",
-                "/api/account/activate/verify",
-                "/api/account/activate/request",
-                "/refresh",
-                "/account/activate/**",
-                "/api/account/reset-password/init",
-                "/api/account/reset-password/finish",
-                "/api/account/reset-password/verify",
-                "/account/reset-password/**",
-                "/files/**");
         http.cors(cors -> cors.configurationSource(corsConfig))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(
@@ -118,7 +126,7 @@ public class SecurityConfiguration {
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(
                                         jwtAuthenticationConverter
                                 )
-                                .decoder(new GuestAwareJwtDecoder(baseJwtDecoder, request, publicEndpoints)))
+                                .decoder(new GuestAwareJwtDecoder(baseJwtDecoder, request, PUBLIC_ENDPOINTS)))
                         .authenticationEntryPoint(smartAuthenticationEntryPoint)
                 ).formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED));

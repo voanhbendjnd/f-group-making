@@ -18,10 +18,24 @@ export const apiClient: AxiosInstance = axios.create({
 // Request interceptor: Attach JWT Bearer token and Accept-Language header
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
-    const token = storage.getToken();
+    const isAuthEndpoint =
+      config.url?.includes('/login') ||
+      config.url?.includes('/register') ||
+      config.url?.includes('/account/activate') ||
+      config.url?.includes('/account/reset-password');
+
     if (config.headers) {
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (isAuthEndpoint) {
+        if (typeof config.headers.delete === 'function') {
+          config.headers.delete('Authorization');
+        } else {
+          delete (config.headers as Record<string, any>).Authorization;
+        }
+      } else {
+        const token = storage.getToken();
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
+        }
       }
       config.headers['Accept-Language'] = i18n.language || 'vi';
     }
@@ -59,11 +73,33 @@ apiClient.interceptors.response.use(
 
     // If 401 Unauthorized, notify application if needed
     if (status === 401) {
-      const isAuthEndpoint = error.config?.url?.includes('/login') || error.config?.url?.includes('/activate');
+      const isAuthEndpoint =
+        error.config?.url?.includes('/login') ||
+        error.config?.url?.includes('/register') ||
+        error.config?.url?.includes('/activate');
+
       if (!isAuthEndpoint) {
+        const authHeader = (error.config?.headers?.Authorization as string) || '';
+        const requestToken = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : null;
+        const currentToken = storage.getToken();
+
+        // If the request was made with a token different from the currently active token,
+        // it is a stale in-flight response from a previous session and should not invalidate the new session.
+        if (requestToken && currentToken && requestToken !== currentToken) {
+          return Promise.reject(apiError);
+        }
+
         // Session expired on protected route
         storage.clearAll();
-        window.dispatchEvent(new CustomEvent('app:unauthorized', { detail: { message: friendlyMessage } }));
+        window.dispatchEvent(
+          new CustomEvent('app:unauthorized', {
+            detail: {
+              message: friendlyMessage,
+              code: data?.code,
+              errorKey: data?.errorKey,
+            },
+          })
+        );
       }
     }
 
