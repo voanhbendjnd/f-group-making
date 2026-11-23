@@ -1,25 +1,88 @@
 <!doctype html>
-<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}" lang="en">
-
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
 <head>
-    <title th:text="#{email.activation.title}">F Group Making activation</title>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <link rel="icon" th:href="@{|${baseUrl}/favicon.ico|}" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title th:text="#{email.activation.title}">Kích hoạt tài khoản F-Group Making</title>
 </head>
+<body style="margin:0; padding:0; background-color:#f1f5f9; color:#0f172a; font-family:Arial,Helvetica,sans-serif; -webkit-text-size-adjust:100%;">
+<div style="display:none; max-height:0; overflow:hidden; opacity:0;">Chào mừng bạn đến với F-Group Making. Vui lòng kích hoạt tài khoản để bắt đầu sử dụng.</div>
+<th:block th:with="url=${activationUrl != null ? activationUrl : (baseUrl + '/account/activate?key=' + user.activationKey)}">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9; table-layout:fixed;">
+    <tr><td align="center" style="padding:32px 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px; table-layout:fixed;">
+            <tr><td style="padding:0 8px 20px;">
+                <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+                    <td width="40" height="40" align="center" style="border-radius:12px; background-color:#2563eb; color:#ffffff; font-size:22px; font-weight:bold;">F</td>
+                    <td style="padding-left:12px;"><strong style="font-size:17px;">F-Group Making</strong><br /><span style="font-size:12px; color:#64748b;">Kết nối thành viên, cùng nhau tạo giá trị</span></td>
+                </tr></table>
+            </td></tr>
+            <tr><td style="border:1px solid #e2e8f0; border-radius:16px; background-color:#ffffff; overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="table-layout:fixed;">
+                    <tr><td height="5" style="height:5px; background-color:#2563eb;"></td></tr>
+                    <tr><td style="padding:28px 24px;">
+                        <span style="display:inline-block; padding:6px 10px; border-radius:6px; font-size:11px; font-weight:bold; letter-spacing:0.5px; color:#2563eb; background-color:#dbeafe;">KÍCH HOẠT TÀI KHOẢN</span>
+                        <h1 style="margin:16px 0; font-size:24px; line-height:1.35; letter-spacing:-0.5px;">Kích hoạt tài khoản của bạn</h1>
+                        <p style="margin:0 0 12px; font-size:14px; line-height:1.7;">Xin chào <strong th:text="${user.name != null and !user.name.isBlank() ? user.name : user.email}">bạn</strong>,</p>
+                        <p style="margin:0 0 20px; color:#475569; font-size:14px; line-height:1.7;">
+                            Tài khoản của bạn trên hệ thống <strong>F-Group Making</strong> đã được tạo thành công. Vui lòng nhấn vào nút bên dưới để kích hoạt tài khoản và thiết lập mật khẩu đăng nhập.
+                        </p>
 
-<body>
-<p th:text="#{email.activation.greeting(${user.email})}">Dear</p>
-<p th:text="#{email.activation.text1}">Your F Group Making account has been created, please click on the URL below to
-    activate it:</p>
-<p>
-    <a th:href="@{|${baseUrl}/account/activate?key=${user.activationKey}|}"
-       th:text="@{|${baseUrl}/account/activate?key=${user.activationKey}|}">Activation link</a>
-</p>
-<p>
-    <span th:text="#{email.activation.text2}">Regards, </span>
-    <br />
-    <em th:text="#{email.signature}">F Group Making team.</em>
-</p>
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; font-size:13px; line-height:1.6; table-layout:fixed; margin-bottom:24px;">
+                            <tr>
+                                <td style="padding:14px 16px 4px; color:#64748b; width:130px; vertical-align:top;">Email tài khoản</td>
+                                <td th:text="${user.email}" style="padding:14px 16px 4px 0; font-weight:bold; overflow-wrap:anywhere; word-break:break-word;">user@example.com</td>
+                            </tr>
+                            <tr th:if="${user.name != null and !user.name.isBlank() and user.name != user.email}">
+                                <td style="padding:4px 16px 4px; color:#64748b; vertical-align:top;">Tên hiển thị</td>
+                                <td th:text="${user.name}" style="padding:4px 16px 4px 0;">Nguyễn Văn A</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:4px 16px 14px; color:#64748b; vertical-align:top;">Trạng thái</td>
+                                <td style="padding:4px 16px 14px 0; color:#2563eb; font-weight:bold;">Chờ kích hoạt</td>
+                            </tr>
+                        </table>
+
+                        <!-- Action Button -->
+                        <table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px auto 20px;">
+                            <tr>
+                                <td align="center" style="background-color:#2563eb; border-radius:8px;">
+                                    <a th:href="${url}"
+                                       style="display:inline-block; padding:13px 32px; color:#ffffff; text-decoration:none; font-size:15px; font-weight:bold; border-radius:8px; line-height:1.2; text-align:center;">
+                                        Kích hoạt tài khoản
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+
+                        <!-- Fallback URL Copy Box -->
+                        <div style="margin-top:24px; padding:14px 16px; background-color:#f8fafc; border:1px dashed #cbd5e1; border-radius:10px;">
+                            <p style="margin:0 0 6px; font-size:12px; line-height:1.6; color:#64748b; font-weight:bold;">
+                                Nếu không thể nhấp vào nút trên, bạn có thể sao chép liên kết sau vào trình duyệt:
+                            </p>
+                            <div style="background-color:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:10px 12px; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:12px; line-height:1.6; color:#0f172a; word-break:break-all; user-select:all; -webkit-user-select:all;">
+                                <a th:href="${url}" th:text="${url}" style="color:#2563eb; text-decoration:none; word-break:break-all;">https://...</a>
+                            </div>
+                        </div>
+
+                        <hr style="border:none; border-top:1px solid #e2e8f0; margin:24px 0;" />
+                        <p style="font-size:13px; color:#64748b; margin:0 0 8px; line-height:1.6;">
+                            <em>Lưu ý: Liên kết kích hoạt này dành riêng cho tài khoản của bạn. Vui lòng không chia sẻ liên kết này cho người khác. Nếu bạn không yêu cầu tạo tài khoản này, bạn có thể an tâm bỏ qua email.</em>
+                        </p>
+                        <p style="font-size:13px; color:#64748b; margin-top:16px; line-height:1.6;">
+                            Trân trọng,<br />
+                            <strong>F-Group Making Team</strong>
+                        </p>
+                    </td></tr>
+                </table>
+            </td></tr>
+            <tr><td align="center" style="padding:20px 12px 0; font-size:11px; color:#64748b; line-height:1.8;">
+                Đây là email tự động từ F-Group Making. Vui lòng không trả lời email này.<br />
+                Hệ thống hỗ trợ quản lý và phân nhóm sinh viên hiệu quả.
+            </td></tr>
+        </table>
+    </td></tr>
+</table>
+</th:block>
 </body>
-
 </html>
