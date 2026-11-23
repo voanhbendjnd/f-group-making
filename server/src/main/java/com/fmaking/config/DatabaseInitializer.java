@@ -53,9 +53,16 @@ public class DatabaseInitializer implements CommandLineRunner {
                 Authority auth = new Authority();
                 auth.setName(roleName);
                 authorityRepository.save(auth);
-                authorities.add(auth);
             }
         }
+
+        Authority adminAuthority = authorityRepository.findById(AuthoritiesConstants.ADMIN)
+                .orElseGet(() -> {
+                    Authority auth = new Authority();
+                    auth.setName(AuthoritiesConstants.ADMIN);
+                    return authorityRepository.save(auth);
+                });
+        Set<Authority> adminAuthorities = Set.of(adminAuthority);
 
         if (totalUsers.equals(0L)) {
             log.info("Start create user...");
@@ -64,21 +71,21 @@ public class DatabaseInitializer implements CommandLineRunner {
             admin.setActivated(true);
             admin.setEmail("hoangtlt.ce190272@gmail.com");
             admin.setPassword(passwordEncoder.encode("admin@123"));
-            admin.setAuthorities(authorities);
+            admin.setAuthorities(adminAuthorities);
             userRepository.save(admin);
             User admin2 = new User();
             admin2.setName("Djnd");
             admin2.setActivated(true);
             admin2.setEmail("benva.ce190709@gmail.com");
             admin2.setPassword(passwordEncoder.encode("123123"));
-            admin2.setAuthorities(authorities);
+            admin2.setAuthorities(adminAuthorities);
             userRepository.save(admin2);
             User admin3 = new User();
             admin3.setName("Trang");
             admin3.setActivated(true);
             admin3.setEmail("trangtttce191027@gmail.com");
             admin3.setPassword(passwordEncoder.encode("123123"));
-            admin3.setAuthorities(authorities);
+            admin3.setAuthorities(adminAuthorities);
             userRepository.save(admin3);
         }
 

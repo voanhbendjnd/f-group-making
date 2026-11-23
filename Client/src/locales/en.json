@@ -1324,7 +1324,8 @@
     "required": "This field is required.",
     "invalid": {
       "code": "Lecturer code must contain 2–50 characters.",
-      "email": "Enter a valid email of at most 254 characters."
+      "codePattern": "Lecturer code must have no accents and no spaces. Example: trangtt12 (valid), trântt12 (invalid).",
+      "email": "Enter a valid unaccented email of at most 254 characters."
     },
     "duplicateCode": "This lecturer code already exists (including different letter casing).",
     "duplicateEmail": "This email is already used by another account.",

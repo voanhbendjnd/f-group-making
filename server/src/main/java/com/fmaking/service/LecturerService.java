@@ -38,6 +38,7 @@ public class LecturerService {
 
     private static final long MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024L; // 5 MB
     private static final String XLSX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    private static final Pattern CODE_PATTERN = Pattern.compile("^[A-Za-z0-9_.-]+$");
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
 
     private final LecturerRepository lecturerRepository;
@@ -105,8 +106,12 @@ public class LecturerService {
         if (!errors.isEmpty()) {
             Map<String, String> conflicts = findCreationConflicts(request).stream()
                     .collect(Collectors.toMap(Violation::getField, Violation::getMessage));
-            List<Violation> violations = errors.stream().map(error -> new Violation(error.getField(),
-                    conflicts.getOrDefault(error.getField(), "lecturerCreate.invalid." + error.getField()))).toList();
+            List<Violation> violations = errors.stream().map(error -> {
+                String defaultMsg = error.getMessage().contains("trangtt12")
+                        ? "lecturerCreate.invalid.codePattern"
+                        : "lecturerCreate.invalid." + error.getField();
+                return new Violation(error.getField(), conflicts.getOrDefault(error.getField(), defaultMsg));
+            }).toList();
             boolean duplicatesOnly = violations.stream().allMatch(value -> value.getMessage().startsWith("lecturerCreate.duplicate"));
             throw new ConstraintViolationProblem(duplicatesOnly ? Status.CONFLICT : Status.BAD_REQUEST, violations);
         }
@@ -428,6 +433,12 @@ public class LecturerService {
                         .row(row.getRowIndex())
                         .field("code")
                         .message("Lecturer / Mentor code must be between 2 and 50 characters.")
+                        .build());
+            } else if (!CODE_PATTERN.matcher(row.getCode()).matches()) {
+                errors.add(ImportRowErrorDTO.builder()
+                        .row(row.getRowIndex())
+                        .field("code")
+                        .message("Lecturer code must have no accents and no spaces. Example: trangtt12 (valid), trântt12 (invalid).")
                         .build());
             } else {
                 String normalizedCode = row.getCode().toLowerCase(Locale.ROOT);

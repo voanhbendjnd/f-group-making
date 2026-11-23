@@ -1324,7 +1324,8 @@
     "required": "Vui lòng nhập trường này.",
     "invalid": {
       "code": "Mã giảng viên phải có từ 2–50 ký tự.",
-      "email": "Nhập email hợp lệ, tối đa 254 ký tự."
+      "codePattern": "Mã giảng viên không dấu, không khoảng trắng. Ví dụ: trangtt12 (đúng), trântt12 (sai).",
+      "email": "Nhập email hợp lệ không dấu, tối đa 254 ký tự."
     },
     "duplicateCode": "Mã giảng viên đã tồn tại (không phân biệt chữ hoa/thường).",
     "duplicateEmail": "Email đã được sử dụng bởi tài khoản khác.",

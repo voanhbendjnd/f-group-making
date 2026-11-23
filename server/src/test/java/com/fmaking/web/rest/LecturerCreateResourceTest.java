@@ -83,9 +83,20 @@ class LecturerCreateResourceTest {
         List<Map<String,Object>> invalid = List.of(Map.of(), Map.of("code", "GV"), Map.of("email", "a@example.test"),
                 Map.of("code", " ", "email", " "), Map.of("code", "A", "email", "a@example.test"),
                 Map.of("code", "A".repeat(51), "email", "a@example.test"), Map.of("code", "GV", "email", "invalid"),
-                Map.of("code", "GV", "email", "a".repeat(245) + "@example.test"), Map.of("code", "GV", "email", "a@b"));
+                Map.of("code", "GV", "email", "a".repeat(245) + "@example.test"), Map.of("code", "GV", "email", "a@b"),
+                Map.of("code", "trântt", "email", "valid@example.test"),
+                Map.of("code", "GV Đỗ", "email", "valid@example.test"),
+                Map.of("code", "GV-12", "email", "trântt@example.test"));
         for (var body : invalid) create(body).andExpect(status().isBadRequest());
         assertThat(users.count()).isEqualTo(before);
+    }
+
+    @Test void acceptsValidUnaccentedCodesAndEmails() throws Exception {
+        String code = "trangttt12", email = "trangttt12@example.test";
+        create(Map.of("code", code, "email", email))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.code").value(code))
+                .andExpect(jsonPath("$.data.email").value(email));
     }
 
     @Test void reportsBothDuplicatesIncludingCaseVariantsAndEmailFromANonLecturer() throws Exception {
