@@ -96,7 +96,7 @@ describe('group review', () => {
     mount(); await screen.findByText('Review fixture');
     expect(screen.queryByRole('button', { name: i18n.t('groupBoard.open') })).not.toBeInTheDocument();
     expect(screen.queryByText(i18n.t('groupBoard.chooseClass'))).not.toBeInTheDocument();
-    expect(screen.getByText(i18n.t('groupReview.selectClassPrompt'))).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: i18n.t('groupReview.selectedClassHeading') })).not.toBeInTheDocument();
   });
 
   it('discards class and search filters from another term', async () => {
