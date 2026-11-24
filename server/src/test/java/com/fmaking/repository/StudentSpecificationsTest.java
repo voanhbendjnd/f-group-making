@@ -13,6 +13,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.transaction.annotation.Transactional;
 import com.fmaking.domain.Student;
 import com.fmaking.domain.User;
+import com.fmaking.domain.SchoolClass;
 import com.fmaking.service.projection.StudentRow;
 
 import java.time.Instant;
@@ -45,6 +46,9 @@ class StudentSpecificationsTest {
 
     @Autowired
     private MajorRepository majorRepository;
+
+    @Autowired
+    private SchoolClassRepository schoolClassRepository;
 
     private Student student1;
     private Student student2;
@@ -299,5 +303,40 @@ class StudentSpecificationsTest {
         assertThat(row.rollNumber()).isEqualTo("SE10001");
         assertThat(row.email()).isEqualTo("active.student@fpt.edu.vn");
         assertThat(row.activated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Should correctly return className when student is assigned to a class, and null when not")
+    void testClassNameMapping() {
+        SchoolClass sc = new SchoolClass();
+        sc.setName("EXE101_G08");
+        sc = schoolClassRepository.save(sc);
+
+        student1.setSchoolClassId(sc.getId());
+        studentRepository.save(student1);
+
+        Optional<StudentRow> optWithClass = studentRepository.findStudentProjectionById(student1.getUserId());
+        assertThat(optWithClass).isPresent();
+        assertThat(optWithClass.get().schoolClassId()).isEqualTo(sc.getId());
+        assertThat(optWithClass.get().schoolClassName()).isEqualTo("EXE101_G08");
+
+        Optional<StudentRow> optWithoutClass = studentRepository.findStudentProjectionById(student2.getUserId());
+        assertThat(optWithoutClass).isPresent();
+        assertThat(optWithoutClass.get().schoolClassId()).isNull();
+        assertThat(optWithoutClass.get().schoolClassName()).isNull();
+
+        Specification<Student> spec = StudentSpecifications.withFilter(null, null, null, null);
+        Page<StudentRow> page = studentQueryRepository.search(spec, PageRequest.of(0, 10));
+        StudentRow searchedWithClass = page.getContent().stream()
+                .filter(r -> r.userId().equals(student1.getUserId()))
+                .findFirst().orElseThrow();
+        assertThat(searchedWithClass.schoolClassId()).isEqualTo(sc.getId());
+        assertThat(searchedWithClass.schoolClassName()).isEqualTo("EXE101_G08");
+
+        StudentRow searchedWithoutClass = page.getContent().stream()
+                .filter(r -> r.userId().equals(student2.getUserId()))
+                .findFirst().orElseThrow();
+        assertThat(searchedWithoutClass.schoolClassId()).isNull();
+        assertThat(searchedWithoutClass.schoolClassName()).isNull();
     }
 }

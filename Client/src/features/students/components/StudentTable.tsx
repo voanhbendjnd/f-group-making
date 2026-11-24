@@ -52,7 +52,6 @@ export const StudentTable: React.FC<StudentTableProps> = ({
             <th>{t('students.colEmail')}</th>
             <th>{t('students.colMajor')}</th>
             <th>{t('classes.className')}</th>
-            <th>{t('students.colMemberCode')}</th>
             <th>{t('students.colAccountStatus')}</th>
             <th style={{ textAlign: 'right', paddingRight: '1.25rem' }}>{t('students.colActions')}</th>
           </tr>
@@ -92,14 +91,11 @@ export const StudentTable: React.FC<StudentTableProps> = ({
                       fontWeight: 600,
                     }}
                   >
-                    {student.majorCode || 'N/A'}{student.majorName && student.majorName !== student.majorCode && ` — ${student.majorName}`}
+                    {student.majorCode || 'N/A'}
                   </span>
                 </td>
 
-                <td>{student.groupName || '—'}</td>
-                <td style={{ color: 'var(--color-text-subtle)', fontSize: '0.8125rem' }}>
-                  {student.memberCode}
-                </td>
+                <td>{student.className || student.groupName || '—'}</td>
 
                 <td>
                   <StatusBadge

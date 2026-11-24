@@ -467,13 +467,13 @@ export async function fetchMultipleClassesAllocationData(
   classesList: Array<{
     id: number;
     name: string;
-    lecturerCode?: string;
-    termId?: number;
-    termName?: string;
+    lecturerCode?: string | null;
+    termId?: number | null;
+    termName?: string | null;
   }>,
   options: {
-    termId?: number;
-    termName?: string;
+    termId?: number | null;
+    termName?: string | null;
     onProgress?: (completed: number, total: number, currentClassName: string) => void;
   } = {}
 ): Promise<ClassExportBundle[]> {
@@ -481,7 +481,7 @@ export async function fetchMultipleClassesAllocationData(
 
   // Map lưu classId -> deadlineId sau khi quét deadline của học kỳ
   const deadlineMap = new Map<number, number>();
-  const termId = options.termId ?? classesList[0]?.termId;
+  const termId = (options.termId ?? classesList[0]?.termId) ?? undefined;
 
   try {
     const deadlines = await deadlineApi.getDeadlines({
@@ -512,9 +512,9 @@ export async function fetchMultipleClassesAllocationData(
     options.onProgress?.(completed, classesList.length, cls.name);
     const deadlineId = deadlineMap.get(cls.id);
     const { rows, meta } = await fetchClassAllocationData(cls.id, {
-      termId: options.termId ?? cls.termId,
-      termName: options.termName ?? cls.termName,
-      lecturerCode: cls.lecturerCode,
+      termId: (options.termId ?? cls.termId) ?? undefined,
+      termName: (options.termName ?? cls.termName) ?? undefined,
+      lecturerCode: cls.lecturerCode ?? undefined,
       className: cls.name,
       deadlineId,
     });

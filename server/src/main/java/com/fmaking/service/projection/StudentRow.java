@@ -18,13 +18,23 @@ public record StudentRow(
         Instant lastModifiedDate,
         String selfDescription,
         String cohort,
-        String slotType
+        String slotType,
+        Integer schoolClassId,
+        String schoolClassName
 ) {
+    public StudentRow(Long userId, String rollNumber, String fullName, String email, String memberCode,
+                      Integer majorId, String majorCode, String majorName, Boolean activated, String activationKey,
+                      Instant activationKeyExpiresAt, Instant createdDate, Instant lastModifiedDate,
+                      String selfDescription, String cohort, String slotType) {
+        this(userId, rollNumber, fullName, email, memberCode, majorId, majorCode, majorName, activated,
+                activationKey, activationKeyExpiresAt, createdDate, lastModifiedDate, selfDescription, cohort, slotType, null, null);
+    }
+
     public StudentRow(Long userId, String rollNumber, String fullName, String email, String memberCode,
                       Integer majorId, String majorCode, String majorName, Boolean activated, String activationKey,
                       Instant activationKeyExpiresAt, Instant createdDate, Instant lastModifiedDate, String selfDescription) {
         this(userId, rollNumber, fullName, email, memberCode, majorId, majorCode, majorName, activated,
-                activationKey, activationKeyExpiresAt, createdDate, lastModifiedDate, selfDescription, null, null);
+                activationKey, activationKeyExpiresAt, createdDate, lastModifiedDate, selfDescription, null, null, null, null);
     }
 
     public StudentRow(
@@ -56,6 +66,10 @@ public record StudentRow(
                 activationKeyExpiresAt,
                 createdDate,
                 lastModifiedDate,
+                null,
+                null,
+                null,
+                null,
                 null
         );
     }

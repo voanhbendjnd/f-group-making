@@ -32,11 +32,12 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
         select new com.fmaking.service.projection.StudentRow(
             s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, m.code, m.name,
             u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate,
-            s.selfDescription, s.cohort, s.slotType
+            s.selfDescription, s.cohort, s.slotType, s.schoolClassId, sc.name
         )
         from Student s
         join User u on s.userId = u.id
         left join Major m on s.majorId = m.id
+        left join SchoolClass sc on s.schoolClassId = sc.id
         where s.userId = :userId
     """)
     Optional<StudentRow> findStudentProjectionById(@Param("userId") Long userId);
@@ -45,11 +46,12 @@ public interface StudentRepository extends JpaRepository<Student, Long>, JpaSpec
         select new com.fmaking.service.projection.StudentRow(
             s.userId, s.rollNumber, s.fullName, u.email, s.memberCode, s.majorId, m.code, m.name,
             u.activated, u.activationKey, u.activationKeyExpiresAt, u.createdDate, u.lastModifiedDate,
-            s.selfDescription, s.cohort, s.slotType
+            s.selfDescription, s.cohort, s.slotType, s.schoolClassId, sc.name
         )
         from Student s
         join User u on s.userId = u.id
         left join Major m on s.majorId = m.id
+        left join SchoolClass sc on s.schoolClassId = sc.id
         where s.schoolClassId = :classId
         order by s.rollNumber asc
     """)

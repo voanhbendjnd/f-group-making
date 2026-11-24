@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from './AuthContext';
 import { storage } from '@/utils/storage';
 import { useStudentProfile } from '@/features/students/hooks/useStudentProfile';
-import { syncDeadlineQueries, type RealtimeEvent } from '@/features/deadline/realtime';
+import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { parseJwtSessionId } from '@/utils/jwt';
 import i18n from '@/locales/i18n';
 import { RealtimeContext, type WebSocketStatus, type RealtimeListener as Listener } from './realtimeContext';

@@ -26,10 +26,10 @@ export interface ExportClassItem {
   id: number;
   name: string;
   studentCount?: number;
-  lecturerCode?: string;
-  lecturerName?: string;
-  termId?: number;
-  termName?: string;
+  lecturerCode?: string | null;
+  lecturerName?: string | null;
+  termId?: number | null;
+  termName?: string | null;
 }
 
 export interface MultiClassExportModalProps {

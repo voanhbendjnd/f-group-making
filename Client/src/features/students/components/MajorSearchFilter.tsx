@@ -63,9 +63,10 @@ export function MajorSearchFilter({ filters, onFilterChange, majorOptions }: Pro
 
   return <div style={{ position: 'relative' }}>
     <label className="form-label" htmlFor={id}>{t('students.majorLabel')}</label>
-    <div style={{ display: 'flex', gap: '0.25rem' }}>
+    <div style={{ position: 'relative' }}>
       <input id={id} className="form-control" role="combobox" autoComplete="off"
         placeholder={t('students.majorPlaceholder')} value={input}
+        style={{ paddingRight: input ? '1.75rem' : '0.75rem' }}
         aria-expanded={expanded} aria-controls={expanded ? `${id}-list` : undefined}
         aria-autocomplete="list" aria-activedescendant={expanded && suggestions[activeIndex] ? `${id}-option-${suggestions[activeIndex].id}` : undefined}
         onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
@@ -92,8 +93,24 @@ export function MajorSearchFilter({ filters, onFilterChange, majorOptions }: Pro
             setActiveIndex(-1);
           }
         }} />
-      {input && <button type="button" className="btn btn-ghost btn-sm" aria-label={t('students.clearMajor')}
-        onClick={() => { setInput(''); setFocused(false); setActiveIndex(-1); applyText(''); }}>×</button>}
+      {input && <button type="button" aria-label={t('students.clearMajor')}
+        onClick={() => { setInput(''); setFocused(false); setActiveIndex(-1); applyText(''); }}
+        style={{
+          position: 'absolute',
+          right: '0.5rem',
+          top: '50%',
+          transform: 'translateY(-50%)',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--color-text-subtle)',
+          padding: '2px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: '1rem',
+          lineHeight: 1,
+        }}>×</button>}
     </div>
     {expanded && <div style={{ position: 'absolute', zIndex: 20, left: 0, right: 0, background: 'var(--color-surface, white)',
       border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', boxShadow: '0 4px 12px #0002', maxHeight: 260, overflowY: 'auto' }}>

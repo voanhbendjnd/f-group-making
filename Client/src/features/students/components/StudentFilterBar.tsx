@@ -99,24 +99,24 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
     <div
       className="card"
       style={{
-        padding: '1.25rem',
-        marginBottom: '1.25rem',
+        padding: '0.875rem 1rem',
+        marginBottom: '1rem',
         backgroundColor: '#ffffff',
       }}
     >
       <div className="student-filter-grid">
         {/* Search input */}
         <div className="student-filter-search">
-          <label htmlFor={`${id}-search`} className="form-label" style={{ marginBottom: '0.375rem' }}>
+          <label htmlFor={`${id}-search`} className="form-label">
             {t('students.searchLabel')}
           </label>
           <div style={{ position: 'relative' }}>
             {isLoading ? (
               <Loader2
-                size={18}
+                size={16}
                 style={{
                   position: 'absolute',
-                  left: '0.875rem',
+                  left: '0.75rem',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--color-primary)',
@@ -126,10 +126,10 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
               />
             ) : (
               <Search
-                size={18}
+                size={16}
                 style={{
                   position: 'absolute',
-                  left: '0.875rem',
+                  left: '0.75rem',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   color: 'var(--color-text-subtle)',
@@ -146,8 +146,8 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
               onChange={(e) => setSearchTerm(e.target.value)}
               onKeyDown={handleKeyDown}
               style={{
-                paddingLeft: '2.5rem',
-                paddingRight: searchTerm ? '2.25rem' : '0.875rem',
+                paddingLeft: '2.25rem',
+                paddingRight: searchTerm ? '2rem' : '0.75rem',
               }}
             />
             {searchTerm && (
@@ -156,21 +156,21 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
                 onClick={handleClearSearch}
                 style={{
                   position: 'absolute',
-                  right: '0.625rem',
+                  right: '0.5rem',
                   top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
                   color: 'var(--color-text-subtle)',
-                  padding: '4px',
+                  padding: '2px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
                 aria-label={t('students.clearSearchAria')}
               >
-                <X size={16} />
+                <X size={14} />
               </button>
             )}
           </div>
@@ -180,7 +180,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
 
         {/* Account status filter */}
         <div>
-          <label htmlFor={`${id}-activated`} className="form-label" style={{ marginBottom: '0.375rem' }}>
+          <label htmlFor={`${id}-activated`} className="form-label">
             {t('students.activationStatusLabel')}
           </label>
           <select
@@ -197,7 +197,7 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
 
         {/* Key / Invitation status filter */}
         <div>
-          <label htmlFor={`${id}-key`} className="form-label" style={{ marginBottom: '0.375rem' }}>
+          <label htmlFor={`${id}-key`} className="form-label">
             {t('adminUx.linkStatus')}
           </label>
           <select
@@ -213,8 +213,15 @@ export const StudentFilterBar: React.FC<StudentFilterBarProps> = ({
         </div>
 
         {/* Reset button */}
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <Button type="button" variant="secondary" icon={<X size={16} />} onClick={handleReset}>
+        <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            className="student-filter-reset-btn"
+            icon={<X size={14} />}
+            onClick={handleReset}
+          >
             {t('students.clearFilters')}
           </Button>
         </div>
