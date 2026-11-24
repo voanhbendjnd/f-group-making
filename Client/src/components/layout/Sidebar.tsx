@@ -75,6 +75,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: t('lecturer.role'),
           icon: <UserCheck size={18} />,
         },
+        {
+          to: '/admin/create-admin',
+          label: t('nav.createAdmin', 'Tạo tài khoản Admin'),
+          icon: <ShieldCheck size={18} />,
+        },
         { to: '/admin/majors', label: t('majors.navLabel'), icon: <GraduationCap size={18} />, group: 'adminUx.navigationCatalog' },
       ]
     : isLecturer ? [

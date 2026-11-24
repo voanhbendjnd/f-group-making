@@ -29,6 +29,7 @@ import { StudentImportPage } from '@/pages/admin/StudentImportPage';
 import { MajorListPage } from '@/pages/admin/MajorListPage';
 import { LecturerListPage } from '@/pages/admin/LecturerListPage';
 import { LecturerImportPage } from '@/pages/admin/LecturerImportPage';
+import { CreateAdminPage } from '@/pages/admin/CreateAdminPage';
 import { ClassListPage } from '@/pages/admin/ClassListPage';
 import { ClassDetailPage } from '@/pages/admin/ClassDetailPage';
 import { AdminDeadlinePage } from '@/pages/admin/AdminDeadlinePage';
@@ -136,6 +137,10 @@ export const router = createBrowserRouter([
       {
         path: 'lecturers/import',
         element: <LecturerImportPage />,
+      },
+      {
+        path: 'create-admin',
+        element: <CreateAdminPage />,
       },
       {
         path: 'classes',
