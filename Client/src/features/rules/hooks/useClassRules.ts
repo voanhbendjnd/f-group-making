@@ -15,7 +15,10 @@ export function useClassRules(classId: number) {
   const mutation = useMutation({
     mutationFn: (request: SaveClassRules) => ruleApi.saveRules(classId, request),
     retry: false,
-    onSuccess: data => queryClient.setQueryData(queryKey, data),
+    onSuccess: data => {
+      queryClient.setQueryData(queryKey, data);
+      void queryClient.invalidateQueries({ queryKey: ['allocation'] });
+    },
   });
   return { query, mutation };
 }

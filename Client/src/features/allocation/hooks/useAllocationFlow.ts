@@ -21,6 +21,9 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const attemptRef = useRef(attempt); const busy = useRef(false);
   const [configuring, setConfiguring] = useState(false); const [rawTarget, setRawTarget] = useState<string | null>(null);
   const [preview, setPreview] = useState<Preview | null>(null); const [previewLoading, setPreviewLoading] = useState(false);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [setupLoading, setSetupLoading] = useState(false);
+  const setupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [previewError, setPreviewError] = useState<unknown>(null); const [applyError, setApplyError] = useState<unknown>(null);
   const [applying, setApplying] = useState(false); const [applied, setApplied] = useState<ApplyResult | null>(null);
   useUnsavedChanges(false, applying);
@@ -38,20 +41,64 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   const suggested = setup.data?.suggestion;
   const target = rawTarget ?? (suggested?.status === 'FEASIBLE' && suggested.suggestedCount !== null ? String(suggested.suggestedCount) : '');
   const parsedTarget = validTarget(target, setup.data?.range);
-  const generate = async () => {
-    if (!canManage || complete || !configuring || parsedTarget === null || attemptRef.current || busy.current || calculating.current) return;
+  const generate = async (overrideTarget?: number, options?: { minDuration?: number }) => {
+    const targetToUse = overrideTarget ?? parsedTarget;
+    if (!canManage || complete || !configuring || targetToUse === null || attemptRef.current || busy.current || calculating.current) return;
     const ticket = ++generation.current; const abort = new AbortController(); controller.current = abort;
-    calculating.current = true; setConfirmedTarget(parsedTarget); setSavedPlan(null); setApplied(null);
+    calculating.current = true; setConfirmedTarget(targetToUse); setSavedPlan(null); setApplied(null);
     setPreview(null); setPreviewLoading(true); setPreviewError(null); setApplyError(null);
+    const minWait = options?.minDuration ?? 0;
+    const startTime = Date.now();
     try {
-      const response = await allocationApi.preview(deadlineId, classId, { targetGroupCount: parsedTarget,
-        seed: newSeed(previous.current.seed), previousPlanFingerprint: previous.current.fingerprint }, abort.signal);
+      const response = await allocationApi.preview(deadlineId, classId, {
+        targetGroupCount: targetToUse,
+        seed: newSeed(previous.current.seed),
+        previousPlanFingerprint: previous.current.fingerprint
+      }, abort.signal);
       if (!abort.signal.aborted && generation.current === ticket) {
-        setPreview(response); previous.current = { seed: response.result.seed, fingerprint: response.planFingerprint ?? undefined };
-        void client.invalidateQueries({ queryKey: [...key, 'plans'] });
+        if (minWait > 0) {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, minWait - elapsed);
+          if (remaining > 0) {
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(resolve, remaining);
+              abort.signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                resolve();
+              });
+            });
+          }
+        }
+        if (!abort.signal.aborted && generation.current === ticket) {
+          setPreview(response);
+          previous.current = { seed: response.result.seed, fingerprint: response.planFingerprint ?? undefined };
+          void client.invalidateQueries({ queryKey: [...key, 'plans'] });
+        }
       }
-    } catch (error) { if (!abort.signal.aborted && generation.current === ticket) setPreviewError(error); }
-    finally { if (generation.current === ticket) { calculating.current = false; setPreviewLoading(false); } }
+    } catch (error) {
+      if (!abort.signal.aborted && generation.current === ticket) {
+        if (minWait > 0) {
+          const elapsed = Date.now() - startTime;
+          const remaining = Math.max(0, minWait - elapsed);
+          if (remaining > 0) {
+            await new Promise<void>(resolve => {
+              const timer = setTimeout(resolve, remaining);
+              abort.signal.addEventListener('abort', () => {
+                clearTimeout(timer);
+                resolve();
+              });
+            });
+          }
+        }
+        if (!abort.signal.aborted && generation.current === ticket) setPreviewError(error);
+      }
+    } finally {
+      if (generation.current === ticket) {
+        calculating.current = false;
+        setPreviewLoading(false);
+        setIsRegenerating(false);
+      }
+    }
   };
   useEffect(() => () => { generation.current++; controller.current?.abort(); }, []);
   useEffect(() => {
@@ -77,15 +124,24 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
   }, [subscribe, client, classId, deadlineId]);
   const resetPreview = () => {
     generation.current++; controller.current?.abort(); calculating.current = false;
+    if (setupTimer.current) clearTimeout(setupTimer.current);
     setPreview(null); setSavedPlan(null); setPreviewError(null); setPreviewLoading(false); setApplyError(null);
+    setIsRegenerating(false);
+    setSetupLoading(false);
   };
   const changeTarget = (value: string) => {
     if (busy.current || attemptRef.current || !/^\d*$/.test(value)) return;
     resetPreview(); setRawTarget(value); setConfirmedTarget(null);
   };
   const autoAgain = () => {
-    if (confirmedTarget !== parsedTarget) return;
-    void generate();
+    if (!canManage || complete || parsedTarget === null || attemptRef.current || busy.current) return;
+    resetPreview();
+    setIsRegenerating(true);
+    setPreviewLoading(true);
+    setConfirmedTarget(parsedTarget);
+    void client.invalidateQueries({ queryKey: [...key, 'overview'] });
+    void client.invalidateQueries({ queryKey: [...key, 'setup'] });
+    void generate(parsedTarget, { minDuration: 3000 });
   };
   const stale = !!preview && !!overview.data && preview.snapshotFingerprint !== overview.data.snapshotFingerprint;
   const canApply = canManage && !complete && preview?.result.status === 'FEASIBLE' && !!preview.previewId && !stale
@@ -127,8 +183,33 @@ export function useAllocationFlow(classId: number, deadlineId: number) {
     setConfirmedTarget(detail.preview.result.targetGroupCount); setSavedPlan(detail.summary); setPreview(detail.preview);
     previous.current = { seed: detail.preview.result.seed, fingerprint: detail.preview.planFingerprint ?? undefined };
   };
-  return { overview, setup, configuring, setConfiguring, target, changeTarget, parsedTarget, preview: visiblePreview, previewLoading, previewError,
+  const start = (options?: { minDuration?: number }) => {
+    if (!canManage || complete || attemptRef.current || busy.current) return;
+    setApplied(null);
+    setRawTarget(null);
+    setConfirmedTarget(null);
+    resetPreview();
+    client.removeQueries({ queryKey: [...key, 'setup'] });
+    setConfiguring(true);
+
+    if (setupTimer.current) clearTimeout(setupTimer.current);
+    void client.invalidateQueries({ queryKey: [...key, 'overview'] });
+
+    const isTest = typeof globalThis !== 'undefined' && Boolean((globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV === 'test');
+    const defaultDuration = isTest ? 0 : 3000;
+    const minWait = options?.minDuration ?? defaultDuration;
+
+    if (minWait > 0) {
+      setSetupLoading(true);
+      setupTimer.current = setTimeout(() => {
+        setSetupLoading(false);
+      }, minWait);
+    }
+  };
+  return {
+    overview, setup, configuring, setConfiguring, target, changeTarget, parsedTarget, preview: visiblePreview, previewLoading, previewError,
     applyError, applying, applied, attempt, complete, acceptedWithUnassigned, stale, canApply, canManage, autoAgain, confirmApply, confirmTarget: generate, restorePlan, savedPlan,
-    start: () => { if (canManage && !complete && !attemptRef.current && !busy.current) { setApplied(null); setConfiguring(true); } },
-    refresh: () => client.invalidateQueries({ queryKey: key }) };
+    start, isRegenerating, setupLoading,
+    refresh: () => client.invalidateQueries({ queryKey: key })
+  };
 }

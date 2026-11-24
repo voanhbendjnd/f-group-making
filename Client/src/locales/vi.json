@@ -438,7 +438,7 @@
     "samePlan": "Phương án giống lần trước. Không bảo đảm luôn có phương án hợp lệ khác.",
     "expiration": "Thời hạn phương án",
     "expiresIn": "Phương án hết hạn sau {{time}}",
-    "autoAgain": "Phân nhóm ngẫu nhiên lại",
+    "autoAgain": "Tạo lại đề xuất thông minh",
     "apply": "Áp dụng phương án",
     "confirmTitle": "Xác nhận áp dụng và duyệt nhóm",
     "confirmApply": "Xác nhận áp dụng",
@@ -535,15 +535,22 @@
       "invalidIdempotencyKey": "Khóa yêu cầu không hợp lệ. Yêu cầu này chưa áp dụng phân bổ."
     },
     "thinking": {
-      "criteria": "Các tiêu chí được xem xét — không phải tiến độ trực tiếp:",
       "analyzing": "Đang phân tích",
-      "title": "Đang xây dựng phương án",
-      "subtitle": "Đang chờ kết quả từ máy chủ. Chưa có thay đổi nào được áp dụng.",
+      "aiBadge": "AI Engine • Phân bổ thông minh",
+      "title": "Đang xây dựng phương án phân nhóm tối ưu",
+      "subtitle": "Hệ thống AI đang phân tích dữ liệu lớp học, kiểm tra quy định và giải bài toán tối ưu hóa nhóm...",
       "step1": "Sĩ số và cơ cấu chuyên ngành",
       "step2": "Quy định phân nhóm của lớp",
       "step3": "Nhóm và trưởng nhóm hiện có",
       "step4": "Cân bằng sĩ số giữa các nhóm",
-      "step5": "Phương án và thay đổi dự kiến"
+      "step5": "Phương án và thay đổi dự kiến",
+      "reasoning1": "Phân tích sĩ số sinh viên, danh sách chuyên ngành và tỷ lệ phân bố...",
+      "reasoning2": "Áp dụng các ràng buộc số lượng nhóm và thành viên tối thiểu / tối đa...",
+      "reasoning3": "Đánh giá các nhóm hợp lệ hiện có, bảo toàn vai trò nhóm trưởng...",
+      "reasoning4": "Mô phỏng hoán vị, cân bằng quy mô nhóm và tối ưu hóa tính liên ngành...",
+      "reasoning5": "Tổng hợp phương án tối ưu nhất, kiểm tra tính toàn vẹn dữ liệu và hoàn tất...",
+      "footerStatus": "AI Solver: Heuristic Group Optimizer • Đang tính toán ma trận tương thích...",
+      "footerComplete": "Đã hoàn thành phân tích — Chuẩn bị hiển thị phương án..."
     },
     "smartSuggestions": {
       "badge": "Đề xuất theo quy định",

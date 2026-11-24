@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, ConfigProvider, Empty, Input, Modal, Pagination, Skeleton, Tabs, Tag, Tooltip } from 'antd';
 import viVN from 'antd/locale/vi_VN';
 import enUS from 'antd/locale/en_US';
-import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, GitFork, History, LockKeyhole, RefreshCw, ShieldCheck, Sparkles, Target, TriangleAlert, UserRound, Users, UsersRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BookOpen, CalendarDays, CheckCircle2, ChevronDown, ClipboardCheck, ClipboardList, GitFork, History, LockKeyhole, RefreshCw, ShieldCheck, SlidersHorizontal, Sparkles, Target, TriangleAlert, UserRound, Users, UsersRound } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/app/providers/AuthContext';
 import { useTerm } from '@/app/providers/TermContext';
@@ -21,6 +21,7 @@ import { AllocationPlanHistory } from '@/features/allocation/components/Allocati
 import { AllocationApplyHistory } from '@/features/allocation/components/AllocationHistory';
 import { AllocationIllustration } from '@/features/allocation/components/AllocationIllustration';
 import { AllocationThinking } from '@/features/allocation/components/AllocationThinking';
+import { ClassRulesPanel } from '@/features/rules/components/ClassRulesPanel';
 import { allocationErrorKey } from '@/features/allocation/utils';
 import './LecturerAllocationPage.css';
 
@@ -113,6 +114,7 @@ export function AllocationError({ error, retry }: { error: unknown; retry?: () =
 function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { classId: number; deadlineId: number; termName: string | null; backAction: ReactNode }) {
   const { t } = useTranslation(); const flow = useAllocationFlow(classId, deadlineId);
   const [confirming, setConfirming] = useState(false);
+  const [editingRules, setEditingRules] = useState(false);
   const [contentTab, setContentTab] = useState('current');
   const data = flow.overview.data; const setup = flow.setup.data;
   const report = flow.preview?.report;
@@ -136,7 +138,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     <div className="allocation-detail-toolbar">{backAction}
         <div className="allocation-actions"><Button icon={<RefreshCw size={16} />} loading={flow.overview.isFetching} onClick={() => void flow.refresh()}>{t('allocation.refresh')}</Button>
           {flow.canManage && <Tooltip title={actionHint} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={actionHint ? 0 : undefined}>
-            <Button type="primary" icon={<Sparkles size={16} />} disabled={flow.complete || !!flow.attempt || flow.applying} aria-describedby={flow.complete ? 'allocation-complete' : undefined} onClick={() => flow.start()}>{t('allocation.autoAllocate')}</Button>
+            <Button type="primary" icon={<Sparkles size={16} />} disabled={flow.complete || !!flow.attempt || flow.applying || flow.previewLoading} loading={flow.previewLoading} aria-describedby={flow.complete ? 'allocation-complete' : undefined} onClick={() => flow.start()}>{t('allocation.autoAllocate')}</Button>
           </span></Tooltip>}</div>
     </div>
     {!flow.canManage && <Alert type="info" showIcon title={t('classVisibility.readOnlyHint')} />}
@@ -151,9 +153,21 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     </header>
     <section className="allocation-overview" aria-label={t('allocation.overview')}>
       <dl className="allocation-overview-metrics">{metrics.map(([label, value, Icon, accent]) => <div key={label} className={`allocation-metric allocation-metric--${accent}`}><dt><Icon size={15} aria-hidden="true" />{t(`allocation.${label}`)}</dt><dd>{value}</dd><Icon className="allocation-metric-watermark" size={32} aria-hidden="true" /></div>)}</dl>
-      <details className="allocation-rule-disclosure"><summary><span>{t('allocation.rules')} <small>{t('allocation.activeRules', { count: data.rules.filter(rule => rule.status).length })}</small></span><ChevronDown size={16} aria-hidden="true" /></summary>
-        <div className="allocation-rule-chips">{data.rules.filter(rule => rule.status).map(rule => <Tag key={rule.code}>{t(`classRules.names.${rule.code}`, { defaultValue: t(`allocation.ruleNames.${rule.code}`) })}: <strong>{rule.value}</strong></Tag>)}</div>
-      </details>
+      <div className="allocation-rules-wrapper" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <details className="allocation-rule-disclosure" style={{ flex: 1, minWidth: '240px' }}><summary><span>{t('allocation.rules')} <small>{t('allocation.activeRules', { count: data.rules.filter(rule => rule.status).length })}</small></span><ChevronDown size={16} aria-hidden="true" /></summary>
+          <div className="allocation-rule-chips">{data.rules.filter(rule => rule.status).map(rule => <Tag key={rule.code}>{t(`classRules.names.${rule.code}`, { defaultValue: t(`allocation.ruleNames.${rule.code}`) })}: <strong>{rule.value}</strong></Tag>)}</div>
+        </details>
+        {flow.canManage && (
+          <Button
+            size="small"
+            icon={<SlidersHorizontal size={14} />}
+            onClick={() => setEditingRules(true)}
+            style={{ marginTop: '0.25rem' }}
+          >
+            {t('rules.configureButton', 'Quy định nhóm')}
+          </Button>
+        )}
+      </div>
       <AllocationReasons reasons={data.warnings} />
     </section>
     {flow.complete && <div id="allocation-complete" className="allocation-completed" role="status"><CheckCircle2 size={18} aria-hidden="true" /><div><strong>{t('allocation.completed')}</strong><p>{t('allocation.completedHint')}</p></div></div>}
@@ -164,7 +178,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
     {flow.applyError !== null && <AllocationError error={flow.applyError} />}
     {flow.configuring && <section className="allocation-workflow" aria-label={t('allocation.setup')}>
       <div className="allocation-heading"><div><h2>{t('allocation.setup')}</h2><p>{t('allocation.confirmTargetHint')}</p></div><Tag>{t('allocation.previewOnly')}</Tag></div>
-      {flow.setup.isPending ? <Skeleton active /> : flow.setup.isError ? <AllocationError error={flow.setup.error} retry={() => void flow.setup.refetch()} /> : setup && <>
+      {(flow.setup.isPending || flow.setupLoading) ? <Skeleton active /> : flow.setup.isError ? <AllocationError error={flow.setup.error} retry={() => void flow.setup.refetch()} /> : setup && <>
         <div className="allocation-panel allocation-setup">
         <div className="allocation-setup-grid">
           <div className="allocation-range"><span>{t('allocation.range')}</span><strong>{setup.range.minimum <= setup.range.maximum ? `${setup.range.minimum}–${setup.range.maximum}` : t('allocation.noRange')}</strong>
@@ -178,7 +192,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
               onChange={event => flow.changeTarget(event.target.value)} />
             <small id="allocation-target-help" className="allocation-block">{t(flow.target && flow.parsedTarget === null ? 'allocation.invalidTarget' : 'allocation.targetHint', { min: setup.range.minimum, max: setup.range.maximum })}</small>
             <Tooltip title={actionHint || (flow.parsedTarget === null ? t('allocation.invalidTarget', { min: setup.range.minimum, max: setup.range.maximum }) : undefined)} trigger={['hover', 'focus']}><span className="allocation-action-hint allocation-confirm-target" tabIndex={actionHint || flow.parsedTarget === null ? 0 : undefined}>
-              <Button type="primary" icon={<Target size={15} aria-hidden="true" />} disabled={flow.complete || flow.parsedTarget === null || !!flow.attempt || flow.applying || flow.previewLoading} loading={flow.previewLoading} onClick={() => void flow.confirmTarget()}>{t('allocation.confirmTarget')}</Button>
+              <Button type="primary" icon={<Target size={15} aria-hidden="true" />} disabled={flow.complete || flow.parsedTarget === null || !!flow.attempt || flow.applying || flow.previewLoading} onClick={() => void flow.confirmTarget()}>{t('allocation.confirmTarget')}</Button>
             </span></Tooltip>
           </div>
         </div>
@@ -187,7 +201,12 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
           <details><summary>{t('allocation.searchDetails')}</summary><p>{t('allocation.searchLimits', { nodes: setup.limits.maximumSearchNodes, depth: setup.limits.maximumSearchDepth })}</p>
             <p>{t(setup.limits.createsNewGroups ? 'allocation.newGroupsAllowed' : 'allocation.noNewGroups')}</p></details>
         </div></div>
-        {flow.previewLoading && <AllocationThinking />}
+        {flow.previewLoading && (
+          <AllocationThinking
+            mode={flow.isRegenerating ? 'regenerate' : 'default'}
+            minDuration={flow.isRegenerating ? 3000 : undefined}
+          />
+        )}
         {flow.previewError !== null && <AllocationError error={flow.previewError} retry={flow.autoAgain} />}
         {flow.preview && <div className="allocation-preview" aria-label={t('allocation.previewData')}>
           <div className={flow.preview.result.status === 'FEASIBLE' ? 'allocation-smart-suggestion-banner' : 'allocation-heading'}>
@@ -236,7 +255,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
             {report && <><h3>{t('allocation.beforeAfter')}</h3><AllocationReport report={report} /></>}
           </>}
           <div className="allocation-actions allocation-preview-actions">
-            <Button icon={<RefreshCw size={15} aria-hidden="true" />} disabled={flow.complete || !!flow.attempt || flow.applying || flow.previewLoading} onClick={flow.autoAgain}>{t('allocation.autoAgain')}</Button>
+            <Button className="allocation-auto-again-btn" icon={<Sparkles size={15} aria-hidden="true" />} disabled={flow.complete || !!flow.attempt || flow.applying || flow.previewLoading} onClick={flow.autoAgain}>{t('allocation.autoAgain')}</Button>
             <Tooltip title={applyHint} trigger={['hover', 'focus']}><span className="allocation-action-hint" tabIndex={applyHint ? 0 : undefined}><Button type="primary" icon={<CheckCircle2 size={15} aria-hidden="true" />} disabled={!flow.canApply} loading={flow.applying} onClick={() => setConfirming(true)}>{t('allocation.apply')}</Button></span></Tooltip>
           </div>
         </div>}
@@ -258,6 +277,20 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
         [t('allocation.disbanded'), report.disbandedGroupIds.length], [t('allocation.movementsLabel'), report.movements.length],
         [t('allocation.leaderChangesLabel'), report.leaderChanges.length], [t('allocation.autoApproved'), report.keptGroupIds.length - report.protectedGroupIds.length + (report.createdGroupKeys?.length ?? report.createdGroupIds.length)],
       ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>}
+    </Modal>
+    <Modal
+      open={editingRules}
+      onCancel={() => {
+        setEditingRules(false);
+        void flow.refresh();
+        void flow.setup.refetch();
+      }}
+      footer={null}
+      title={t('rules.title', 'Quy định nhóm')}
+      width={720}
+      destroyOnClose
+    >
+      {editingRules && <ClassRulesPanel classId={classId} />}
     </Modal>
   </>;
 }

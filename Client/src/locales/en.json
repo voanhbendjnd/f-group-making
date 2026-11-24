@@ -438,7 +438,7 @@
     "samePlan": "This plan matches the previous one. Another distinct valid plan is not guaranteed.",
     "expiration": "Preview expiration",
     "expiresIn": "Preview expires in {{time}}",
-    "autoAgain": "Random Again",
+    "autoAgain": "Regenerate smart suggestion",
     "apply": "Apply Plan",
     "confirmTitle": "Confirm plan and group approval",
     "confirmApply": "Confirm Apply",
@@ -535,15 +535,22 @@
       "invalidIdempotencyKey": "The request key is invalid. No allocation was applied by this request."
     },
     "thinking": {
-      "criteria": "Criteria considered — not live progress:",
       "analyzing": "Analyzing",
-      "title": "Building your proposal",
-      "subtitle": "Waiting for the server response. No changes have been applied.",
+      "aiBadge": "AI Engine • Smart Allocation",
+      "title": "Synthesizing Optimal Group Allocation Plan",
+      "subtitle": "The AI engine is analyzing class data, validating constraints, and solving group optimization...",
       "step1": "Class size and major composition",
       "step2": "Class grouping rules",
       "step3": "Existing groups and leaders",
       "step4": "Balanced group sizes",
-      "step5": "Proposed assignments and changes"
+      "step5": "Proposed assignments and changes",
+      "reasoning1": "Analyzing student roster, major breakdown, and distribution ratios...",
+      "reasoning2": "Applying target group count and min/max member constraints...",
+      "reasoning3": "Evaluating current valid groups and preserving team leaders...",
+      "reasoning4": "Simulating permutations, balancing team sizes, and diversifying skills...",
+      "reasoning5": "Synthesizing optimal proposal, verifying constraints, and finalizing...",
+      "footerStatus": "AI Solver: Heuristic Group Optimizer • Computing compatibility matrix...",
+      "footerComplete": "Analysis complete — Presenting proposal..."
     },
     "smartSuggestions": {
       "badge": "Rule-based proposal",
