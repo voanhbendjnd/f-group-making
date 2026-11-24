@@ -21,8 +21,14 @@ import { groupApi } from '@/features/group/api/groupApi';
 import { advancedGroupPath, positiveId } from '@/features/group/navigation';
 import { syncDeadlineQueries } from '@/features/deadline/realtime';
 import { GroupPreviewExportModal } from '@/features/group/components/GroupPreviewExportModal';
+import { MultiClassExportModal } from '@/features/group/components/MultiClassExportModal';
 import { StaffGroupRuleWarning } from '@/features/group/components/StaffGroupRuleWarning';
-import { fetchClassAllocationData, exportGroupResultExcel } from '@/features/group/utils/exportGroupResultExcel';
+import {
+  fetchClassAllocationData,
+  fetchMultipleClassesAllocationData,
+  exportGroupResultExcel,
+  exportMultiClassResultExcel,
+} from '@/features/group/utils/exportGroupResultExcel';
 import { ClassMajorDistributionCard } from '@/features/classes/components/ClassMajorDistributionCard';
 import type { GroupReviewRow, GroupStatus } from '@/features/group/types/groupTypes';
 import { getApiError } from '@/services/api/types';
@@ -50,10 +56,12 @@ function ReviewContent() {
   const [filters, setFilters] = useState(() => {
     const sameTerm = !params.has('termId') || positiveId(params.get('termId')) === selectedTermId;
     const status = params.get('status') as GroupStatus;
-    return { page: sameTerm ? positiveId(params.get('page')) ?? 1 : 1, size: 10,
+    return {
+      page: sameTerm ? positiveId(params.get('page')) ?? 1 : 1, size: 10,
       search: sameTerm ? params.get('search') ?? '' : '',
       classId: sameTerm ? positiveId(params.get('classId')) ?? undefined : undefined,
-      status: sameTerm && statuses.includes(status) ? status : undefined };
+      status: sameTerm && statuses.includes(status) ? status : undefined
+    };
   });
   const [search, setSearch] = useState(filters.search);
   const filterQuery = new URLSearchParams({ termId: String(selectedTermId), page: String(filters.page) });
@@ -68,7 +76,8 @@ function ReviewContent() {
   const [actionError, setActionError] = useState<unknown>(null);
   const [reasonRequired, setReasonRequired] = useState(false);
   const busy = useRef(false);
-  const classes = useQuery({ queryKey: [viewAll ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, 'review', classScope],
+  const classes = useQuery({
+    queryKey: [viewAll ? 'school-classes' : 'my-school-classes', user?.id, selectedTermId, 'review', classScope],
     queryFn: async ({ signal }) => {
       const fetchClasses = viewAll ? classApi.getClasses : classApi.getMyClasses;
       const first = await fetchClasses({ termId: selectedTermId!, ...scopeParams, size: 50 }, signal);
@@ -78,10 +87,13 @@ function ReviewContent() {
         result.push(...next.result);
       }
       return { ...first, result };
-    } });
-  const reviews = useQuery({ queryKey: ['group-reviews', user?.id, selectedTermId, filters, classScope],
+    }
+  });
+  const reviews = useQuery({
+    queryKey: ['group-reviews', user?.id, selectedTermId, filters, classScope],
     queryFn: ({ signal }) => groupApi.getReviews({ ...filters, ...scopeParams, termId: selectedTermId! }, signal),
-    retry: (count, error) => count < 1 && ![400, 401, 403].includes(getApiError(error).status) });
+    retry: (count, error) => count < 1 && ![400, 401, 403].includes(getApiError(error).status)
+  });
   const pages = reviews.data?.meta.pages;
   if (pages && filters.page > pages) setFilters({ ...filters, page: pages });
   const rows = reviews.data?.result ?? [];
@@ -98,18 +110,22 @@ function ReviewContent() {
     const cleanup = topics.split(',').filter(Boolean).map(id => subscribe(`/topic/classes/${id}/deadlines`));
     return () => cleanup.forEach(unsubscribe => unsubscribe());
   }, [topics, subscribe]);
-  const mutation = useMutation({ retry: false,
+  const mutation = useMutation({
+    retry: false,
     mutationFn: async (request: Action) => {
       const { deadlineId, schoolClassId, id } = request.row.group;
       if (request.kind === 'approve') return groupApi.acceptGroup(deadlineId, schoolClassId, id);
       if (request.kind === 'reopen') return groupApi.revokeGroup(deadlineId, schoolClassId, id);
       return groupApi.rejectGroup(deadlineId, schoolClassId, id, { reason: reason.trim() });
-    } });
+    }
+  });
   const discardReview = useUnsavedChanges(Boolean(action && reason.trim()), mutation.isPending);
   const reviewError = actionError ? getApiError(actionError) : null;
   const reviewUnknown = Boolean(reviewError && (reviewError.outcomeUnknown || reviewError.status === 0 || reviewError.status >= 500));
   const [previewClassId, setPreviewClassId] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [isMultiExportOpen, setIsMultiExportOpen] = useState(false);
+  const [isExportingAll, setIsExportingAll] = useState(false);
 
   const handleOpenPreview = (classIdToPreview?: number) => {
     const targetClassId = classIdToPreview ?? filters.classId;
@@ -151,6 +167,39 @@ function ReviewContent() {
     }
   };
 
+  const handleExportAllClasses = async () => {
+    const allClasses = classes.data?.result || [];
+    if (allClasses.length === 0) {
+      toast.error(t('groupReview.noClassesToExport'));
+      return;
+    }
+
+    setIsExportingAll(true);
+    try {
+      const bundles = await fetchMultipleClassesAllocationData(allClasses, {
+        termId: selectedTermId ?? undefined,
+        termName: selectedTerm?.name,
+      });
+
+      const totalRows = bundles.reduce((sum, b) => sum + b.rows.length, 0);
+      if (totalRows === 0) {
+        toast.error(t('groupExport.noDataToExport'));
+        return;
+      }
+
+      exportMultiClassResultExcel(bundles, {
+        termName: selectedTerm?.name,
+        filenamePrefix: 'DSSV_AllClasses',
+      });
+
+      toast.success(t('groupReview.exportAllSuccess', { count: bundles.length }));
+    } catch {
+      toast.error(t('groupReview.exportAllError'));
+    } finally {
+      setIsExportingAll(false);
+    }
+  };
+
   const confirm = async () => {
     if (!action || busy.current || reviewUnknown) return;
     if (action.kind === 'reject' && !reason.trim()) { setReasonRequired(true); return; }
@@ -171,21 +220,25 @@ function ReviewContent() {
   const columns = [
     { title: t('groupExport.colGroupCode'), key: 'groupCode', render: (_: unknown, row: GroupReviewRow) => row.group.groupCode || '—' },
     { title: t('groupReview.group'), key: 'group', render: (_: unknown, row: GroupReviewRow) => <strong>{row.group.name}</strong> },
-    { title: t('groupReview.class'), key: 'class', render: (_: unknown, row: GroupReviewRow) => <>{row.className}
-      {row.readOnly && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}</> },
+    {
+      title: t('groupReview.class'), key: 'class', render: (_: unknown, row: GroupReviewRow) => <>{row.className}
+        {row.readOnly && <span className="badge badge-neutral">{t('classVisibility.readOnly')}</span>}</>
+    },
     { title: t('groupReview.leader'), key: 'leader', render: (_: unknown, row: GroupReviewRow) => row.group.leaderName && row.group.leaderName !== 'N/A' ? row.group.leaderName : t('groupReview.missing') },
     { title: t('groupReview.members'), key: 'members', render: (_: unknown, row: GroupReviewRow) => row.group.memberCount },
     { title: t('groupReview.rules'), key: 'rules', render: (_: unknown, row: GroupReviewRow) => eligibility(row) },
     { title: t('groupReview.status'), key: 'status', render: (_: unknown, row: GroupReviewRow) => statusBadge(row.group.status) },
     { title: t('groupReview.submittedAt'), key: 'submitted', render: (_: unknown, row: GroupReviewRow) => row.submittedAt ? new Date(row.submittedAt).toLocaleString(i18n.language) : t('groupReview.notSubmitted') },
-    { title: t('groupReview.actions'), key: 'actions', className: 'review-actions-cell', render: (_: unknown, row: GroupReviewRow) => <div className="review-actions">
-      <Button size="sm" variant="secondary" onClick={() => setViewId(row.group.id)}>{t('groupReview.view')}</Button>
-      {row.canReview && <>
-        <Button size="sm" disabled={mutation.isPending} onClick={() => begin('approve', row)}>{t('groupReview.approve')}</Button>
-        <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => begin('reject', row)}>{t('groupReview.reject')}</Button>
-      </>}
-      {row.canReopen && <Button size="sm" variant="secondary" disabled={mutation.isPending} onClick={() => begin('reopen', row)}>{t('groupReview.reopen')}</Button>}
-    </div> },
+    {
+      title: t('groupReview.actions'), key: 'actions', className: 'review-actions-cell', render: (_: unknown, row: GroupReviewRow) => <div className="review-actions">
+        <Button size="sm" variant="secondary" onClick={() => setViewId(row.group.id)}>{t('groupReview.view')}</Button>
+        {row.canReview && <>
+          <Button size="sm" disabled={mutation.isPending} onClick={() => begin('approve', row)}>{t('groupReview.approve')}</Button>
+          <Button size="sm" variant="ghost" disabled={mutation.isPending} onClick={() => begin('reject', row)}>{t('groupReview.reject')}</Button>
+        </>}
+        {row.canReopen && <Button size="sm" variant="secondary" disabled={mutation.isPending} onClick={() => begin('reopen', row)}>{t('groupReview.reopen')}</Button>}
+      </div>
+    },
   ];
   return <div className="group-review-page">
     <PageHeader title={t('groupReview.title')} description={t('groupReview.description')} />
@@ -201,7 +254,30 @@ function ReviewContent() {
             <p className="review-classes-subtitle">{t(viewAll ? 'classVisibility.chooseClass' : 'groupReview.selectClassHint')}</p>
           </div>
         </div>
-        {classes.data && <span className="badge badge-info review-classes-count">{t('groupReview.classesCount', { count: classes.data.result.length })}</span>}
+        <div className="review-classes-header-actions">
+          {classes.data && <span className="badge badge-info review-classes-count">{t('groupReview.classesCount', { count: classes.data.result.length })}</span>}
+          {Boolean(classes.data?.result?.length) && (
+            <>
+              <Button
+                variant="secondary"
+                icon={<FileSpreadsheet size={16} />}
+                loading={isExportingAll}
+                disabled={isExportingAll}
+                onClick={handleExportAllClasses}
+              >
+                {t('groupReview.exportAllClasses')}
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Layers size={16} />}
+                disabled={isExportingAll}
+                onClick={() => setIsMultiExportOpen(true)}
+              >
+                {t('groupReview.exportSelectedClasses')}
+              </Button>
+            </>
+          )}
+        </div>
       </div>
       {classes.isPending ? (
         <div className="review-classes-loading"><RefreshCw size={18} className="spin" aria-hidden="true" /><span>{t('groupReview.refresh')}…</span></div>
@@ -237,7 +313,7 @@ function ReviewContent() {
         </div>
       )}
     </section>}
-    {selectedClass ? (
+    {selectedClass && (
       <>
         <div className="card review-selected-class-banner" role="region" aria-label={t('groupReview.selectedClassHeading')}>
           <div className="selected-class-info">
@@ -264,8 +340,6 @@ function ReviewContent() {
           assignedStudentIds={assignedStudentIds}
         />
       </>
-    ) : (
-      <div className="review-class-prompt-banner"><Info size={18} aria-hidden="true" /><span>{t('groupReview.selectClassPrompt')}</span></div>
     )}
     <form className="card review-filters" onSubmit={event => { event.preventDefault(); setFilters(old => ({ ...old, search: search.trim(), page: 1 })); setViewId(null); }}>
       <label className="review-search-field">{t('groupReview.search')}<AntInput prefix={<Search size={16} aria-hidden="true" />} value={search} onChange={event => setSearch(event.target.value)} /></label>
@@ -287,12 +361,12 @@ function ReviewContent() {
         <div className="review-table-heading">
           <span><ClipboardCheck size={18} aria-hidden="true" />{t('groupReview.title')}</span>
           <div className="review-table-heading-actions">
-            {selectedClass && (
-              <>
-                <Button size="sm" variant="secondary" icon={<Eye size={14} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
-                <Button size="sm" variant="secondary" icon={<FileSpreadsheet size={14} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
-              </>
-            )}
+              { selectedClass && (
+                <>
+                  <Button size="sm" variant="secondary" icon={<Eye size={14} />} onClick={() => handleOpenPreview(selectedClass.id)}>{t('groupReview.previewExport')}</Button>
+                  <Button size="sm" variant="secondary" icon={<FileSpreadsheet size={14} />} loading={isExporting} onClick={() => { void handleDirectExport(selectedClass.id); }}>{t('groupReview.exportExcel')}</Button>
+                </>
+              )}
             {reviews.data && <span className="badge badge-info">{reviews.data.meta.total}</span>}
           </div>
         </div>
@@ -359,6 +433,15 @@ function ReviewContent() {
         termId={selectedTermId ?? undefined}
         termName={selectedTerm?.name}
         lecturerCode={classes.data?.result.find(c => c.id === previewClassId)?.lecturerCode || ''}
+      />
+    )}
+    {isMultiExportOpen && (
+      <MultiClassExportModal
+        open={isMultiExportOpen}
+        onClose={() => setIsMultiExportOpen(false)}
+        classes={classes.data?.result || []}
+        termId={selectedTermId ?? undefined}
+        termName={selectedTerm?.name}
       />
     )}
   </div>;

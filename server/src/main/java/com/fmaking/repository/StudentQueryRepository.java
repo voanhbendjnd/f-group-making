@@ -15,6 +15,7 @@ import org.springframework.stereotype.Repository;
 import com.fmaking.domain.Student;
 import com.fmaking.domain.User;
 import com.fmaking.domain.Major;
+import com.fmaking.domain.SchoolClass;
 import com.fmaking.service.projection.StudentRow;
 
 import java.util.List;
@@ -39,6 +40,8 @@ public class StudentQueryRepository {
         // Join the entity explicitly by ID; Student has no association mapping.
         JpaEntityJoin<Major> major = ((JpaRoot<Student>) root).join(Major.class, SqmJoinType.LEFT);
         major.on(cb.equal(root.get("majorId"), major.get("id")));
+        JpaEntityJoin<SchoolClass> schoolClass = ((JpaRoot<Student>) root).join(SchoolClass.class, SqmJoinType.LEFT);
+        schoolClass.on(cb.equal(root.get("schoolClassId"), schoolClass.get("id")));
         Root<User> user = cq.from(User.class);
         Predicate studentUserCondition = cb.equal(root.get("userId"), user.get("id"));
 //        Join<Student, User> user = root.join("user", JoinType.LEFT);
@@ -70,7 +73,9 @@ public class StudentQueryRepository {
                 user.get("lastModifiedDate"),
                 root.get("selfDescription"),
                 root.get("cohort"),
-                root.get("slotType")));
+                root.get("slotType"),
+                root.get("schoolClassId"),
+                schoolClass.get("name")));
 
 //        Predicate predicate = spec.toPredicate(root, cq, cb);
 //        if (predicate != null) cq.where(predicate);

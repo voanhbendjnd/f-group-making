@@ -38,7 +38,13 @@ export function CreateLecturerModal({ onClose, onSuccess }: { onClose: () => voi
       for (const violation of apiError.violations || []) {
         if (violation.field !== 'code' && violation.field !== 'email') continue;
         const duplicate = violation.message === (violation.field === 'code' ? 'lecturerCreate.duplicateCode' : 'lecturerCreate.duplicateEmail');
-        setError(violation.field, { message: `addLecturer.${duplicate ? `duplicate${violation.field === 'code' ? 'Code' : 'Email'}` : `invalid.${violation.field}`}` });
+        const patternError = violation.message === 'lecturerCreate.invalid.codePattern';
+        const messageKey = duplicate
+          ? `addLecturer.duplicate${violation.field === 'code' ? 'Code' : 'Email'}`
+          : patternError
+            ? 'addLecturer.invalid.codePattern'
+            : `addLecturer.invalid.${violation.field}`;
+        setError(violation.field, { message: messageKey });
       }
       const uncertain = Boolean(apiError.outcomeUnknown || apiError.status === 0 || apiError.status >= 500);
       setUnknownResult(uncertain);
@@ -69,13 +75,20 @@ export function CreateLecturerModal({ onClose, onSuccess }: { onClose: () => voi
         <fieldset disabled={busy} className="lecturer-create-fields">
           <Input id="create-lecturer-code" label={t('addLecturer.code')} placeholder={t('addLecturer.codePlaceholder')} required autoFocus maxLength={50}
             hint={t('addLecturer.codeHint')} error={fieldError('code')} {...register('code', { validate: (value) => {
-              if (!value.trim()) return 'addLecturer.required';
-              return (value.trim().length >= 2 && value.trim().length <= 50) || 'addLecturer.invalid.code';
+              const trimmed = value.trim();
+              if (!trimmed) return 'addLecturer.required';
+              if (trimmed.length < 2 || trimmed.length > 50) return 'addLecturer.invalid.code';
+              if (!/^[A-Za-z0-9_.-]+$/.test(trimmed)) return 'addLecturer.invalid.codePattern';
+              return true;
             } })} />
           <Input id="create-lecturer-email" type="email" label={t('addLecturer.email')} placeholder={t('addLecturer.emailPlaceholder')} required maxLength={254}
             error={fieldError('email')} {...register('email', { validate: (value) => {
-              if (!value.trim()) return 'addLecturer.required';
-              return (value.trim().length <= 254 && /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(value.trim())) || 'addLecturer.invalid.email';
+              const trimmed = value.trim();
+              if (!trimmed) return 'addLecturer.required';
+              if (trimmed.length > 254 || !/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(trimmed)) {
+                return 'addLecturer.invalid.email';
+              }
+              return true;
             } })} />
         </fieldset>
         <p className="student-create-note">{t('addLecturer.hint')}</p>

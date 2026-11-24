@@ -3,13 +3,20 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import XLSX from 'xlsx-js-style';
 import {
   buildGroupResultWorkbook,
+  buildGroupResultWorksheet,
+  buildMultiClassResultWorkbook,
+  exportGroupResultExcel,
+  exportMultiClassResultExcel,
   extractSubjectCode,
   fetchClassAllocationData,
-  exportGroupResultExcel,
+  fetchMultipleClassesAllocationData,
+  sanitizeSheetName,
   type StudentGroupExportRow,
   type GroupExportMeta,
+  type ClassExportBundle,
 } from '../features/group/utils/exportGroupResultExcel';
 import { GroupPreviewExportModal } from '../features/group/components/GroupPreviewExportModal';
+import { MultiClassExportModal } from '../features/group/components/MultiClassExportModal';
 import { groupApi } from '../features/group/api/groupApi';
 import { classApi } from '../features/classes/api/classApi';
 import { deadlineApi } from '../features/deadline/api/deadlineApi';
@@ -453,5 +460,273 @@ describe('GroupPreviewExportModal Component', () => {
     const exported = XLSX.utils.sheet_to_json<string[]>(filteredWorkbook.Sheets[filteredWorkbook.SheetNames[0]], { header: 1 });
     expect(exported).toHaveLength(3);
     expect(exported[2][1]).toBe('SE180002');
+  });
+
+  describe('Multi-Class Excel Export Features', () => {
+    it('sanitizeSheetName enforces length limit, cleans invalid characters, and resolves duplicate collisions', () => {
+      const usedNames = new Set<string>();
+
+      // Normal valid name
+      expect(sanitizeSheetName('EXE101_G01', usedNames)).toBe('EXE101_G01');
+
+      // Invalid characters: \ / ? * : [ ]
+      expect(sanitizeSheetName('EXE101:G01/Test?*[]', usedNames)).toBe('EXE101_G01_Test____');
+
+      // More than 31 characters
+      const longName = 'ThisIsAnExtremelyLongSchoolClassNameForTestingPurposes';
+      const sanitizedLong = sanitizeSheetName(longName, usedNames);
+      expect(sanitizedLong.length).toBeLessThanOrEqual(31);
+
+      // Duplicate name collisions
+      const dup1 = sanitizeSheetName('DUPLICATE', usedNames);
+      expect(dup1).toBe('DUPLICATE');
+      const dup2 = sanitizeSheetName('DUPLICATE', usedNames);
+      expect(dup2).toBe('DUPLICATE_2');
+      const dup3 = sanitizeSheetName('DUPLICATE', usedNames);
+      expect(dup3).toBe('DUPLICATE_3');
+    });
+
+    it('buildMultiClassResultWorkbook creates TongHop summary sheet and individual class sheets with correct ordering', () => {
+      const bundle1: ClassExportBundle = {
+        classId: 101,
+        className: 'EXE101_G01',
+        meta: {
+          className: 'EXE101_G01',
+          subjectCode: 'EXE101',
+          termName: 'FA26',
+          lecturerCode: 'GV01',
+        },
+        rows: [
+          {
+            studentId: 1,
+            rollNumber: 'SE180001',
+            fullName: 'Nguyen Van A',
+            khoa: 'K18',
+            memberCode: 'ANVSE180001',
+            email: 'anv@fpt.edu.vn',
+            slotType: 'A1',
+            subjectCode: 'EXE101',
+            groupName: 'EXE101_G01',
+            gv: 'GV01',
+            groupMentor: 'EXE101_G01.01',
+            groupSequenceNo: 1,
+            groupCode: 'G01',
+          },
+        ],
+      };
+
+      const bundle2: ClassExportBundle = {
+        classId: 102,
+        className: 'EXE101_G02',
+        meta: {
+          className: 'EXE101_G02',
+          subjectCode: 'EXE101',
+          termName: 'FA26',
+          lecturerCode: 'GV01',
+        },
+        rows: [
+          {
+            studentId: 2,
+            rollNumber: 'SE180002',
+            fullName: 'Tran Thi B',
+            khoa: 'K18',
+            memberCode: 'BTTSE180002',
+            email: 'btt@fpt.edu.vn',
+            slotType: 'A1',
+            subjectCode: 'EXE101',
+            groupName: 'EXE101_G02',
+            gv: 'GV01',
+            groupMentor: 'EXE101_G02.01',
+            groupSequenceNo: 1,
+            groupCode: 'G01',
+          },
+        ],
+      };
+
+      const workbook = buildMultiClassResultWorkbook([bundle1, bundle2], { termName: 'FA26' });
+      expect(workbook.SheetNames).toEqual(['TongHop', 'EXE101_G01', 'EXE101_G02']);
+
+      // Check TongHop sheet
+      const tongHopRows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets['TongHop'], { header: 1 });
+      expect(tongHopRows).toHaveLength(4); // row 0: title, row 1: headers, row 2: student 1, row 3: student 2
+      expect(tongHopRows[1]).toEqual([
+        'STT',
+        'RollNumber',
+        'FullName',
+        'Khoá',
+        'MemberCode',
+        'Email',
+        'SlotType',
+        'SubjectCode',
+        'GroupName',
+        'GV',
+        'Group Mentor',
+      ]);
+      expect(tongHopRows[2][1]).toBe('SE180001');
+      expect(tongHopRows[2][8]).toBe('EXE101_G01');
+      expect(tongHopRows[3][1]).toBe('SE180002');
+      expect(tongHopRows[3][8]).toBe('EXE101_G02');
+
+      // Check individual class sheet
+      const class1Rows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets['EXE101_G01'], { header: 1 });
+      expect(class1Rows).toHaveLength(3);
+      expect(class1Rows[2][1]).toBe('SE180001');
+    });
+
+    it('exportMultiClassResultExcel downloads the workbook with proper file name', () => {
+      const bundle: ClassExportBundle = {
+        classId: 101,
+        className: 'EXE101_G01',
+        meta: {
+          className: 'EXE101_G01',
+          subjectCode: 'EXE101',
+          termName: 'FA26',
+          lecturerCode: 'GV01',
+        },
+        rows: [],
+      };
+
+      exportMultiClassResultExcel([bundle], { termName: 'FA26', filenamePrefix: 'DSSV_AllClasses' });
+      expect(XLSX.writeFile).toHaveBeenCalledWith(
+        expect.anything(),
+        'DSSV_AllClasses_FA26.xlsx'
+      );
+    });
+
+    it('fetchMultipleClassesAllocationData fetches deadlines once and aggregates data for all requested classes', async () => {
+      vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({
+        result: [
+          {
+            id: 501,
+            title: 'Deadline FA26',
+            schoolClassIds: [101, 102],
+          } as any,
+        ],
+        meta: { page: 1, pageSize: 50, pages: 1, total: 1 },
+      });
+
+      vi.mocked(groupApi.getWorkspace).mockImplementation(async (deadlineId, classId) => {
+        if (classId === 101) {
+          return {
+            schoolClassId: 101,
+            schoolClassName: 'EXE101_G01',
+            groups: [],
+            unassignedStudents: [
+              {
+                studentId: 1,
+                rollNumber: 'SE180001',
+                fullName: 'Student One',
+                cohort: 'K18',
+                memberCode: 'S1',
+                email: 's1@fpt.edu.vn',
+                slotType: 'A1',
+              },
+            ],
+          } as any;
+        }
+        return {
+          schoolClassId: 102,
+          schoolClassName: 'EXE101_G02',
+          groups: [],
+          unassignedStudents: [
+            {
+              studentId: 2,
+              rollNumber: 'SE180002',
+              fullName: 'Student Two',
+              cohort: 'K18',
+              memberCode: 'S2',
+              email: 's2@fpt.edu.vn',
+              slotType: 'A1',
+            },
+          ],
+        } as any;
+      });
+
+      const onProgress = vi.fn();
+      const bundles = await fetchMultipleClassesAllocationData(
+        [
+          { id: 101, name: 'EXE101_G01', lecturerCode: 'GV01', termId: 1, termName: 'FA26' },
+          { id: 102, name: 'EXE101_G02', lecturerCode: 'GV01', termId: 1, termName: 'FA26' },
+        ],
+        { termId: 1, termName: 'FA26', onProgress }
+      );
+
+      expect(bundles).toHaveLength(2);
+      expect(bundles[0].className).toBe('EXE101_G01');
+      expect(bundles[0].rows).toHaveLength(1);
+      expect(bundles[1].className).toBe('EXE101_G02');
+      expect(bundles[1].rows).toHaveLength(1);
+      expect(onProgress).toHaveBeenCalled();
+    });
+
+    it('MultiClassExportModal renders class list, handles selection toggles, and triggers export', async () => {
+      const classes = [
+        { id: 101, name: 'EXE101_G01', studentCount: 30, lecturerCode: 'GV01', termId: 1, termName: 'FA26' },
+        { id: 102, name: 'EXE101_G02', studentCount: 28, lecturerCode: 'GV01', termId: 1, termName: 'FA26' },
+      ];
+
+      vi.mocked(deadlineApi.getDeadlines).mockResolvedValue({
+        result: [{ id: 501, title: 'Session', schoolClassIds: [101, 102] } as any],
+        meta: { page: 1, pageSize: 50, pages: 1, total: 1 },
+      });
+
+      vi.mocked(groupApi.getWorkspace).mockResolvedValue({
+        schoolClassId: 101,
+        schoolClassName: 'EXE101_G01',
+        groups: [],
+        unassignedStudents: [
+          {
+            studentId: 1,
+            rollNumber: 'SE180001',
+            fullName: 'Student One',
+            cohort: 'K18',
+            memberCode: 'S1',
+            email: 's1@fpt.edu.vn',
+            slotType: 'A1',
+          },
+        ],
+      } as any);
+
+      const onClose = vi.fn();
+      const queryClient = new QueryClient();
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MultiClassExportModal
+            open={true}
+            onClose={onClose}
+            classes={classes}
+            termId={1}
+            termName="FA26"
+          />
+        </QueryClientProvider>
+      );
+
+      // Verify header and classes rendered
+      expect(screen.getByText('Chọn lớp để xuất Excel')).toBeInTheDocument();
+      expect(screen.getByText('EXE101_G01')).toBeInTheDocument();
+      expect(screen.getByText('EXE101_G02')).toBeInTheDocument();
+
+      // Test deselect all button
+      const deselectBtn = screen.getByTestId('deselect-all-classes-btn');
+      fireEvent.click(deselectBtn);
+
+      // Export button should be disabled when 0 classes selected
+      const exportBtn = screen.getByRole('button', { name: /Xuất file Excel/i });
+      expect(exportBtn).toBeDisabled();
+
+      // Test select all button
+      const selectAllBtn = screen.getByTestId('select-all-classes-btn');
+      fireEvent.click(selectAllBtn);
+      expect(exportBtn).not.toBeDisabled();
+
+      // Trigger export
+      fireEvent.click(exportBtn);
+
+      await waitFor(() => {
+        expect(mockToastSuccess).toHaveBeenCalled();
+        expect(onClose).toHaveBeenCalled();
+      });
+    });
   });
 });

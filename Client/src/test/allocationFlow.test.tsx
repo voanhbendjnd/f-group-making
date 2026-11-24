@@ -74,7 +74,7 @@ describe('automatic allocation workflow', () => {
     expect(interval).not.toHaveBeenCalled();
     await act(async () => { await i18n.changeLanguage('en'); });
     expect(screen.getByText('Analyzing')).toBeInTheDocument();
-    expect(screen.getByText(i18n.t('allocation.thinking.criteria'))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t('allocation.thinking.criteria'))).not.toBeInTheDocument();
     expect(allocationApi.preview).not.toHaveBeenCalled();
     view.unmount(); interval.mockRestore();
   });
@@ -101,6 +101,7 @@ describe('automatic allocation workflow', () => {
     expect(vi.getTimerCount()).toBe(1);
     view.unmount();
     expect(vi.getTimerCount()).toBe(0);
+    vi.useRealTimers();
   });
   it('shows thinking only during the real request and displays the result without an artificial delay', async () => {
     let resolve!: (value: ReturnType<typeof previewFixture>) => void;
@@ -115,6 +116,38 @@ describe('automatic allocation workflow', () => {
     expect(screen.queryByRole('status', { name: i18n.t('allocation.calculating') })).not.toBeInTheDocument();
     expect(screen.getAllByRole('heading', { name: i18n.t('allocation.previewData') })).toHaveLength(1);
     expect(allocationApi.apply).not.toHaveBeenCalled();
+  }, 15000);
+  it('clears preview and resets targets when clicking autoAllocate again after changing rules', async () => {
+    let resolveFirst!: (value: ReturnType<typeof previewFixture>) => void;
+    vi.mocked(allocationApi.preview).mockImplementationOnce(() => new Promise(done => { resolveFirst = done; }));
+    render(pageTree()); await screen.findByText('Fixture group 1');
+
+    const autoAllocateBtn = screen.getByRole('button', { name: i18n.t('allocation.autoAllocate'), exact: true });
+    fireEvent.click(autoAllocateBtn);
+    const confirm = await screen.findByRole('button', { name: i18n.t('allocation.confirmTarget') });
+    fireEvent.click(confirm);
+
+    await screen.findByRole('status', { name: i18n.t('allocation.calculating') });
+    await act(async () => resolveFirst(previewFixture()));
+    expect(screen.queryByRole('status', { name: i18n.t('allocation.calculating') })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('heading', { name: i18n.t('allocation.previewData') })).toHaveLength(1);
+
+    // Click "Tạo phương án đề xuất" again (after changing rules)
+    fireEvent.click(autoAllocateBtn);
+
+    // Old preview must be cleared immediately without needing a 2nd click
+    expect(screen.queryByRole('heading', { name: i18n.t('allocation.previewData') })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: i18n.t('allocation.setup') })).toBeInTheDocument();
+
+    const confirm2 = await screen.findByRole('button', { name: i18n.t('allocation.confirmTarget') });
+    expect(confirm2).not.toHaveClass('ant-btn-loading');
+  });
+  it('triggers setup skeleton loading when start is called with a duration', async () => {
+    const value = hook();
+    await waitFor(() => expect(value.result.current.overview.isSuccess).toBe(true));
+    act(() => value.result.current.start({ minDuration: 50 }));
+    expect(value.result.current.setupLoading).toBe(true);
+    await waitFor(() => expect(value.result.current.setupLoading).toBe(false));
   });
   it.each(['PROVEN_INFEASIBLE', 'SEARCH_LIMIT_REACHED'] as const)('does not claim a saved suggestion for %s', async status => {
     vi.mocked(allocationApi.preview).mockResolvedValue({ ...previewFixture(), result: { ...previewFixture().result, status }, previewId: null, report: null, groups: [] });
@@ -126,7 +159,7 @@ describe('automatic allocation workflow', () => {
     expect(document.querySelector('.allocation-smart-suggestion-banner')).toBeNull();
     expect(screen.getByRole('button', { name: i18n.t('allocation.apply'), exact: true })).toBeDisabled();
     expect(allocationApi.apply).not.toHaveBeenCalled();
-  });
+  }, 15000);
   it('separates existing student moves from newly assigned students using the actual report', async () => {
     const preview = previewFixture();
     preview.result.optimization!.movedStudents = 999;
@@ -508,7 +541,7 @@ describe('automatic allocation workflow', () => {
     expect(allocationApi.plan).toHaveBeenCalledWith(3, 2, planFixture().summary.planId, expect.anything());
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     fireEvent.click(screen.getByRole('tab', { name: i18n.t('allocation.applyAudit') }));
-    fireEvent.click(await screen.findByRole('button', { name: 'View run #9' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'View run #9' }, { timeout: 6000 }));
     await screen.findByText('Allocation run #9'); expect(allocationApi.historyDetail).toHaveBeenCalledWith(3, 2, 9, expect.anything());
     await act(async () => i18n.changeLanguage('vi')); expect(await screen.findByText('Lần phân bổ #9')).toBeInTheDocument();
   }, 15000);

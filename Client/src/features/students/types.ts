@@ -20,6 +20,7 @@ export interface Student {
   majorCode: string | null;
   majorName?: string | null;
   schoolClassId?: number | null;
+  className?: string | null;
   groupName?: string | null;
   lecturerCode?: string | null;
   activated: boolean;

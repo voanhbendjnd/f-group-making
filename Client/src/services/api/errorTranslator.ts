@@ -14,8 +14,21 @@ export function translateErrorMessage(error: any): string {
   const data = error.response?.data || error.raw || error.data || error;
 
   // Check error key / title from Zalando Problem or custom exception
-  const errorKey = data?.errorKey || data?.message || data?.title || data?.error;
+  const errorKey = data?.errorKey || data?.code || data?.message || data?.title || data?.error;
   const detail = data?.detail;
+
+  // Check session terminated due to concurrent login on another device
+  if (
+    data?.code === 'SESSION_TERMINATED_CONCURRENT_LOGIN' ||
+    data?.errorKey === 'sessionConcurrentLogin' ||
+    errorKey === 'sessionConcurrentLogin' ||
+    errorKey === 'error.sessionConcurrentLogin' ||
+    errorKey === 'SESSION_TERMINATED_CONCURRENT_LOGIN' ||
+    (typeof errorKey === 'string' && errorKey.includes('thiết bị khác')) ||
+    (typeof data?.message === 'string' && data.message.includes('thiết bị khác'))
+  ) {
+    return i18n.t('auth.sessionConcurrentLogin', 'Tài khoản đã được đăng nhập trên thiết bị khác.');
+  }
 
   // Known backend error keys
   switch (errorKey) {

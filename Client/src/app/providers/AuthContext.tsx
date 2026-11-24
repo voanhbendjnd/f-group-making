@@ -21,28 +21,52 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<StoredUser | null>(() => storage.getUser());
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const { info, error } = useToast();
+  const { info, error, warning } = useToast();
 
   const handleUnauthorized = useCallback(
     (e: Event) => {
-      const customEvent = e as CustomEvent<{ message?: string }>;
+      const customEvent = e as CustomEvent<{ message?: string; code?: string; errorKey?: string }>;
       setUser(null);
       storage.clearAll();
-      info(customEvent.detail?.message || i18n.t('common.sessionExpired'));
+
+      const isConcurrentLogin =
+        customEvent.detail?.code === 'SESSION_TERMINATED_CONCURRENT_LOGIN' ||
+        customEvent.detail?.errorKey === 'sessionConcurrentLogin' ||
+        customEvent.detail?.message?.includes('thiết bị khác') ||
+        customEvent.detail?.message?.includes('another device');
+
+      const fallbackMsg = isConcurrentLogin
+        ? i18n.t('auth.sessionConcurrentLogin', 'Tài khoản đã được đăng nhập trên thiết bị khác.')
+        : i18n.t('common.sessionExpired');
+
+      const displayMsg = customEvent.detail?.message || fallbackMsg;
+      if (warning) {
+        warning(displayMsg);
+      } else if (info) {
+        info(displayMsg);
+      }
     },
-    [info]
+    [info, warning]
   );
 
   useEffect(() => {
     window.addEventListener('app:unauthorized', handleUnauthorized);
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'f_group_auth_token' && !e.newValue) {
+        setUser(null);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
     return () => {
       window.removeEventListener('app:unauthorized', handleUnauthorized);
+      window.removeEventListener('storage', handleStorageChange);
     };
   }, [handleUnauthorized]);
 
   const login = async (request: LoginRequest): Promise<StoredUser> => {
     setIsLoading(true);
     try {
+      storage.clearAll();
       const response = await authApi.login(request);
       storage.setToken(response.accessToken);
       const storedUser: StoredUser = {

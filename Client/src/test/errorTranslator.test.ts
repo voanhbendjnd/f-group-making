@@ -51,6 +51,30 @@ describe('errorTranslator', () => {
     expect(msg).toContain('Email hoặc mật khẩu không chính xác');
   });
 
+  it('translates concurrent login on another device to distinct warning and not bad credentials', async () => {
+    const error = {
+      response: {
+        status: 401,
+        data: {
+          code: 'SESSION_TERMINATED_CONCURRENT_LOGIN',
+          errorKey: 'sessionConcurrentLogin',
+          message: 'Tài khoản đã được đăng nhập trên thiết bị khác',
+        },
+      },
+    };
+    await i18n.changeLanguage('vi');
+    const msgVi = translateErrorMessage(error);
+    expect(msgVi).toBe('Tài khoản đã được đăng nhập trên thiết bị khác.');
+    expect(msgVi).not.toContain('Email hoặc mật khẩu không chính xác');
+
+    await i18n.changeLanguage('en');
+    const msgEn = translateErrorMessage(error);
+    expect(msgEn).toBe('Your account has been logged in on another device.');
+    expect(msgEn).not.toContain('Incorrect email or password');
+
+    await i18n.changeLanguage('vi');
+  });
+
   it('translates 403 Forbidden to friendly message', () => {
     const error = {
       response: {

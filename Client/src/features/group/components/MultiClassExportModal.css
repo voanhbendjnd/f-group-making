@@ -1,0 +1,134 @@
+.multi-class-export-modal .multi-export-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.multi-class-stats-grid {
+  grid-template-columns: repeat(3, 1fr);
+  margin-bottom: 0;
+}
+
+.multi-export-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.multi-export-search {
+  flex: 1 1 240px;
+}
+
+.multi-export-quick-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.multi-export-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--color-primary-light, #eff6ff);
+  border: 1px solid var(--color-primary-border, #bfdbfe);
+  color: var(--color-primary-dark, #1e40af);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.multi-export-notice svg {
+  flex-shrink: 0;
+  color: var(--color-primary, #2563eb);
+}
+
+.multi-export-progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.multi-export-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.multi-export-progress-header svg {
+  color: #2563eb;
+}
+
+.multi-export-table-container {
+  border: 1px solid var(--border-color, #e2e8f0);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.multi-export-class-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-primary, #0f172a);
+}
+
+.multi-export-class-name svg {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.multi-export-student-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary, #64748b);
+  font-size: 0.875rem;
+}
+
+.multi-export-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.multi-export-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.multi-export-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 640px) {
+  .multi-class-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .multi-export-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .multi-export-footer-actions {
+    margin-left: 0;
+    justify-content: flex-end;
+  }
+}

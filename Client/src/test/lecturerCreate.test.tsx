@@ -57,7 +57,11 @@ describe('Add Lecturer', () => {
   });
 
   it.each([
-    ['', '', 'addLecturer.required'], ['A', 'invalid', 'addLecturer.invalid.code'],
+    ['', '', 'addLecturer.required'],
+    ['A', 'invalid', 'addLecturer.invalid.code'],
+    ['trântt', 'valid@example.test', 'addLecturer.invalid.codePattern'],
+    ['trangttt12', 'invalid-email', 'addLecturer.invalid.email'],
+    ['trangttt12', 'trântt@example.com', 'addLecturer.invalid.email'],
     ['X'.repeat(51), 'a'.repeat(245) + '@example.test', 'addLecturer.invalid.email'],
   ])('validates input lengths and formats before sending', async (code, email, errorKey) => {
     mount(); fireEvent.change(screen.getByLabelText(/Lecturer Code/), { target: { value: code } });
@@ -65,6 +69,15 @@ describe('Add Lecturer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create lecturer' }));
     await waitFor(() => expect(screen.getAllByText(i18n.t(errorKey)).length).toBeGreaterThan(0));
     expect(lecturerApi.createLecturer).not.toHaveBeenCalled(); expect(success).not.toHaveBeenCalled();
+  });
+
+  it('maps invalid codePattern violation from API', async () => {
+    vi.mocked(lecturerApi.createLecturer).mockRejectedValue({ status: 400, message: 'bad request', violations: [{
+      field: 'code', message: 'lecturerCreate.invalid.codePattern',
+    }] });
+    mount(); fill(); fireEvent.click(screen.getByRole('button', { name: 'Create lecturer' }));
+    await screen.findByText(i18n.t('addLecturer.invalid.codePattern'));
+    expect(close).not.toHaveBeenCalled(); expect(success).not.toHaveBeenCalled();
   });
 
   it('blocks double-submit and closing while pending', async () => {

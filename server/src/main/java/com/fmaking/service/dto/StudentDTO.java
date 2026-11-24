@@ -28,6 +28,7 @@ public class StudentDTO {
     String majorCode;
     String majorName;
     Integer schoolClassId;
+    String className;
     String groupName;
     Boolean activated;
     Boolean hasActivationKey;

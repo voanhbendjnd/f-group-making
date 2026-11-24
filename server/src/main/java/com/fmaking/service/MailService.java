@@ -86,6 +86,8 @@ public class MailService {
         Context context = new Context(locale);
         context.setVariable(USER, user);
         context.setVariable(BASE_URL, clientBaseUrl);
+        String activationUrl = clientBaseUrl + "/account/activate?key=" + (user.getActivationKey() != null ? user.getActivationKey() : "");
+        context.setVariable("activationUrl", activationUrl);
         String content = springTemplateEngine.process(templateName, context);
         String subject = messageSource.getMessage(titleKey, null, locale);
         sendEmailSync(user.getEmail(), subject, content, false, true);

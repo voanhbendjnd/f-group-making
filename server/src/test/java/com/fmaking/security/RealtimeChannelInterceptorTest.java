@@ -90,4 +90,18 @@ class RealtimeChannelInterceptorTest {
         assertThatThrownBy(() -> send(subscription("/topic/classes/1/deadlines", "ROLE_LECTURE_MASTER")))
             .isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
     }
+
+    @Test void anyAuthenticatedUserCanSubscribeToSessionQueue() {
+        assertThatCode(() -> send(subscription("/user/queue/session", "ROLE_STUDENT"))).doesNotThrowAnyException();
+        assertThatCode(() -> send(subscription("/user/queue/session", "ROLE_LECTURE"))).doesNotThrowAnyException();
+        assertThatCode(() -> send(subscription("/user/queue/session", "ROLE_ADMIN"))).doesNotThrowAnyException();
+    }
+
+    @Test void sessionInvalidationOutboundMessageIsAuthorizedEvenWhenSessionIsRevoked() {
+        var headers = org.springframework.messaging.simp.SimpMessageHeaderAccessor.create(org.springframework.messaging.simp.SimpMessageType.MESSAGE);
+        headers.setSessionId("connected-session");
+        headers.setDestination("/user/queue/session");
+        var outbound = MessageBuilder.createMessage(new byte[0], headers.getMessageHeaders());
+        assertThat(interceptor.authorizeOutbound(outbound)).isSameAs(outbound);
+    }
 }

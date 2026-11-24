@@ -10,6 +10,7 @@ import com.fmaking.domain.User;
 import com.fmaking.repository.AuthorityRepository;
 import com.fmaking.repository.UserRepository;
 import com.fmaking.security.AuthoritiesConstants;
+import com.fmaking.service.dto.CreateAdminDTO;
 import com.fmaking.service.dto.ResetKeyVerifyDTO;
 import com.fmaking.service.dto.UserDTO;
 import com.fmaking.service.errors.AccessDeniedException;
@@ -337,5 +338,51 @@ public class UserService {
                     this.clearUserCaches(user);
                     return user;
                 });
+    }
+
+    /**
+     * Create a new Admin user account.
+     * Similar to Student and Lecturer creation, generates an activation key
+     * and sends an activation email for the user to set their password.
+     */
+    public UserDTO createAdmin(CreateAdminDTO dto) {
+        String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ENGLISH);
+        if (userRepository.findOneByEmail(normalizedEmail).isPresent()) {
+            throw new BadRequestResourceException("Email already in use", "userManagement", "emailexists");
+        }
+
+        User user = new User();
+        user.setEmail(normalizedEmail);
+        user.setName(dto.getName().trim());
+
+        Authority adminAuth = authorityRepository.findById(AuthoritiesConstants.ADMIN)
+                .orElseGet(() -> {
+                    Authority auth = new Authority();
+                    auth.setName(AuthoritiesConstants.ADMIN);
+                    return authorityRepository.save(auth);
+                });
+        user.setAuthorities(new HashSet<>(Set.of(adminAuth)));
+
+        boolean sendEmail = dto.getSendActivationEmail() == null || Boolean.TRUE.equals(dto.getSendActivationEmail()) || dto.getPassword() == null;
+
+        if (sendEmail) {
+            user.setActivated(false);
+            assignNewActivationKey(user);
+        } else {
+            user.setPassword(passwordEncoder.encode(dto.getPassword()));
+            user.setActivated(true);
+        }
+
+        User savedUser = userRepository.save(user);
+        this.clearUserCaches(savedUser);
+
+        UserDTO res = new UserDTO();
+        res.setId(savedUser.getId());
+        res.setEmail(savedUser.getEmail());
+        res.setName(savedUser.getName());
+        res.setActivated(savedUser.getActivated());
+        res.setActivationKey(savedUser.getActivationKey());
+        res.setAuthorities(Set.of(AuthoritiesConstants.ADMIN));
+        return res;
     }
 }
