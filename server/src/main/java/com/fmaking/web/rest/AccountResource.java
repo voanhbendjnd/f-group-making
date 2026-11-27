@@ -110,7 +110,12 @@ public class AccountResource {
 
         UserDTO dto;
         if (rawUserId != null) {
-            Long userId = rawUserId instanceof Number ? ((Number) rawUserId).longValue() : Long.parseLong(rawUserId.toString());
+            Long userId;
+            try {
+                userId = rawUserId instanceof Number ? ((Number) rawUserId).longValue() : Long.parseLong(rawUserId.toString().trim());
+            } catch (NumberFormatException ex) {
+                throw new BadRequestResourceException("Invalid user ID format", "userManagement", "invalidids");
+            }
             termService.validateUserIdsInTerm(List.of(userId), termId);
             dto = userService.initActivatedKeyAccountById(userId);
         } else if (email != null && !email.isBlank()) {

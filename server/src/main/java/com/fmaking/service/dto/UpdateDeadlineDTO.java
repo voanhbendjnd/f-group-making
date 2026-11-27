@@ -13,7 +13,6 @@ import java.util.List;
 @Setter
 public class UpdateDeadlineDTO {
 
-    @NotNull
     private Integer id;
 
     @NotBlank

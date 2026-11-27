@@ -97,7 +97,7 @@ export const InviteMemberModal: React.FC<InviteMemberModalProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width="min(95vw, 680px)"
     >
       <div style={{ marginBottom: '1rem' }}>

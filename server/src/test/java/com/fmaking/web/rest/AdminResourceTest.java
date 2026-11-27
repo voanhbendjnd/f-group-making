@@ -56,7 +56,7 @@ class AdminResourceTest {
                 .andExpect(jsonPath("$.data.email").value("new.admin@fpt.edu.vn"))
                 .andExpect(jsonPath("$.data.name").value("New Admin"))
                 .andExpect(jsonPath("$.data.activated").value(false))
-                .andExpect(jsonPath("$.data.activationKey").isNotEmpty())
+                .andExpect(jsonPath("$.data.activationKey").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.data.authorities[0]").value("ROLE_ADMIN"));
 
         User saved = userRepository.findOneByEmail("new.admin@fpt.edu.vn").orElseThrow();

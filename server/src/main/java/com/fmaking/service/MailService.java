@@ -129,6 +129,7 @@ public class MailService {
             case REJECTED -> "Nhóm của bạn chưa được duyệt";
         };
         Context context = new Context(Locale.forLanguageTag("vi"));
+        context.setVariable(BASE_URL, clientBaseUrl);
         context.setVariable("notification", event);
         context.setVariable("recipientName", recipient.name());
         context.setVariable("heading", heading);

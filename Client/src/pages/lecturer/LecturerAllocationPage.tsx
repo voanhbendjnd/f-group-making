@@ -288,7 +288,7 @@ function AllocationWorkspace({ classId, deadlineId, termName, backAction }: { cl
       footer={null}
       title={t('rules.title', 'Quy định nhóm')}
       width={720}
-      destroyOnClose
+      destroyOnHidden
     >
       {editingRules && <ClassRulesPanel classId={classId} />}
     </Modal>

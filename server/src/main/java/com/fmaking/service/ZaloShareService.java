@@ -8,14 +8,16 @@ import com.fmaking.service.dto.ZaloShareDTO;
 import com.fmaking.service.dto.ZaloShareDTO.Write;
 import com.fmaking.web.rest.errors.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import java.util.*;
 
 @Service
-@Transactional(readOnly = true)
 public class ZaloShareService {
     private final ZaloShareRepository shares;
     private final SchoolClassRepository classes;
@@ -26,24 +28,32 @@ public class ZaloShareService {
     private final SchoolClassAccessService access;
     private final ZaloQrStorage storage;
     private final GroupEventPublisher events;
+    private final TransactionTemplate readTx;
+    private final TransactionTemplate writeTx;
 
     public ZaloShareService(ZaloShareRepository shares, SchoolClassRepository classes, LecturerRepository lecturers,
         StudentRepository students, UserRepository users, TermRepository terms, SchoolClassAccessService access,
-        ZaloQrStorage storage, GroupEventPublisher events) {
+        ZaloQrStorage storage, GroupEventPublisher events, PlatformTransactionManager txManager) {
         this.shares = shares; this.classes = classes; this.lecturers = lecturers; this.students = students;
         this.users = users; this.terms = terms; this.access = access; this.storage = storage; this.events = events;
+        this.readTx = new TransactionTemplate(txManager);
+        this.readTx.setReadOnly(true);
+        this.writeTx = new TransactionTemplate(txManager);
     }
 
+    @Transactional(readOnly = true)
     public ZaloShareDTO classShare(Integer classId, Integer termId) {
         var target = classTarget(classId, termId, false);
         return shares.findByScopeKey(target.key()).map(share -> checkedDto(share, target)).orElse(null);
     }
 
+    @Transactional(readOnly = true)
     public ZaloShareDTO lecturerShare(Long lecturerId, Integer termId) {
         var target = lecturerTarget(lecturerId, termId, false);
         return shares.findByScopeKey(target.key()).map(share -> checkedDto(share, target)).orElse(null);
     }
 
+    @Transactional(readOnly = true)
     public List<ZaloShareDTO> mine() {
         var student = currentStudent();
         if (student.getSchoolClassId() == null) return List.of();
@@ -63,18 +73,17 @@ public class ZaloShareService {
             .map(share -> toDto(share, share.getScope() == ZaloShare.Scope.CLASS ? schoolClass : null, teacher, term)).toList();
     }
 
-    @Transactional
     public ZaloShareDTO saveClass(Integer classId, Integer termId, Write request, MultipartFile qr) {
-        return save(classTarget(classId, termId, true), request, qr);
+        return saveWithTarget(() -> classTarget(classId, termId, false), () -> classTarget(classId, termId, true), request, qr);
     }
 
-    @Transactional
     public ZaloShareDTO saveLecturer(Long lecturerId, Integer termId, Write request, MultipartFile qr) {
-        return save(lecturerTarget(lecturerId, termId, true), request, qr);
+        return saveWithTarget(() -> lecturerTarget(lecturerId, termId, false), () -> lecturerTarget(lecturerId, termId, true), request, qr);
     }
 
-    private ZaloShareDTO save(Target target, Write request, MultipartFile qr) {
-        if (request.scope() != target.scope()) throw ZaloShareValidation.invalid("zaloInvalidScope");
+    private ZaloShareDTO saveWithTarget(java.util.function.Supplier<Target> readTargetSupplier,
+                                        java.util.function.Supplier<Target> lockTargetSupplier,
+                                        Write request, MultipartFile qr) {
         String title = request.title() == null ? "" : request.title().trim();
         String description = request.description() == null ? null : request.description().trim();
         if (title.isBlank() || title.length() > 100 || (description != null && description.length() > 500)) throw ZaloShareValidation.invalid("zaloInvalidData");
@@ -82,29 +91,57 @@ public class ZaloShareService {
         String link = ZaloShareValidation.inviteUrl(request.inviteUrl());
         var image = ZaloShareValidation.image(qr);
         if (image != null && request.removeQr()) throw ZaloShareValidation.invalid("zaloInvalidData");
-        var share = shares.findByScopeKey(target.key()).orElse(null);
-        if (share != null) checkTarget(share, target);
-        if ((share == null && request.version() != null) || (share != null && !Objects.equals(share.getVersion(), request.version()))) throw changed();
-        if (share == null) {
-            share = new ZaloShare(); share.setScope(target.scope()); share.setScopeKey(target.key());
-            share.setTermId(target.term().getId());
-            share.setSchoolClassId(target.schoolClass() == null ? null : target.schoolClass().getId());
-            share.setLecturerId(target.scope() == ZaloShare.Scope.LECTURER ? target.teacher().getId() : null);
-        }
-        String oldPublicId = share.getQrPublicId();
+
+        // Pre-validate access, scope, and version before uploading externally without holding DB locks.
+        readTx.executeWithoutResult(status -> {
+            var preTarget = readTargetSupplier.get();
+            if (request.scope() != preTarget.scope()) throw ZaloShareValidation.invalid("zaloInvalidScope");
+            var existing = shares.findByScopeKey(preTarget.key()).orElse(null);
+            if (existing != null) checkTarget(existing, preTarget);
+            if ((existing == null && request.version() != null) || (existing != null && !Objects.equals(existing.getVersion(), request.version()))) {
+                throw changed();
+            }
+        });
+
+        String uploadedPublicId = null;
         if (image != null) {
-            String publicId = "fgroup/zalo/" + UUID.randomUUID();
-            cleanup(publicId, false);
-            storage.upload(image.bytes(), publicId, image.format());
-            share.setQrPublicId(publicId); share.setQrFormat(image.format()); share.setQrBytes((long)image.bytes().length);
-        } else if (request.removeQr()) {
-            share.setQrPublicId(null); share.setQrFormat(null); share.setQrBytes(null);
+            uploadedPublicId = "fgroup/zalo/" + UUID.randomUUID();
+            try {
+                storage.upload(image.bytes(), uploadedPublicId, image.format());
+            } catch (RuntimeException ex) {
+                storage.deleteSafely(uploadedPublicId);
+                throw ex;
+            }
         }
-        share.setTitle(title); share.setInviteUrl(link); share.setDescription(description);
-        share = shares.saveAndFlush(share);
-        if (!Objects.equals(oldPublicId, share.getQrPublicId())) cleanup(oldPublicId, true);
-        publish(target);
-        return checkedDto(share, target);
+        final String newPublicId = uploadedPublicId;
+
+        return writeTx.execute(status -> {
+            if (newPublicId != null) cleanup(newPublicId, false);
+            var target = lockTargetSupplier.get();
+            if (request.scope() != target.scope()) throw ZaloShareValidation.invalid("zaloInvalidScope");
+            var share = shares.findByScopeKey(target.key()).orElse(null);
+            if (share != null) checkTarget(share, target);
+            if ((share == null && request.version() != null) || (share != null && !Objects.equals(share.getVersion(), request.version()))) {
+                throw changed();
+            }
+            if (share == null) {
+                share = new ZaloShare(); share.setScope(target.scope()); share.setScopeKey(target.key());
+                share.setTermId(target.term().getId());
+                share.setSchoolClassId(target.schoolClass() == null ? null : target.schoolClass().getId());
+                share.setLecturerId(target.scope() == ZaloShare.Scope.LECTURER ? target.teacher().getId() : null);
+            }
+            String oldPublicId = share.getQrPublicId();
+            if (image != null) {
+                share.setQrPublicId(newPublicId); share.setQrFormat(image.format()); share.setQrBytes((long) image.bytes().length);
+            } else if (request.removeQr()) {
+                share.setQrPublicId(null); share.setQrFormat(null); share.setQrBytes(null);
+            }
+            share.setTitle(title); share.setInviteUrl(link); share.setDescription(description);
+            share = shares.saveAndFlush(share);
+            if (!Objects.equals(oldPublicId, share.getQrPublicId())) cleanup(oldPublicId, true);
+            publish(target);
+            return checkedDto(share, target);
+        });
     }
 
     @Transactional
@@ -125,23 +162,28 @@ public class ZaloShareService {
     }
 
     public QrImage qr(Long id) {
-        var share = shares.findById(id).orElseThrow(ZaloShareService::missing);
-        if (isManager()) {
-            var target = share.getScope() == ZaloShare.Scope.LECTURER
-                ? lecturerTarget(share.getLecturerId(), share.getTermId(), false)
-                : classTarget(share.getSchoolClassId(), share.getTermId(), false);
-            checkTarget(share, target);
-        } else {
-            var student = currentStudent();
-            var schoolClass = student.getSchoolClassId() == null ? null : classes.findById(student.getSchoolClassId()).orElse(null);
-            if (schoolClass == null || !Objects.equals(schoolClass.getTermId(), share.getTermId()) || !terms.existsById(share.getTermId())) throw missing();
-            if (share.getScope() == ZaloShare.Scope.CLASS) {
-                if (!Objects.equals(share.getSchoolClassId(), schoolClass.getId()) || share.getLecturerId() != null) throw missing();
-            } else if (share.getSchoolClassId() != null || schoolClass.getLecturerId() == null
-                || !Objects.equals(share.getLecturerId(), schoolClass.getLecturerId())) throw missing();
-        }
-        if (share.getQrPublicId() == null) throw missing();
-        return new QrImage(storage.read(share.getQrPublicId(), share.getQrFormat()), "image/" + ("jpg".equals(share.getQrFormat()) ? "jpeg" : share.getQrFormat()));
+        record QrLocation(String publicId, String format) {}
+        QrLocation location = readTx.execute(status -> {
+            var share = shares.findById(id).orElseThrow(ZaloShareService::missing);
+            if (isManager()) {
+                var target = share.getScope() == ZaloShare.Scope.LECTURER
+                    ? lecturerTarget(share.getLecturerId(), share.getTermId(), false)
+                    : classTarget(share.getSchoolClassId(), share.getTermId(), false);
+                checkTarget(share, target);
+            } else {
+                var student = currentStudent();
+                var schoolClass = student.getSchoolClassId() == null ? null : classes.findById(student.getSchoolClassId()).orElse(null);
+                if (schoolClass == null || !Objects.equals(schoolClass.getTermId(), share.getTermId()) || !terms.existsById(share.getTermId())) throw missing();
+                if (share.getScope() == ZaloShare.Scope.CLASS) {
+                    if (!Objects.equals(share.getSchoolClassId(), schoolClass.getId()) || share.getLecturerId() != null) throw missing();
+                } else if (share.getSchoolClassId() != null || schoolClass.getLecturerId() == null
+                    || !Objects.equals(share.getLecturerId(), schoolClass.getLecturerId())) throw missing();
+            }
+            if (share.getQrPublicId() == null) throw missing();
+            return new QrLocation(share.getQrPublicId(), share.getQrFormat());
+        });
+        return new QrImage(storage.read(location.publicId(), location.format()),
+            "image/" + ("jpg".equals(location.format()) ? "jpeg" : location.format()));
     }
 
     private Target classTarget(Integer classId, Integer termId, boolean lock) {

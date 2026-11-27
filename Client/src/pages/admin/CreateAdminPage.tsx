@@ -58,19 +58,26 @@ export const CreateAdminPage: React.FC = () => {
       reset();
     } catch (err: any) {
       const responseData = err?.response?.data;
-      const errorKey = responseData?.errorKey || responseData?.message;
+      const errorKey =
+        err?.errorKey ||
+        err?.raw?.errorKey ||
+        err?.raw?.message ||
+        responseData?.errorKey ||
+        responseData?.message;
+      const serverMsg = err?.message || err?.detail || responseData?.message;
+      const titleStr = String(err?.raw?.title || responseData?.title || '').toLowerCase();
       if (
         errorKey === 'emailexists' ||
         errorKey === 'userexists' ||
-        String(responseData?.title || '').toLowerCase().includes('already') ||
-        String(err?.message || '').toLowerCase().includes('email')
+        titleStr.includes('already') ||
+        String(serverMsg || '').toLowerCase().includes('email')
       ) {
         setServerError(
           t('createAdmin.errorDuplicateEmail', 'Email này đã được sử dụng trong hệ thống. Vui lòng chọn email khác.')
         );
       } else {
         setServerError(
-          responseData?.message ||
+          serverMsg ||
             t('createAdmin.errorDefault', 'Không thể tạo tài khoản Admin. Vui lòng thử lại sau.')
         );
       }

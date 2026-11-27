@@ -40,21 +40,24 @@ export const AuthLayout: React.FC = () => {
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div
             style={{
-              width: '48px',
-              height: '48px',
+              width: '56px',
+              height: '56px',
               borderRadius: 'var(--radius-lg)',
-              backgroundColor: 'var(--color-primary)',
-              color: '#ffffff',
+              backgroundColor: '#ffffff',
+              border: '1px solid var(--color-primary-light)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: 800,
-              fontSize: '1.5rem',
-              boxShadow: '0 4px 14px rgba(29, 78, 216, 0.35)',
+              padding: '5px',
+              boxShadow: '0 4px 14px rgba(29, 78, 216, 0.16)',
               marginBottom: '0.875rem',
             }}
           >
-            F
+            <img
+              src="/logo.png"
+              alt={t('common.systemBrand')}
+              style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            />
           </div>
           <h2 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--color-text-main)', letterSpacing: '-0.02em' }}>
             {t('common.systemBrand')}

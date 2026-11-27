@@ -665,7 +665,11 @@
     "student": "Sinh viên",
     "sessionExpired": "Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.",
     "logoutSuccess": "Bạn đã đăng xuất an toàn khỏi hệ thống.",
-    "pageTitle": "F-Group Making — Quản lý Sinh viên & Xếp nhóm"
+    "pageTitle": "F-Group Making — Quản lý Sinh viên & Xếp nhóm",
+    "refresh": "Làm mới",
+    "edit": "Chỉnh sửa",
+    "delete": "Xóa",
+    "view": "Xem"
   },
   "breadcrumbs": {
     "admin": "Quản trị",
@@ -1611,7 +1615,9 @@
       "deleteConfirmDesc": "Bạn có chắc muốn xóa mô tả này không?",
       "bannerHint": "Hãy viết vài dòng giới thiệu về thế mạnh kỹ năng và vai trò bạn hướng tới để các nhóm dễ dàng liên hệ và đề xuất bạn!",
       "title": "Mô tả bản thân",
-      "emptyPlaceholder": "Chưa cập nhật mô tả bản thân"
+      "emptyPlaceholder": "Chưa cập nhật mô tả bản thân",
+      "updateError": "Không thể cập nhật mô tả. Vui lòng thử lại.",
+      "deleteError": "Không thể xóa mô tả. Vui lòng thử lại."
     },
     "recommendation": {
       "sectionTitle": "Gợi ý thành viên phù hợp",
@@ -1772,8 +1778,10 @@
       "rejectSuccess": "Đã từ chối lời mời.",
       "rejectError": "Không thể từ chối lời mời",
       "receivedTitle": "Lời mời tham gia nhóm mới!",
-      "receivedDesc": "Nhóm \"{{groupName}}\" đã gửi lời mời bạn tham gia nhóm!"
-    }
+      "receivedDesc": "Nhóm \"{{groupName}}\" đã gửi lời mời bạn tham gia nhóm!",
+      "groupFullTooltip": "Nhóm đã đủ thành viên"
+    },
+    "members": "thành viên"
   },
   "studentWidget": {
     "resolving": "Đang kết nối không gian chọn nhóm của lớp bạn...",
@@ -1836,7 +1844,8 @@
     "suggestForGroup": "Gợi ý cho nhóm",
     "allPool": "Tất cả sinh viên",
     "noSuggestions": "Không có sinh viên phù hợp",
-    "quickAddMember": "Thêm nhanh vào nhóm"
+    "quickAddMember": "Thêm nhanh vào nhóm",
+    "loading": "Đang tải bảng sắp nhóm..."
   },
   "groupWorkspace": {
     "backToClasses": "Quay lại lớp",

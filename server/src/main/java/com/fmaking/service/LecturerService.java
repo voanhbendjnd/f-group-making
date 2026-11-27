@@ -16,8 +16,10 @@ import com.fmaking.repository.AuthorityRepository;
 import com.fmaking.repository.LecturerQueryRepository;
 import com.fmaking.repository.LecturerRepository;
 import com.fmaking.repository.LecturerSpecifications;
+import com.fmaking.repository.SchoolClassRepository;
 import com.fmaking.repository.UserRepository;
 import com.fmaking.security.AuthoritiesConstants;
+import com.fmaking.security.SessionManager;
 import com.fmaking.service.dto.*;
 import com.fmaking.service.errors.ExcelImportException;
 import com.fmaking.service.projection.LecturerRow;
@@ -49,6 +51,8 @@ public class LecturerService {
     private final NotificationAsyncService notificationAsyncService;
     private final org.springframework.cache.CacheManager cacheManager;
     private final TermService termService;
+    private final SchoolClassRepository schoolClassRepository;
+    private final SessionManager sessionManager;
 
     public LecturerService(
             LecturerRepository lecturerRepository,
@@ -58,7 +62,9 @@ public class LecturerService {
             UserService userService,
             NotificationAsyncService notificationAsyncService,
             org.springframework.cache.CacheManager cacheManager,
-            TermService termService
+            TermService termService,
+            SchoolClassRepository schoolClassRepository,
+            SessionManager sessionManager
     ) {
         this.lecturerRepository = lecturerRepository;
         this.lecturerQueryRepository = lecturerQueryRepository;
@@ -68,6 +74,8 @@ public class LecturerService {
         this.notificationAsyncService = notificationAsyncService;
         this.cacheManager = cacheManager;
         this.termService = termService;
+        this.schoolClassRepository = schoolClassRepository;
+        this.sessionManager = sessionManager;
     }
 
     /**
@@ -142,6 +150,7 @@ public class LecturerService {
             user.setSessionId(UUID.randomUUID().toString());
             user.setRefreshToken(null);
             userRepository.saveAndFlush(user);
+            sessionManager.updateSessionCache(user.getEmail(), user.getSessionId());
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                 new org.springframework.transaction.support.TransactionSynchronization() {
                     @Override public void afterCommit() { clearUserCaches(user); }
@@ -545,6 +554,7 @@ public class LecturerService {
         Lecturer lecturer = lecturerRepository.findById(userId)
                 .orElseThrow(() -> new com.fmaking.service.errors.BadRequestResourceException("Lecturer not found with ID: " + userId, "lecturerManagement", "notfound"));
 
+        schoolClassRepository.clearLecturerByIds(List.of(userId));
         lecturerRepository.delete(lecturer);
         lecturerRepository.flush();
 
@@ -552,6 +562,7 @@ public class LecturerService {
             userRepository.delete(user);
             userRepository.flush();
             clearUserCaches(user);
+            sessionManager.evictSessionCache(user.getEmail());
         });
         log.info("Deleted lecturer and user account with ID: {}", userId);
     }
@@ -561,11 +572,14 @@ public class LecturerService {
     }
 
     public void deleteLecturers(List<Long> userIds, Integer termId) {
-        termService.validateUserIdsInTerm(userIds, termId);
         if (userIds == null || userIds.isEmpty()) {
             return;
         }
+        termService.validateUserIdsInTerm(userIds, termId);
         List<Long> distinctIds = userIds.stream().filter(Objects::nonNull).distinct().toList();
+        if (distinctIds.isEmpty()) {
+            return;
+        }
         if (termId != null) {
             long matching = lecturerRepository.findAll(LecturerSpecifications.withTerm(termId)).stream()
                     .filter(lecturer -> distinctIds.contains(lecturer.getUserId())).count();
@@ -575,18 +589,24 @@ public class LecturerService {
             }
         }
         List<Lecturer> lecturers = lecturerRepository.findAllById(distinctIds);
-        if (!lecturers.isEmpty()) {
-            lecturerRepository.deleteAll(lecturers);
-            lecturerRepository.flush();
+        List<Long> lecturerIds = lecturers.stream().map(Lecturer::getUserId).filter(Objects::nonNull).toList();
+        if (lecturerIds.isEmpty()) {
+            return;
         }
+        schoolClassRepository.clearLecturerByIds(lecturerIds);
+        lecturerRepository.deleteAll(lecturers);
+        lecturerRepository.flush();
 
-        List<User> users = userRepository.findAllById(distinctIds);
+        List<User> users = userRepository.findAllById(lecturerIds);
         if (!users.isEmpty()) {
             userRepository.deleteAll(users);
             userRepository.flush();
-            users.forEach(this::clearUserCaches);
+            users.forEach(user -> {
+                clearUserCaches(user);
+                sessionManager.evictSessionCache(user.getEmail());
+            });
         }
-        log.info("Deleted {} lecturer(s) and corresponding user accounts", distinctIds.size());
+        log.info("Deleted {} lecturer(s) and corresponding user accounts", lecturerIds.size());
     }
 
     private void clearUserCaches(User user) {

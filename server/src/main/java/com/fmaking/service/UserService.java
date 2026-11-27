@@ -1,5 +1,6 @@
 package com.fmaking.service;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.CacheManager;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -8,8 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.fmaking.domain.Authority;
 import com.fmaking.domain.User;
 import com.fmaking.repository.AuthorityRepository;
+import com.fmaking.repository.LecturerRepository;
+import com.fmaking.repository.SchoolClassRepository;
+import com.fmaking.repository.StudentRepository;
 import com.fmaking.repository.UserRepository;
 import com.fmaking.security.AuthoritiesConstants;
+import com.fmaking.security.SessionManager;
 import com.fmaking.service.dto.CreateAdminDTO;
 import com.fmaking.service.dto.ResetKeyVerifyDTO;
 import com.fmaking.service.dto.UserDTO;
@@ -33,14 +38,35 @@ public class UserService {
     private final CacheManager cacheManager;
     private final PasswordEncoder passwordEncoder;
     private final AuthorityRepository authorityRepository;
+    private final StudentRepository studentRepository;
+    private final LecturerRepository lecturerRepository;
+    private final SchoolClassRepository schoolClassRepository;
+    private final SessionManager sessionManager;
+
     public UserService(UserRepository userRepository,
                        CacheManager cacheManager,
                        PasswordEncoder passwordEncoder,
                        AuthorityRepository authorityRepository) {
+        this(userRepository, cacheManager, passwordEncoder, authorityRepository, null, null, null, null);
+    }
+
+    @Autowired
+    public UserService(UserRepository userRepository,
+                       CacheManager cacheManager,
+                       PasswordEncoder passwordEncoder,
+                       AuthorityRepository authorityRepository,
+                       @Autowired(required = false) StudentRepository studentRepository,
+                       @Autowired(required = false) LecturerRepository lecturerRepository,
+                       @Autowired(required = false) SchoolClassRepository schoolClassRepository,
+                       @Autowired(required = false) SessionManager sessionManager) {
         this.userRepository = userRepository;
         this.cacheManager = cacheManager;
         this.passwordEncoder = passwordEncoder;
         this.authorityRepository = authorityRepository;
+        this.studentRepository = studentRepository;
+        this.lecturerRepository = lecturerRepository;
+        this.schoolClassRepository = schoolClassRepository;
+        this.sessionManager = sessionManager;
     }
     public User registerUser(UserDTO dto, String password) {
         String normalizedEmail = dto.getEmail().trim().toLowerCase(Locale.ENGLISH);
@@ -86,9 +112,26 @@ public class UserService {
     @Scheduled(cron = "0 0 1 * * ?")
     public void removeNotActivatedUsers(){
         List<User> currentUsers = userRepository.findAllByActivatedIsFalseAndActivationKeyNotNullAndLastModifiedDateBefore(Instant.now().minus(3, ChronoUnit.DAYS));
-        List<Long> currentUserIds = currentUsers.stream().map(User::getId).toList();
+        List<Long> currentUserIds = currentUsers.stream().map(User::getId).filter(Objects::nonNull).toList();
+        if (currentUserIds.isEmpty()) {
+            return;
+        }
+        if (schoolClassRepository != null) {
+            schoolClassRepository.clearLecturerByIds(currentUserIds);
+        }
+        if (lecturerRepository != null) {
+            lecturerRepository.deleteAllByIdInBatch(currentUserIds);
+        }
+        if (studentRepository != null) {
+            studentRepository.deleteAllByIdInBatch(currentUserIds);
+        }
         userRepository.deleteByIdIn(currentUserIds);
-        currentUsers.forEach(this::clearUserCaches);
+        currentUsers.forEach(user -> {
+            clearUserCaches(user);
+            if (sessionManager != null) {
+                sessionManager.evictSessionCache(user.getEmail());
+            }
+        });
     }
 
     public UserDTO initActivatedKeyAccount(String email){
@@ -116,6 +159,10 @@ public class UserService {
         }
         User user = userOpt.get();
         if (Boolean.TRUE.equals(user.getActivated())) {
+            return Optional.empty();
+        }
+        Instant cooldownThreshold = Instant.now().plus(ACTIVATION_KEY_VALIDITY_DAYS, ChronoUnit.DAYS).minus(60, ChronoUnit.SECONDS);
+        if (user.getActivationKeyExpiresAt() != null && user.getActivationKeyExpiresAt().isAfter(cooldownThreshold)) {
             return Optional.empty();
         }
         assignNewActivationKey(user);
@@ -332,7 +379,11 @@ public class UserService {
                     user.setPassword(passwordEncoder.encode(newPassword));
                     user.setResetKey(null);
                     user.setResetDate(null);
-                    user.setSessionId(null);
+                    if (sessionManager != null) {
+                        sessionManager.revokeSession(user);
+                    } else {
+                        user.setSessionId("REVOKED-" + UUID.randomUUID());
+                    }
                     user.setRefreshToken(null);
                     userRepository.save(user);
                     this.clearUserCaches(user);

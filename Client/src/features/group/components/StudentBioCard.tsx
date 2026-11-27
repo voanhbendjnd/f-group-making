@@ -216,7 +216,7 @@ export const StudentBioCard: React.FC<StudentBioCardProps> = ({ initialBio, onBi
         okText={t('common.save', 'Lưu mô tả')}
         cancelText={t('common.cancel', 'Hủy')}
         centered
-        destroyOnClose
+        destroyOnHidden
       >
         <p style={{ fontSize: '0.8125rem', color: '#64748b', marginBottom: 12 }}>
           {t(

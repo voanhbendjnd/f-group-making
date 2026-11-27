@@ -2,6 +2,7 @@ package com.fmaking.service;
 
 import com.fmaking.domain.*;
 import com.fmaking.repository.*;
+import com.fmaking.security.AuthoritiesConstants;
 import com.fmaking.security.SecurityUtils;
 import com.fmaking.service.dto.*;
 import com.fmaking.service.projection.StudentRow;
@@ -12,8 +13,11 @@ import com.fmaking.web.rest.errors.UnprocessableAlertException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.*;
@@ -39,6 +43,8 @@ public class GroupInvitationService {
     private final DeadlinePolicy deadlinePolicy;
     private final GroupEventPublisher eventPublisher;
     private final GroupService groupService;
+    private final SchoolClassAccessService accessService;
+    private final TransactionTemplate requiresNewTx;
 
     public GroupInvitationService(
             GroupInvitationRepository groupInvitationRepository,
@@ -53,7 +59,9 @@ public class GroupInvitationService {
             GroupRecommendationService recommendationService,
             DeadlinePolicy deadlinePolicy,
             GroupEventPublisher eventPublisher,
-            GroupService groupService
+            GroupService groupService,
+            SchoolClassAccessService accessService,
+            PlatformTransactionManager transactionManager
     ) {
         this.groupInvitationRepository = groupInvitationRepository;
         this.groupRepository = groupRepository;
@@ -68,6 +76,9 @@ public class GroupInvitationService {
         this.deadlinePolicy = deadlinePolicy;
         this.eventPublisher = eventPublisher;
         this.groupService = groupService;
+        this.accessService = accessService;
+        this.requiresNewTx = new TransactionTemplate(transactionManager);
+        this.requiresNewTx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
     /**
@@ -75,6 +86,7 @@ public class GroupInvitationService {
      */
     @Transactional(readOnly = true)
     public List<StudentSearchForInviteDTO> searchStudentsForInvite(Integer deadlineId, Integer classId, Long groupId, String query) {
+        requireClassReadAccess(classId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "groupNotFound"));
 
@@ -193,7 +205,7 @@ public class GroupInvitationService {
             throw new ForbiddenAlertException("Nhóm không thuộc đợt hạn hoặc lớp học này", "group", "ERR_FORBIDDEN_NOT_IN_CLASS");
         }
 
-        if (group.getStatus() != GroupStatus.OPEN) {
+        if (group.getStatus() != GroupStatus.OPEN && group.getStatus() != GroupStatus.REVOKED) {
             throw new ConflictAlertException("Nhóm hiện không ở trạng thái mở để mời thành viên.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
@@ -319,8 +331,12 @@ public class GroupInvitationService {
      */
     @Transactional(readOnly = true)
     public List<GroupInvitationDTO> getGroupInvitations(Integer deadlineId, Integer classId, Long groupId) {
+        requireClassReadAccess(classId);
         Group group = groupRepository.findById(groupId)
                 .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy nhóm", "group", "groupNotFound"));
+        if (!Objects.equals(group.getSchoolClassId(), classId) || !Objects.equals(group.getDeadlineId(), deadlineId)) {
+            throw new ForbiddenAlertException("Nhóm không thuộc đợt hạn hoặc lớp học này", "group", "ERR_FORBIDDEN_NOT_IN_CLASS");
+        }
 
         List<GroupInvitation> invitations = groupInvitationRepository.findByGroupIdAndDeadlineId(groupId, deadlineId);
         if (invitations.isEmpty()) {
@@ -372,18 +388,14 @@ public class GroupInvitationService {
         if (!Objects.equals(group.getSchoolClassId(), classId) || !Objects.equals(group.getDeadlineId(), deadlineId))
             throw new ForbiddenAlertException("Invalid invitation group scope", "invitation", "ERR_FORBIDDEN_NOT_IN_CLASS");
 
-        if (group.getStatus() != GroupStatus.OPEN) {
-            invitation.setStatus(GroupInvitationStatus.CANCELLED);
-            invitation.setRespondedAt(Instant.now());
-            groupInvitationRepository.save(invitation);
+        if (group.getStatus() != GroupStatus.OPEN && group.getStatus() != GroupStatus.REVOKED) {
+            cancelInvitationInNewTx(invitation.getId());
             throw new ConflictAlertException("Nhóm hiện không ở trạng thái mở để tham gia.", "group", "ERR_GROUP_STATE_CONFLICT");
         }
 
         // Kiểm tra xem sinh viên đã có nhóm chưa
         if (groupMemberRepository.findByStudentIdAndDeadlineId(studentId, deadlineId).isPresent()) {
-            invitation.setStatus(GroupInvitationStatus.CANCELLED);
-            invitation.setRespondedAt(Instant.now());
-            groupInvitationRepository.save(invitation);
+            cancelInvitationInNewTx(invitation.getId());
             throw new ConflictAlertException("Bạn đã tham gia một nhóm khác trong đợt này.", "group", "ERR_ALREADY_IN_GROUP");
         }
 
@@ -391,9 +403,7 @@ public class GroupInvitationService {
         long currentCount = groupMemberRepository.countByGroupId(groupId);
         int maxMembersLimit = ruleValidationService.getMaxMembers(classId);
         if (currentCount >= maxMembersLimit) {
-            invitation.setStatus(GroupInvitationStatus.CANCELLED);
-            invitation.setRespondedAt(Instant.now());
-            groupInvitationRepository.save(invitation);
+            cancelInvitationInNewTx(invitation.getId());
             throw new ConflictAlertException("Nhóm đã đủ số lượng thành viên tối đa.", "group", "ERR_GROUP_FULL");
         }
 
@@ -528,6 +538,36 @@ public class GroupInvitationService {
         invitation.setStatus(GroupInvitationStatus.CANCELLED); invitation.setRespondedAt(Instant.now());
         groupInvitationRepository.save(invitation);
         eventPublisher.publish("GROUP_INVITATION_CANCELLED", invitation.getGroupId(), invitation.getDeadlineId(), invitation.getSchoolClassId(), getCurrentUserLogin(), invitation.getId());
+    }
+
+    private void cancelInvitationInNewTx(Long invitationId) {
+        requiresNewTx.executeWithoutResult(status ->
+            groupInvitationRepository.findById(invitationId).ifPresent(inv -> {
+                if (inv.getStatus() == GroupInvitationStatus.PENDING) {
+                    inv.setStatus(GroupInvitationStatus.CANCELLED);
+                    inv.setRespondedAt(Instant.now());
+                    groupInvitationRepository.save(inv);
+                }
+            })
+        );
+    }
+
+    private void requireClassReadAccess(Integer classId) {
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.ADMIN)
+                || SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE_MASTER)) {
+            return;
+        }
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.LECTURE)) {
+            SchoolClass schoolClass = schoolClassRepository.findById(classId)
+                    .orElseThrow(() -> new NotFoundAlertException("Không tìm thấy lớp học", "schoolClass", "classNotFound"));
+            accessService.requireReadAccess(schoolClass);
+            return;
+        }
+        if (SecurityUtils.isCurrentUserInRole(AuthoritiesConstants.STUDENT)) {
+            getCurrentStudent(classId);
+            return;
+        }
+        throw new ForbiddenAlertException("Bạn không có quyền truy cập lớp học này", "group", "ERR_FORBIDDEN_NOT_IN_CLASS");
     }
 
     private Student getCurrentStudent(Integer classId) {

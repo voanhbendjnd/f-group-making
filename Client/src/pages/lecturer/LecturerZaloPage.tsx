@@ -72,7 +72,7 @@ function ZaloPageContent() {
       {scope === 'LECTURER' && viewAll && <div className="zalo-target-select"><label htmlFor="zalo-lecturer-select">{t('zalo.selectLecturer')}</label>
         <Select id="zalo-lecturer-select" value={lecturerId} disabled={isLocked} showSearch filterOption={false} onSearch={setLecturerSearch}
           loading={lecturers.isFetching} placeholder={t('zalo.selectLecturer')} onChange={setLecturerId}
-          options={lecturers.data?.result.map(item => ({ value: item.userId, label: `${item.name} · ${item.code}` }))}
+          options={lecturers.data?.result.map(item => ({ value: item.userId, label: item.code ? `${item.name} · ${item.code}` : item.name }))}
           notFoundContent={t(lecturers.isError ? 'zalo.loadFailed' : 'zalo.noLecturers')} /></div>}
       {scope === 'CLASS' && selectedClass.isError && <Alert type="error" showIcon title={zaloError(selectedClass.error, t)} />}
       {scope === 'CLASS' && selectedClass.data && !classAllowed && <Alert type="warning" showIcon title={t('zalo.errors.zaloInvalidScope')} />}

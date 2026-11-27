@@ -22,9 +22,14 @@ import type { Deadline } from '@/features/deadline/types';
 
 export const AdminDeadlinePage: React.FC = () => (
   <TermScope>
-    <AdminDeadlineContent />
+    <AdminDeadlineTermWrapper />
   </TermScope>
 );
+
+const AdminDeadlineTermWrapper: React.FC = () => {
+  const { selectedTermId } = useTerm();
+  return <AdminDeadlineContent key={selectedTermId ?? 'none'} />;
+};
 
 const AdminDeadlineContent: React.FC = () => {
   const { t } = useTranslation();

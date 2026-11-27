@@ -3,6 +3,7 @@ package com.fmaking.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -30,6 +31,10 @@ public interface SchoolClassRepository extends JpaRepository<SchoolClass, Intege
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sc FROM SchoolClass sc WHERE sc.id = :classId")
     Optional<SchoolClass> findByIdForUpdate(@Param("classId") Integer classId);
+
+    @Modifying
+    @Query("UPDATE SchoolClass sc SET sc.lecturerId = null WHERE sc.lecturerId IN :lecturerIds")
+    int clearLecturerByIds(@Param("lecturerIds") List<Long> lecturerIds);
 
     @Query(
         value = """

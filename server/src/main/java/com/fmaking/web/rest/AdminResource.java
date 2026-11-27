@@ -44,6 +44,7 @@ public class AdminResource {
         if (created.getActivationKey() != null && (request.getSendActivationEmail() == null || Boolean.TRUE.equals(request.getSendActivationEmail()))) {
             mailService.sendActivationEmail(created);
         }
+        created.setActivationKey(null);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 }

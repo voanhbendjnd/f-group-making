@@ -42,7 +42,7 @@ export const CreateGroupModal: React.FC<CreateGroupModalProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
       width="min(92vw, 520px)"
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>

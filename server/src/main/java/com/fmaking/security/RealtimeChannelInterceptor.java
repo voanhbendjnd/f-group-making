@@ -88,8 +88,14 @@ public class RealtimeChannelInterceptor implements ChannelInterceptor {
         return message;
     }
 
+    @org.springframework.context.event.EventListener
+    public void onSessionDisconnect(org.springframework.web.socket.messaging.SessionDisconnectEvent event) {
+        if (event.getSessionId() != null) {
+            sessions.remove(event.getSessionId());
+        }
+    }
+
     /** Stop delivering messages to already subscribed sockets after an admin changes their role. */
-    @Transactional(readOnly = true)
     public Message<?> authorizeOutbound(Message<?> message) {
         if (org.springframework.messaging.simp.SimpMessageHeaderAccessor.getMessageType(message.getHeaders())
                 != org.springframework.messaging.simp.SimpMessageType.MESSAGE) return message;

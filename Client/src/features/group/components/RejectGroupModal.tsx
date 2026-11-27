@@ -47,7 +47,7 @@ export const RejectGroupModal: React.FC<RejectGroupModalProps> = ({
       open={open}
       onCancel={onClose}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <p style={{ color: 'var(--color-text-muted, #64748b)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
         {t('groupWorkspace.rejectModal.description')}

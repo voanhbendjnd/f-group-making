@@ -76,7 +76,8 @@ apiClient.interceptors.response.use(
       const isAuthEndpoint =
         error.config?.url?.includes('/login') ||
         error.config?.url?.includes('/register') ||
-        error.config?.url?.includes('/activate');
+        error.config?.url?.includes('/activate') ||
+        error.config?.url?.includes('/account/reset-password');
 
       if (!isAuthEndpoint) {
         const authHeader = (error.config?.headers?.Authorization as string) || '';

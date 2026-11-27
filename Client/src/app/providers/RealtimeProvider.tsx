@@ -57,7 +57,8 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const classShareChanged = event.eventType === 'ZALO_SHARE_UPDATED'
           && Number.isSafeInteger(event.schoolClassId) && Number(event.schoolClassId) > 0;
-        if (!event.eventType || (!event.deadlineId && !classShareChanged)) return;
+        const allowWithoutDeadline = classShareChanged || event.eventType === 'STUDENT_BIO_UPDATED';
+        if (!event.eventType || (!event.deadlineId && !allowWithoutDeadline)) return;
         if (event.eventType.startsWith('DEADLINE_') && event.version !== undefined) {
           if (event.version < (receivedVersions.current.get(event.deadlineId) ?? -1)) return;
           receivedVersions.current.set(event.deadlineId, event.version);
@@ -75,7 +76,11 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } else {
           void syncDeadlineQueries(clientQueries, event);
         }
-        for (const value of entries.current.values()) value.listeners.forEach(listener => listener(event));
+        const uniqueListeners = new Set<Listener>();
+        for (const value of entries.current.values()) {
+          value.listeners.forEach(listener => uniqueListeners.add(listener));
+        }
+        uniqueListeners.forEach(listener => listener(event));
       } catch (error) { console.error('Invalid realtime message', error); }
     });
   }, [clientQueries]);
@@ -106,8 +111,9 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const activeEntries = entries.current;
     const seenEvents = seen.current;
     const deadlineVersions = receivedVersions.current;
+    const wsBase = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/$/, '');
     const client = new Client({
-      webSocketFactory: () => new SockJS('/ws'),
+      webSocketFactory: () => new SockJS(`${wsBase}/ws`),
       beforeConnect: () => { client.connectHeaders = { Authorization: `Bearer ${storage.getToken() ?? ''}` }; },
       reconnectDelay: 2000, heartbeatIncoming: 4000, heartbeatOutgoing: 4000,
       onConnect: () => {

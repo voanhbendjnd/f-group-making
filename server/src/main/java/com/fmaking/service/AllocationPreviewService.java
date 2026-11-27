@@ -11,8 +11,12 @@ import com.fmaking.service.dto.AllocationResultDTO.ReasonCode;
 import com.fmaking.service.projection.StudentRow;
 import com.fmaking.web.rest.errors.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -26,7 +30,6 @@ import java.util.stream.Collectors;
 import static com.fmaking.domain.GroupingRuleCode.*;
 
 @Service
-@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
 public class AllocationPreviewService {
     private final SchoolClassRepository classes;
     private final DeadlineRepository deadlines;
@@ -42,17 +45,23 @@ public class AllocationPreviewService {
     private final AllocationPreviewStore previewStore;
     private final GroupInvitationRepository invitations;
     private final SecureRandom seeds = new SecureRandom();
+    private final TransactionTemplate readTx;
 
     public AllocationPreviewService(SchoolClassRepository classes, DeadlineRepository deadlines, StudentRepository students,
             GroupRepository groups, GroupMemberRepository memberships, SchoolClassAccessService access,
             DeadlinePolicy deadlinePolicy, GroupRuleValidationService validator, GroupScoreService scores,
-            SmartAllocationService engine, ObjectMapper mapper, AllocationPreviewStore previewStore, GroupInvitationRepository invitations) {
+            SmartAllocationService engine, ObjectMapper mapper, AllocationPreviewStore previewStore,
+            GroupInvitationRepository invitations, PlatformTransactionManager txManager) {
         this.classes = classes; this.deadlines = deadlines; this.students = students; this.groups = groups;
         this.memberships = memberships; this.access = access; this.deadlinePolicy = deadlinePolicy;
         this.validator = validator; this.scores = scores; this.engine = engine; this.mapper = mapper; this.previewStore = previewStore;
         this.invitations = invitations;
+        this.readTx = new TransactionTemplate(txManager);
+        this.readTx.setReadOnly(true);
+        this.readTx.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Overview overview(Integer deadlineId, Integer classId) { return overview(load(deadlineId, classId)); }
 
     public static boolean isAllocationComplete(Overview overview) {
@@ -66,23 +75,32 @@ public class AllocationPreviewService {
     }
 
     public Setup setup(Integer deadlineId, Integer classId, Long requestedSeed) {
-        Loaded loaded = load(deadlineId, classId);
+        record SetupContext(Loaded loaded, Overview overview) {}
+        SetupContext ctx = readTx.execute(status -> {
+            Loaded loaded = load(deadlineId, classId);
+            return new SetupContext(loaded, overview(loaded));
+        });
         long seed = seed(requestedSeed);
-        Overview overview = overview(loaded);
         var limits = SmartAllocationService.SearchLimits.defaults();
-        return new Setup(loaded.scope(), loaded.fingerprint(), seed, overview.summary(), engine.preliminaryRange(loaded.snapshot()),
-            engine.suggest(loaded.snapshot(), seed), new SmartLimits(limits.maximumNodes(), limits.maximumDepth(), true), overview.warnings());
+        return new Setup(ctx.loaded().scope(), ctx.loaded().fingerprint(), seed, ctx.overview().summary(),
+            engine.preliminaryRange(ctx.loaded().snapshot()), engine.suggest(ctx.loaded().snapshot(), seed),
+            new SmartLimits(limits.maximumNodes(), limits.maximumDepth(), true), ctx.overview().warnings());
     }
 
-    @Transactional(isolation = Isolation.REPEATABLE_READ)
     public AllocationPreviewDTO preview(Integer deadlineId, Integer classId, AllocationPreviewRequest request) {
         if (request == null || request.targetGroupCount() == null || request.targetGroupCount() < 1)
             throw new BadRequestAlertException("Positive target required", "allocation", "invalidAllocationTarget");
-        Loaded loaded = load(deadlineId, classId);
-        access.requireWriteAccess(classes.findById(classId).orElseThrow());
+        record PreviewContext(Loaded loaded, Overview before) {}
+        PreviewContext ctx = readTx.execute(status -> {
+            Loaded loaded = load(deadlineId, classId);
+            access.requireWriteAccess(classes.findById(classId).orElseThrow());
+            Overview before = overview(loaded);
+            requireAllocationNeeded(before);
+            return new PreviewContext(loaded, before);
+        });
+        Loaded loaded = ctx.loaded();
+        Overview before = ctx.before();
         long seed = seed(request.seed());
-        Overview before = overview(loaded);
-        requireAllocationNeeded(before);
         var result = engine.allocate(loaded.snapshot(), request.targetGroupCount(), seed);
         boolean feasible = result.status() == AllocationResultDTO.Status.FEASIBLE;
         List<GroupView> proposed = feasible ? result.groups().stream().map(group -> {
@@ -104,11 +122,13 @@ public class AllocationPreviewService {
     }
 
     public record Captured(Overview overview, AllocationSnapshotDTO snapshot) {}
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Captured capture(Integer deadlineId, Integer classId) {
         Loaded loaded = load(deadlineId, classId);
         return new Captured(overview(loaded), loaded.snapshot());
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public Optional<Captured> captureForHistory(Integer deadlineId, Integer classId) {
         // Catch data conflicts inside this transactional boundary. Catching them in a calling service
         // after the proxy returns would mark its joined transaction rollback-only.

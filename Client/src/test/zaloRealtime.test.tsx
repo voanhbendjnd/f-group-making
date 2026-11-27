@@ -72,7 +72,7 @@ it('revalidates a realtime update without clearing cards, changing scope, or rec
   expect(zaloApi.mine).toHaveBeenCalledTimes(previousCalls + 1);
   await act(async () => finish([{ ...share, version: 1, title: 'Updated Zalo' }]));
   await screen.findByRole('heading', { name: 'Updated Zalo' });
-  expect(card).toBeInTheDocument(); expect(socket.activations).toBe(1); expect(socket.listeners.size).toBe(1);
+  expect(card).toBeInTheDocument(); expect(socket.activations).toBe(1); expect(socket.listeners.has('/topic/classes/2/deadlines')).toBe(true); expect(socket.listeners.size).toBe(2);
   view.unmount(); expect(socket.deactivations).toBe(1);
 });
 

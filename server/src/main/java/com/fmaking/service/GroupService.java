@@ -35,6 +35,7 @@ public class GroupService {
     private final GroupMemberHistoryRepository groupMemberHistoryRepository;
     private final GroupStatusHistoryRepository groupStatusHistoryRepository;
     private final GroupRuleOverrideRepository groupRuleOverrideRepository;
+    private final GroupInvitationRepository groupInvitationRepository;
     private final DeadlineRepository deadlineRepository;
     private final SchoolClassRepository schoolClassRepository;
     private final StudentRepository studentRepository;
@@ -52,6 +53,7 @@ public class GroupService {
                         GroupMemberHistoryRepository groupMemberHistoryRepository,
                         GroupStatusHistoryRepository groupStatusHistoryRepository,
                         GroupRuleOverrideRepository groupRuleOverrideRepository,
+                        GroupInvitationRepository groupInvitationRepository,
                         DeadlineRepository deadlineRepository,
                         SchoolClassRepository schoolClassRepository,
                         StudentRepository studentRepository,
@@ -66,6 +68,7 @@ public class GroupService {
         this.groupMemberHistoryRepository = groupMemberHistoryRepository;
         this.groupStatusHistoryRepository = groupStatusHistoryRepository;
         this.groupRuleOverrideRepository = groupRuleOverrideRepository;
+        this.groupInvitationRepository = groupInvitationRepository;
         this.deadlineRepository = deadlineRepository;
         this.schoolClassRepository = schoolClassRepository;
         this.studentRepository = studentRepository;
@@ -326,6 +329,7 @@ public class GroupService {
         leaderMember.setRole(GroupMemberRole.LEADER);
         leaderMember.setJoinedAt(Instant.now());
         groupMemberRepository.save(leaderMember);
+        cancelPendingInvitationsForStudent(studentId, classId, deadlineId);
 
         // Audit logs
         String actor = getCurrentUserLogin();
@@ -379,6 +383,7 @@ public class GroupService {
         member.setRole(GroupMemberRole.MEMBER);
         member.setJoinedAt(Instant.now());
         groupMemberRepository.save(member);
+        cancelPendingInvitationsForStudent(studentId, classId, deadlineId);
 
         String actor = getCurrentUserLogin();
         saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.JOINED, actor, "Tham gia nhóm trực tiếp");
@@ -414,6 +419,7 @@ public class GroupService {
                 GroupStatus previousStatus = group.getStatus();
                 group.setStatus(GroupStatus.DISBANDED);
                 groupRepository.save(group);
+                cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
                 compactGroupSequence(classId, deadlineId);
 
                 String actor = getCurrentUserLogin();
@@ -499,6 +505,7 @@ public class GroupService {
         group.setSubmittedRulesVersion(schoolClass.getRulesVersion());
         group.setRejectReason(null);
         groupRepository.save(group);
+        cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
 
         String actor = getCurrentUserLogin();
         saveStatusHistory(groupId, previousStatus, GroupStatus.PENDING, actor, "Leader nộp danh sách nhóm lên Giảng viên");
@@ -563,6 +570,7 @@ public class GroupService {
         GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
+        cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
         compactGroupSequence(classId, deadlineId);
 
         String actor = getCurrentUserLogin();
@@ -647,6 +655,7 @@ public class GroupService {
             member.setRole(i == 0 ? GroupMemberRole.LEADER : GroupMemberRole.MEMBER);
             member.setJoinedAt(Instant.now());
             groupMemberRepository.save(member);
+            cancelPendingInvitationsForStudent(sid, classId, deadlineId);
 
             saveMemberHistory(savedGroup.getId(), sid, deadlineId, GroupMemberAction.ASSIGNED_BY_LECTURER,
                 getCurrentUserLogin(), "Giảng viên phân công vào nhóm");
@@ -678,6 +687,7 @@ public class GroupService {
         group.setStatus(GroupStatus.ACCEPTED);
         group.setRejectReason(null);
         groupRepository.save(group);
+        cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
 
         String actor = getCurrentUserLogin();
         saveStatusHistory(groupId, GroupStatus.PENDING, GroupStatus.ACCEPTED, actor,
@@ -779,6 +789,7 @@ public class GroupService {
         member.setRole(GroupMemberRole.MEMBER);
         member.setJoinedAt(Instant.now());
         groupMemberRepository.save(member);
+        cancelPendingInvitationsForStudent(studentId, classId, deadlineId);
 
         String actor = getCurrentUserLogin();
         saveMemberHistory(groupId, studentId, deadlineId, GroupMemberAction.ASSIGNED_BY_LECTURER, actor, "Giảng viên thêm vào nhóm");
@@ -874,6 +885,7 @@ public class GroupService {
         GroupStatus previousStatus = group.getStatus();
         group.setStatus(GroupStatus.DISBANDED);
         groupRepository.save(group);
+        cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
         compactGroupSequence(classId, deadlineId);
 
         saveStatusHistory(groupId, previousStatus, GroupStatus.DISBANDED, actor, "Giảng viên giải tán nhóm");
@@ -883,6 +895,40 @@ public class GroupService {
     // ==========================================
     // 4. HELPER METHODS
     // ==========================================
+
+    private void cancelPendingInvitationsForGroup(Long groupId, Integer classId, Integer deadlineId) {
+        List<GroupInvitation> pending = groupInvitationRepository.findByGroupIdAndStatus(groupId, GroupInvitationStatus.PENDING).stream()
+                .filter(inv -> Objects.equals(inv.getSchoolClassId(), classId) && Objects.equals(inv.getDeadlineId(), deadlineId))
+                .toList();
+        if (pending.isEmpty()) return;
+        Instant now = Instant.now();
+        String actor = getCurrentUserLogin();
+        for (GroupInvitation inv : pending) {
+            inv.setStatus(GroupInvitationStatus.CANCELLED);
+            inv.setRespondedAt(now);
+        }
+        groupInvitationRepository.saveAll(pending);
+        for (GroupInvitation inv : pending) {
+            eventPublisher.publish("GROUP_INVITATION_CANCELLED", inv.getGroupId(), inv.getDeadlineId(), inv.getSchoolClassId(), actor, inv.getId());
+        }
+    }
+
+    private void cancelPendingInvitationsForStudent(Long studentId, Integer classId, Integer deadlineId) {
+        List<GroupInvitation> pending = groupInvitationRepository.findByStudentIdAndDeadlineIdAndStatus(studentId, deadlineId, GroupInvitationStatus.PENDING).stream()
+                .filter(inv -> Objects.equals(inv.getSchoolClassId(), classId) && Objects.equals(inv.getDeadlineId(), deadlineId))
+                .toList();
+        if (pending.isEmpty()) return;
+        Instant now = Instant.now();
+        String actor = getCurrentUserLogin();
+        for (GroupInvitation inv : pending) {
+            inv.setStatus(GroupInvitationStatus.CANCELLED);
+            inv.setRespondedAt(now);
+        }
+        groupInvitationRepository.saveAll(pending);
+        for (GroupInvitation inv : pending) {
+            eventPublisher.publish("GROUP_INVITATION_CANCELLED", inv.getGroupId(), inv.getDeadlineId(), inv.getSchoolClassId(), actor, inv.getId());
+        }
+    }
 
     private boolean wasApprovalRevoked(Group group) {
         return groupStatusHistoryRepository.existsByGroupIdAndToStatus(group.getId(), GroupStatus.REVOKED);
@@ -993,6 +1039,7 @@ public class GroupService {
         group.setSubmittedRulesVersion(schoolClassRepository.findById(classId).orElseThrow().getRulesVersion());
         group.setRejectReason(null);
         groupRepository.save(group);
+        cancelPendingInvitationsForGroup(groupId, classId, deadlineId);
         saveStatusHistory(groupId, previous, GroupStatus.PENDING, getCurrentUserLogin(),
             reviewAuditReason("Submitted for review by lecturer", evaluations));
         eventPublisher.publish("GROUP_SUBMITTED", groupId, deadlineId, classId, getCurrentUserLogin(), null);

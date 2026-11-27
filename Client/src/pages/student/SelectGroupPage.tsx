@@ -47,8 +47,14 @@ export const SelectGroupPage: React.FC = () => {
   const deadlineIdStr = searchParams.get('deadlineId');
   const classIdStr = searchParams.get('classId');
 
-  const deadlineId = deadlineIdStr ? parseInt(deadlineIdStr, 10) : null;
-  const classId = classIdStr ? parseInt(classIdStr, 10) : null;
+  const parsePositiveId = (raw: string | null): number | null => {
+    if (!raw || !/^\d+$/.test(raw.trim())) return null;
+    const parsed = Number(raw.trim());
+    return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const deadlineId = parsePositiveId(deadlineIdStr);
+  const classId = parsePositiveId(classIdStr);
 
   // Auto-resolve deadlineId and classId if accessed directly without query params
   const { data: myActivities, isLoading: isActivitiesLoading } = useQuery({
@@ -122,7 +128,9 @@ export const SelectGroupPage: React.FC = () => {
         setUnassignedDrawerOpen(false);
       }
       if (event.eventType === 'GROUP_INVITATION_SENT') {
-        refetchInvitations();
+        if (deadlineId && classId && !workspace?.myGroup && !workspace?.isLecturer) {
+          refetchInvitations();
+        }
         queryClient.invalidateQueries({ queryKey: ['group-invitations', deadlineId, classId] });
         const payload = event.payload as GroupInvitationDTO | undefined;
         if (payload && payload.studentId === user?.id) {
@@ -196,7 +204,9 @@ export const SelectGroupPage: React.FC = () => {
         queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
         queryClient.invalidateQueries({ queryKey: ['recommended-students', deadlineId, classId] });
         queryClient.invalidateQueries({ queryKey: ['group-invitations', deadlineId, classId] });
-        refetchInvitations();
+        if (deadlineId && classId && !workspace?.myGroup && !workspace?.isLecturer) {
+          refetchInvitations();
+        }
       }
     },
   });
@@ -278,6 +288,9 @@ export const SelectGroupPage: React.FC = () => {
     onSuccess: () => {
       message.success(t('studentGroup.messages.createSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['student-profile'] });
     },
     onError: (err: any) => {
       message.error(err.message || t('studentGroup.messages.createError'));
@@ -292,6 +305,9 @@ export const SelectGroupPage: React.FC = () => {
     onSuccess: () => {
       message.success(t('studentGroup.messages.joinSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['student-profile'] });
     },
     onError: (err: any) => {
       message.error(err.message || t('studentGroup.messages.joinError'));
@@ -304,6 +320,9 @@ export const SelectGroupPage: React.FC = () => {
     onSuccess: () => {
       message.success(t('studentGroup.messages.leaveSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['student-profile'] });
     },
     onError: (err: any) => {
       message.error(err.message || t('studentGroup.messages.leaveError'));
@@ -349,6 +368,9 @@ export const SelectGroupPage: React.FC = () => {
     onSuccess: () => {
       message.success(t('studentGroup.messages.disbandSuccess'));
       queryClient.invalidateQueries({ queryKey: ['group-workspace', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['recommended-groups', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['my-invitations', deadlineId, classId] });
+      queryClient.invalidateQueries({ queryKey: ['student-profile'] });
     },
     onError: (err: any) => {
       message.error(err.message || t('studentGroup.messages.disbandError'));

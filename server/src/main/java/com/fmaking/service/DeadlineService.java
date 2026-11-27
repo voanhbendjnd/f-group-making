@@ -354,6 +354,8 @@ public class DeadlineService {
                 if (!isStudentClassInDeadline) {
                     throw new ForbiddenAlertException("You cannot view this deadline", "deadline", "accessDenied");
                 }
+            } else {
+                throw new ForbiddenAlertException("You cannot view this deadline", "deadline", "accessDenied");
             }
         }
 

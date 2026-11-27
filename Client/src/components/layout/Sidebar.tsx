@@ -126,17 +126,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
             width: '38px',
             height: '38px',
             borderRadius: 'var(--radius-md)',
-            backgroundColor: 'var(--color-primary)',
-            color: '#ffffff',
+            backgroundColor: '#ffffff',
+            border: '1px solid var(--color-primary-light)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: '1.125rem',
-            boxShadow: '0 2px 8px rgba(29, 78, 216, 0.35)',
+            padding: '3px',
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(29, 78, 216, 0.16)',
           }}
         >
-          F
+          <img
+            src="/logo.png"
+            alt={t('common.systemBrand')}
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+          />
         </div>
         <div>
           <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--color-text-main)', letterSpacing: '-0.01em' }}>

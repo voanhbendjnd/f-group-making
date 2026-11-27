@@ -50,7 +50,7 @@ public class NotificationAsyncService {
         }
     }
 
-    @Async
+    @Async("notificationMailActivatedAccount")
     public void sendDeadlineNotificationBatch(com.fmaking.domain.Deadline deadline, List<com.fmaking.service.dto.StudentDeadlineRow> students) {
         if (students == null || students.isEmpty() || deadline == null) {
             return;
